@@ -10,6 +10,14 @@ out/
 # claude code
 .claude/
 
+# local development / private notes
+context.md
+memory.md
+skills.md
+CLAUDE.md
+Read-Prompt.txt
+gh
+
 # production
 build/
 
