@@ -182,41 +182,28 @@ async function overseerr(): Promise<ServiceResult> {
 
 async function pihole(): Promise<ServiceResult> {
   const BASE = `http://${TRUENAS_IP}:20720`;
+  const password = process.env.PIHOLE_PASSWORD || "***REMOVED***";
 
-  async function getStats(token: string): Promise<ServiceResult> {
+  try {
+    // Pi-hole v6: POST password → receive JWT → fetch stats
+    const authRes = await fetch(`${BASE}/api/auth`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password }),
+      signal: AbortSignal.timeout(5000),
+      next: { revalidate: 0 },
+    });
+    if (!authRes.ok) throw new Error(`auth HTTP ${authRes.status}`);
+    const authJson = await authRes.json() as { session?: { token?: string }; token?: string };
+    const token = authJson.session?.token ?? authJson.token;
+    if (!token) throw new Error("no token in auth response");
+
     const data = await apiFetch(`${BASE}/api/stats/summary`, { Authorization: `Bearer ${token}` }) as {
       queries?: { total?: number; percent_blocked?: number };
     };
     const total   = data.queries?.total ?? 0;
     const blocked = (data.queries?.percent_blocked ?? 0).toFixed(1);
     return { name: "pihole", up: true, lines: [`${total.toLocaleString()} queries · ${blocked}% blocked`] };
-  }
-
-  // If a password is supplied, do the v6 two-step login to get a fresh token
-  const password = process.env.PIHOLE_PASSWORD;
-  if (password) {
-    try {
-      const authRes = await fetch(`${BASE}/api/auth`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password }),
-        signal: AbortSignal.timeout(5000),
-        next: { revalidate: 0 },
-      });
-      if (!authRes.ok) throw new Error(`auth HTTP ${authRes.status}`);
-      const authJson = await authRes.json() as { session?: { token?: string }; token?: string };
-      const token = authJson.session?.token ?? authJson.token;
-      if (!token) throw new Error("no token in auth response");
-      return await getStats(token);
-    } catch {
-      const up = await checkReachable(BASE);
-      return { name: "pihole", up, lines: up ? ["—"] : [] };
-    }
-  }
-
-  // Fallback: use static Bearer token (Pi-hole v5 or pre-configured v6 token)
-  try {
-    return await getStats("***REMOVED***");
   } catch {
     const up = await checkReachable(BASE);
     return { name: "pihole", up, lines: up ? ["—"] : [] };
