@@ -72,20 +72,31 @@ async function sonarr(): Promise<ServiceResult> {
 }
 
 async function bazarr(): Promise<ServiceResult> {
-  // Bazarr response: { data: { total: N, ... } } — total lives inside the data object
+  const KEY = "***REMOVED***";
+  const BASE_URL = `http://${TRUENAS_IP}:30046`;
   type BazarrResp = { data?: { total?: number } | unknown[]; total?: number };
   const getTotal = (r: BazarrResp) =>
     (r.data as { total?: number } | undefined)?.total ?? r.total ?? 0;
+
+  // Try endpoint, first without version prefix then with /v1/
+  async function fetchWanted(resource: string): Promise<BazarrResp> {
+    try {
+      return await apiFetch(`${BASE_URL}/api/${resource}?start=0&length=1`, { "X-API-KEY": KEY }) as BazarrResp;
+    } catch {
+      return await apiFetch(`${BASE_URL}/api/v1/${resource}?start=0&length=1`, { "X-API-KEY": KEY }) as BazarrResp;
+    }
+  }
+
   try {
     const [epData, mvData] = await Promise.all([
-      apiFetch(`http://${TRUENAS_IP}:30046/api/episodes/wanted?apiKey=***REMOVED***&start=0&length=1`) as Promise<BazarrResp>,
-      apiFetch(`http://${TRUENAS_IP}:30046/api/movies/wanted?apiKey=***REMOVED***&start=0&length=1`) as Promise<BazarrResp>,
+      fetchWanted("episodes/wanted"),
+      fetchWanted("movies/wanted"),
     ]);
     const epMissing = getTotal(epData);
     const mvMissing = getTotal(mvData);
     return { name: "bazarr", up: true, lines: [`${epMissing} ep subs · ${mvMissing} movie subs`] };
   } catch {
-    const up = await checkReachable(`http://${TRUENAS_IP}:30046`);
+    const up = await checkReachable(BASE_URL);
     return { name: "bazarr", up, lines: up ? ["—"] : [] };
   }
 }
@@ -135,7 +146,7 @@ async function qbittorrent(): Promise<ServiceResult> {
       const loginRes = await fetch(`${BASE}/api/v2/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: "username=admin&password=admin",
+        body: "username=admin&password=***REMOVED***",
         signal: AbortSignal.timeout(5000),
         next: { revalidate: 0 },
       });
@@ -170,19 +181,44 @@ async function overseerr(): Promise<ServiceResult> {
 }
 
 async function pihole(): Promise<ServiceResult> {
-  try {
-    const data = await apiFetch(
-      `http://${TRUENAS_IP}:20720/api/stats/summary`,
-      { Authorization: "Bearer ***REMOVED***" }
-    ) as {
+  const BASE = `http://${TRUENAS_IP}:20720`;
+
+  async function getStats(token: string): Promise<ServiceResult> {
+    const data = await apiFetch(`${BASE}/api/stats/summary`, { Authorization: `Bearer ${token}` }) as {
       queries?: { total?: number; percent_blocked?: number };
-      gravity?: { domains_being_blocked?: number };
     };
-    const total    = data.queries?.total ?? 0;
-    const blocked  = (data.queries?.percent_blocked ?? 0).toFixed(1);
+    const total   = data.queries?.total ?? 0;
+    const blocked = (data.queries?.percent_blocked ?? 0).toFixed(1);
     return { name: "pihole", up: true, lines: [`${total.toLocaleString()} queries · ${blocked}% blocked`] };
+  }
+
+  // If a password is supplied, do the v6 two-step login to get a fresh token
+  const password = process.env.PIHOLE_PASSWORD;
+  if (password) {
+    try {
+      const authRes = await fetch(`${BASE}/api/auth`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+        signal: AbortSignal.timeout(5000),
+        next: { revalidate: 0 },
+      });
+      if (!authRes.ok) throw new Error(`auth HTTP ${authRes.status}`);
+      const authJson = await authRes.json() as { session?: { token?: string }; token?: string };
+      const token = authJson.session?.token ?? authJson.token;
+      if (!token) throw new Error("no token in auth response");
+      return await getStats(token);
+    } catch {
+      const up = await checkReachable(BASE);
+      return { name: "pihole", up, lines: up ? ["—"] : [] };
+    }
+  }
+
+  // Fallback: use static Bearer token (Pi-hole v5 or pre-configured v6 token)
+  try {
+    return await getStats("***REMOVED***");
   } catch {
-    const up = await checkReachable(`http://${TRUENAS_IP}:20720`);
+    const up = await checkReachable(BASE);
     return { name: "pihole", up, lines: up ? ["—"] : [] };
   }
 }

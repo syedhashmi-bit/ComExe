@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 
-// base64 of "monitor-only:L03m1Tv0@3"
-const AUTH = "Basic bW9uaXRvci1vbmx5OkwwM20xVHYwQDM=";
+const AUTH = `Basic ${Buffer.from("monitor-only:***REMOVED***").toString("base64")}`;
 
 export async function GET() {
   try {
