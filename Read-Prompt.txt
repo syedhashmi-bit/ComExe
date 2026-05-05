@@ -1,0 +1,229 @@
+Read CLAUDE.md and full codebase first. This is a comprehensive 
+polish and fix pass. Do not break any working data fetching.
+
+=== CRITICAL FIXES FIRST ===
+
+1. LAYOUT - Grid is broken:
+- Row 1 should be: CPU, Memory, Filesystems (3 equal columns)
+- Row 2 should be: Network, GPU, (empty or system info) (3 equal columns)
+- Currently cards are misaligned and different sizes
+- All cards in same row must be identical height
+- Remove the orphaned SYSTEM card - merge its info into a small 
+  section inside another card or add to header as tooltip
+
+2. SPEEDTEST - Bar chart only showing 1 bar:
+- Fetch GET http://192.168.88.196:30220/api/v1/results?take=20
+- Log raw API response to console to see actual data shape
+- The chart must show ALL 20 results as grouped bars
+- If API returns {data: [...]} unwrap it, if returns array use directly
+- Each result needs: download speed, upload speed, timestamp
+- X axis: format timestamp as "HH:MM" 
+- Y axis: 0 to max speed in Mbps
+- Cyan bars = download, Orange bars = upload, side by side per test
+- Do NOT trigger any speedtest runs, display only
+
+3. SERVICES - Pihole, Bazarr, qBittorrent showing "—":
+- These are CORS failures. Fix with try/catch, show "—" for stats
+  but keep green dot if server responds to no-cors ping
+- Pihole specifically: try both with and without trailing slash
+  http://192.168.88.196:20720/api/stats/summary
+  Add header: Authorization: Bearer ***REMOVED***
+
+4. MIKROTIK BAR - Shows "Click to open" only:
+- CORS is blocking the fetch, which is expected
+- Make the static fallback much more informative and beautiful:
+  Show: [router icon] MikroTik · 192.168.88.1 · 
+  RouterOS 7.22.1 · hAP ax³ · Tap to open
+  Hardcode the known values as fallback since CORS will always block
+  Make the entire bar clickable → opens http://192.168.88.1 in new tab
+  Style it as a proper info bar not just a link
+
+=== OVERALL AESTHETIC ===
+- Page background: #0a0c12 with subtle radial gradient at top:
+  radial-gradient(ellipse at 50% 0%, rgba(30,40,80,0.35) 0%, transparent 65%)
+- Import Inter font from Google Fonts for all UI text
+- Keep monospace font (font-mono) for metric numbers only
+
+=== HEADER ===
+- Frosted glass: background rgba(10,12,20,0.9), backdrop-filter blur(12px)
+- Sticky at top, z-index 100
+- Border-bottom: 1px solid rgba(255,255,255,0.07)
+- Logo: "home" white + "lab" cyan, monospace, 18px
+- Uptime pill: [clock icon] 20h 2m · May 3 · 00:15
+  same pill style as truenas pill
+- Weather: temp + condition clearly readable
+- Right side: date on top line muted, time below larger white
+- All pills: background rgba(255,255,255,0.08), 
+  border 1px solid rgba(255,255,255,0.12),
+  border-radius 6px, padding 3px 10px, font-size 11px
+  hover: background rgba(255,255,255,0.13)
+
+=== SEARCH BAR ===
+- Already exists, improve styling:
+- background: rgba(255,255,255,0.05)
+- border: 1px solid rgba(255,255,255,0.12)
+- border-radius: 999px (full pill)
+- backdrop-filter: blur(8px)
+- On focus: border rgba(6,182,212,0.5), 
+  box-shadow: 0 0 0 3px rgba(6,182,212,0.15)
+- Google G: use colored inline SVG
+- Smooth scale(1.01) on focus
+- Press G key anywhere to focus it (when not typing elsewhere)
+
+=== MIKROTIK BAR ===
+- background: rgba(15,18,30,0.9)
+- border: 1px solid rgba(255,255,255,0.08)
+- border-radius: 10px
+- padding: 12px 20px
+- Show these stats hardcoded as fallback (known values):
+  [router SVG] MikroTik hAP ax³  |  RouterOS 7.22.1  |  
+  192.168.88.1  |  CPU: —  |  RAM: —  |  Uptime: 13d 4h
+- Try fetching live data, if succeeds replace — with real values
+- Each stat: label rgba(255,255,255,0.4) + value rgba(255,255,255,0.85)
+- Separated by | dividers rgba(255,255,255,0.12)
+- Entire bar clickable → http://192.168.88.1 new tab
+- Refresh every 30 seconds
+
+=== STATUS BAR ===
+- HEALTHY: 2px solid cyan line at very top of viewport only, no banner
+- WARNING: 36px amber banner, left-aligned icon + specific message
+- CRITICAL: full 48px red banner
+
+=== CARDS ===
+- background: rgba(255,255,255,0.04)
+- border: 1px solid rgba(255,255,255,0.08)
+- backdrop-filter: blur(6px)
+- border-radius: 14px
+- padding: 18px
+- Hover: border rgba(255,255,255,0.15), translateY(-2px), 
+  transition all 0.2s ease
+- Top accent border 2px:
+  CPU: #06b6d4, Memory: #10b981, Filesystems: #f59e0b
+  Network: #3b82f6, GPU: #ef4444, Speedtest: #8b5cf6
+- Card label: 10px, uppercase, letter-spacing 0.12em, 
+  color rgba(255,255,255,0.45)
+- Main number: 32px, font-weight 600, color #ffffff, 
+  font-variant-numeric: tabular-nums
+- Secondary text: rgba(255,255,255,0.55), 12px
+- Progress bar track: rgba(255,255,255,0.08), height 5px, radius 999px
+- Progress bar fill: use linear-gradient matching card accent color
+
+=== CPU CARD ===
+- Main: X.X% in large white monospace
+- Sparkline: 36px tall, gradient fill below line, cyan color
+- Below sparkline: "utilization X.X%" in muted text
+- Add: CPU cores count in small badge, frequency if available
+
+=== MEMORY CARD ===
+- Donut: animated on load, smooth update transitions
+- Center of donut: show % in white bold
+- Legend: colored squares, labels, values all on same row
+- USED bar: gradient red, ZFS CACHE bar: dark gray, FREE: dark green
+- Fix WARNING: use real_used = MemTotal - MemAvailable - SReclaimable
+  Only warn if real_used/MemTotal > 85%
+
+=== FILESYSTEMS CARD ===
+- Donut: largest filesystem, smooth animation
+- List: % on right side, color coded green/amber/red
+- Long paths: truncate with "..." show full on hover tooltip
+- Scroll if more than 4 items
+
+=== NETWORK CARD ===
+- Interface name in small badge: "enp4s0"
+- RX: bright blue line, TX: amber line, both taller sparklines (36px)
+- Current speed as large number above sparkline
+- Total transferred: small muted text below each
+
+=== GPU CARD ===
+- GPU name "NVIDIA GeForce GTX 1660 SUPER" in small cyan text below label
+- Main: 0.0% large white + temperature top right in green/amber/red
+- SVG arc ring around the % number that fills based on utilization
+- VRAM bar: gradient purple fill
+- Power bar: gradient orange fill  
+- Temp sparkline: keep existing
+
+=== SPEEDTEST CARD ===
+- Full width (3 columns), height ~200px
+- LEFT PANEL (30% width):
+  - "EXCELLENT" or rating badge in green (921 Mbps qualifies)
+  - 921 in huge cyan monospace + "Mbps ↓" 
+  - 44 in large orange + "Mbps ↑"
+  - 1ms in green + "ping"
+  - ISP name if available from API
+  - "last tested: Xm ago"
+  - "display only · SpeedTracker manages tests"
+- RIGHT PANEL (70% width):
+  - Grouped bar chart, last 20 results
+  - Cyan bars download, orange bars upload
+  - Fix to show ALL results not just 1
+  - Gridlines: rgba(255,255,255,0.05)
+  - Hover tooltip: download/upload/ping/time
+  - Legend top right: cyan square Download, orange square Upload
+
+=== SERVICES SECTION ===
+- Full width below main grid
+- Header: "SERVICES" + "X / Y online" badge in green
+- 5-column grid (first row), 4-column (second row) or auto-fit
+- Each widget:
+  background: rgba(255,255,255,0.03)
+  border: 1px solid rgba(255,255,255,0.07)
+  border-radius: 12px, padding: 14px
+  min-height: 100px
+  hover: border rgba(255,255,255,0.15), translateY(-2px)
+- Icon: 32px, rounded 6px
+- Name: white, 13px, font-weight 600
+- Status dot: 6px, pulse animation when green
+- Stats: rgba(255,255,255,0.55), 11px, line-height 1.6
+- Click → opens service URL in new tab with press effect scale(0.97)
+
+PIHOLE widget specifically:
+- Show: queries today (large), blocked count, blocked %, gravity domains
+- Try: GET http://192.168.88.196:20720/api/stats/summary
+  with header Authorization: Bearer ***REMOVED***
+- If fails show "—" but green dot
+
+RADARR: X movies · X missing · progress bar X% complete
+SONARR: X series · X missing eps
+BAZARR: X missing subs (amber if > 0)
+TAUTULLI: X streams or "No streams"
+QBITTORRENT: X down · X seeding
+OVERSEERR: X pending (amber) · X approved
+PROWLARR: X grabs · X queries · X indexers
+NGINX: X enabled · X disabled · list domain names
+
+=== BOOKMARKS ===
+- Section: full width, background rgba(255,255,255,0.02)
+- border-radius: 14px, padding: 20px 24px
+- "BOOKMARKS" header: uppercase, letter-spacing 0.15em,
+  rgba(255,255,255,0.35), with colored accent dot per column
+- 4 columns equal width
+- Column header: has bottom border rgba(255,255,255,0.08), 
+  margin-bottom 8px
+- Each item: height 36px, display flex, align-items center, gap 10px
+  border-radius 8px, padding 0 8px
+  hover: background rgba(255,255,255,0.06), translateX(4px),
+  transition 0.15s ease
+- Icon: 18x18, border-radius 4px
+- Name: 13px, rgba(255,255,255,0.8)
+- All links open in new tab
+
+=== ANIMATIONS ===
+- Cards fade+slide in on load with staggered delay (50ms per card)
+- Number updates: opacity briefly 0.4 → 1 on change
+- Live dot: brief pulse on each data refresh cycle
+- Service status dots: continuous subtle pulse when green
+
+=== KEYBOARD SHORTCUTS ===
+- R: force refresh all data
+- G: focus search bar
+- Escape: blur search / close modals
+- H: toggle bookmark section visibility
+
+=== FOOTER ===
+- background: transparent
+- border-top: 1px solid rgba(255,255,255,0.06)
+- padding: 12px 20px
+- Left: "built with Claude Code" · small orange C badge
+- Center: "tracking X metrics across Y services"
+- Right: Prometheus link clickable
+- All text: rgba(255,255,255,0.25), 11px
