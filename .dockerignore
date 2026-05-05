@@ -1,8 +1,23 @@
+# build artifacts
 .next
 node_modules
 npm-debug.log
+tsconfig.tsbuildinfo
+
+# version control
 .git
 .gitignore
-README.md
+
+# docker meta
 Dockerfile
 .dockerignore
+
+# local dev / private notes
+*.md
+.env*
+.claude
+context.md
+memory.md
+skills.md
+Read-Prompt.txt
+gh
