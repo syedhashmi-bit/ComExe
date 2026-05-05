@@ -72,9 +72,10 @@ async function sonarr(): Promise<ServiceResult> {
 }
 
 async function bazarr(): Promise<ServiceResult> {
-  // Bazarr response: { data: [...], total: N } — total is top-level, not inside data
-  type BazarrResp = { total?: number; data?: { total?: number } | unknown[] };
-  const getTotal = (r: BazarrResp) => r.total ?? (r.data as { total?: number } | undefined)?.total ?? 0;
+  // Bazarr response: { data: { total: N, ... } } — total lives inside the data object
+  type BazarrResp = { data?: { total?: number } | unknown[]; total?: number };
+  const getTotal = (r: BazarrResp) =>
+    (r.data as { total?: number } | undefined)?.total ?? r.total ?? 0;
   try {
     const [epData, mvData] = await Promise.all([
       apiFetch(`http://${TRUENAS_IP}:30046/api/episodes/wanted?apiKey=***REMOVED***&start=0&length=1`) as Promise<BazarrResp>,
@@ -202,19 +203,36 @@ async function prowlarr(): Promise<ServiceResult> {
 }
 
 async function uptimeKuma(): Promise<ServiceResult> {
-  try {
-    const data = await apiFetch(
-      `http://${TRUENAS_IP}:31050/api/status-page/services`,
-      { Authorization: "Bearer ***REMOVED***" }
-    ) as { monitors?: { status?: number }[] };
-    const monitors  = data.monitors ?? [];
+  const BASE = `http://${TRUENAS_IP}:31050`;
+  const AUTH = { Authorization: "Bearer ***REMOVED***" };
+
+  function parseMonitors(data: unknown): ServiceResult {
+    const obj = data as { monitors?: { status?: number }[]; heartbeatList?: Record<string, { status?: number }[]> };
+    let monitors: { status?: number }[] = [];
+    if (Array.isArray(obj.monitors)) {
+      monitors = obj.monitors;
+    } else if (obj.heartbeatList) {
+      // /heartbeat endpoint returns { heartbeatList: { monitorId: [beats] } }
+      monitors = Object.values(obj.heartbeatList).map(beats => beats[beats.length - 1] ?? {});
+    }
     const upCount   = monitors.filter(m => m.status === 1).length;
     const downCount = monitors.filter(m => m.status === 0).length;
     const line      = downCount > 0 ? `${upCount} up · ${downCount} down` : `${upCount} sites up`;
     return { name: "uptimekuma", up: true, lines: [line], downCount };
+  }
+
+  try {
+    const data = await apiFetch(`${BASE}/api/status-page/services`, AUTH);
+    return parseMonitors(data);
   } catch {
-    const up = await checkReachable(`http://${TRUENAS_IP}:31050`);
-    return { name: "uptimekuma", up, lines: up ? ["—"] : [] };
+    try {
+      // Fallback endpoint some Uptime Kuma versions expose
+      const data = await apiFetch(`${BASE}/api/status-page/heartbeat/services`, AUTH);
+      return parseMonitors(data);
+    } catch {
+      const up = await checkReachable(BASE);
+      return { name: "uptimekuma", up, lines: up ? ["—"] : [] };
+    }
   }
 }
 
