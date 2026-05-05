@@ -72,13 +72,16 @@ async function sonarr(): Promise<ServiceResult> {
 }
 
 async function bazarr(): Promise<ServiceResult> {
+  // Bazarr response: { data: [...], total: N } — total is top-level, not inside data
+  type BazarrResp = { total?: number; data?: { total?: number } | unknown[] };
+  const getTotal = (r: BazarrResp) => r.total ?? (r.data as { total?: number } | undefined)?.total ?? 0;
   try {
     const [epData, mvData] = await Promise.all([
-      apiFetch(`http://${TRUENAS_IP}:30046/api/episodes/wanted?apiKey=***REMOVED***&start=0&length=1`) as Promise<{ data: { total: number } }>,
-      apiFetch(`http://${TRUENAS_IP}:30046/api/movies/wanted?apiKey=***REMOVED***&start=0&length=1`) as Promise<{ data: { total: number } }>,
+      apiFetch(`http://${TRUENAS_IP}:30046/api/episodes/wanted?apiKey=***REMOVED***&start=0&length=1`) as Promise<BazarrResp>,
+      apiFetch(`http://${TRUENAS_IP}:30046/api/movies/wanted?apiKey=***REMOVED***&start=0&length=1`) as Promise<BazarrResp>,
     ]);
-    const epMissing = epData?.data?.total ?? 0;
-    const mvMissing = mvData?.data?.total ?? 0;
+    const epMissing = getTotal(epData);
+    const mvMissing = getTotal(mvData);
     return { name: "bazarr", up: true, lines: [`${epMissing} ep subs · ${mvMissing} movie subs`] };
   } catch {
     const up = await checkReachable(`http://${TRUENAS_IP}:30046`);
@@ -100,23 +103,48 @@ async function tautulli(): Promise<ServiceResult> {
 }
 
 async function qbittorrent(): Promise<ServiceResult> {
-  try {
-    const data = await apiFetch(`http://${TRUENAS_IP}:30024/api/v2/torrents/info`) as { state: string; dlspeed?: number; size?: number }[];
-    const total      = data.length;
-    const dlStates   = new Set(["downloading", "stalledDL", "checkingDL", "pausedDL", "forcedDL", "metaDL"]);
-    const seedStates = new Set(["uploading", "stalledUP", "checkingUP", "pausedUP", "forcedUP", "seeding"]);
-    const downloading = data.filter(t => dlStates.has(t.state)).length;
-    const seeding     = data.filter(t => seedStates.has(t.state)).length;
-    const totalSize   = data.reduce((s, t) => s + (t.size ?? 0), 0);
+  const BASE = `http://${TRUENAS_IP}:30024`;
+  const dlStates   = new Set(["downloading", "stalledDL", "checkingDL", "pausedDL", "forcedDL", "metaDL"]);
+  const seedStates = new Set(["uploading", "stalledUP", "checkingUP", "pausedUP", "forcedUP", "seeding"]);
+
+  async function fetchTorrents(cookie?: string) {
+    const headers: Record<string, string> = {};
+    if (cookie) headers["Cookie"] = cookie;
+    return await apiFetch(`${BASE}/api/v2/torrents/info`, headers) as { state: string; dlspeed?: number; size?: number }[];
+  }
+
+  function buildResult(data: { state: string; dlspeed?: number; size?: number }[]): ServiceResult {
+    const total        = data.length;
+    const downloading  = data.filter(t => dlStates.has(t.state)).length;
+    const seeding      = data.filter(t => seedStates.has(t.state)).length;
+    const totalSize    = data.reduce((s, t) => s + (t.size ?? 0), 0);
     const totalDlSpeed = data.reduce((s, t) => s + (t.dlspeed ?? 0), 0);
     const lines = [`${total} total · ${downloading} dl · ${seeding} seed`];
     if (totalSize > 0) lines.push(`${fmtMB(totalSize)} total`);
     if (totalDlSpeed > 0) lines.push(`${fmtMB(totalDlSpeed)}/s`);
     return { name: "qbittorrent", up: true, lines };
+  }
+
+  try {
+    // Try unauthenticated first (works when bypass-auth-for-localhost is enabled)
+    return buildResult(await fetchTorrents());
   } catch {
-    // qBittorrent may require auth cookie; check if server responds at all
-    const up = await checkReachable(`http://${TRUENAS_IP}:30024/api/v2/app/version`);
-    return { name: "qbittorrent", up, lines: up ? ["—"] : [] };
+    try {
+      // Fall back to login with credentials
+      const loginRes = await fetch(`${BASE}/api/v2/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: "username=admin&password=admin",
+        signal: AbortSignal.timeout(5000),
+        next: { revalidate: 0 },
+      });
+      const sid = loginRes.headers.get("set-cookie")?.split(";")[0];
+      if (sid) return buildResult(await fetchTorrents(sid));
+      throw new Error("login failed");
+    } catch {
+      const up = await checkReachable(`${BASE}/api/v2/app/version`);
+      return { name: "qbittorrent", up, lines: up ? ["—"] : [] };
+    }
   }
 }
 
