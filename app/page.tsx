@@ -1326,8 +1326,9 @@ interface MtData {
   board: string | null;
   version: string | null;
   cpu: number | null;
-  memUsed: number | null;
-  memTotal: number | null;
+  ramUsed: string | null;
+  ramTotal: string | null;
+  ramPct: number | null;
   hddUsed: number | null;
   hddTotal: number | null;
   uptime: string | null;
@@ -1349,8 +1350,9 @@ function MikrotikTab() {
           board:    d.board,
           version:  d.version,
           cpu:      d.cpu,
-          memUsed:  d.memUsed,
-          memTotal: d.memTotal,
+          ramUsed:  d.ramUsed,
+          ramTotal: d.ramTotal,
+          ramPct:   d.ramPct,
           hddUsed:  d.hddUsed,
           hddTotal: d.hddTotal,
           uptime:   d.uptime,
@@ -1438,7 +1440,7 @@ function MikrotikTab() {
   }
 
   const cpuPct = data.cpu ?? 0;
-  const memPct = data.memTotal && data.memUsed ? (data.memUsed / data.memTotal) * 100 : 0;
+  const memPct = data.ramPct ?? 0;
   const hddPct = data.hddTotal && data.hddUsed ? (data.hddUsed / data.hddTotal) * 100 : 0;
 
   return (
@@ -1466,7 +1468,7 @@ function MikrotikTab() {
       {data.board && pill("Model", data.board)}
       {data.version && <>{sep()}{pill("RouterOS", data.version)}</>}
       {data.cpu != null && <>{sep()}{pill("CPU", `${data.cpu}%`, cpuPct)}</>}
-      {data.memTotal != null && <>{sep()}{pill("RAM", `${fmtMtBytes(data.memUsed)} / ${fmtMtBytes(data.memTotal)}`, memPct)}</>}
+      {data.ramTotal != null && <>{sep()}{pill("RAM", `${data.ramUsed ?? "—"} / ${data.ramTotal}`, memPct)}</>}
       {data.hddTotal != null && <>{sep()}{pill("Storage", `${fmtMtBytes(data.hddUsed)} / ${fmtMtBytes(data.hddTotal)}`, hddPct)}</>}
       {data.uptime && <>{sep()}{pill("Uptime", data.uptime)}</>}
       {data.temp != null && <>{sep()}{pill("Temp", `${data.temp}°C`, undefined, data.temp)}</>}

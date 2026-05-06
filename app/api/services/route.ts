@@ -78,13 +78,20 @@ async function bazarr(): Promise<ServiceResult> {
   const getTotal = (r: BazarrResp) =>
     (r.data as { total?: number } | undefined)?.total ?? r.total ?? 0;
 
-  // Try endpoint, first without version prefix then with /v1/
+  // Try three auth formats in order until one succeeds
   async function fetchWanted(resource: string): Promise<BazarrResp> {
-    try {
-      return await apiFetch(`${BASE_URL}/api/${resource}?start=0&length=1`, { "X-API-KEY": KEY }) as BazarrResp;
-    } catch {
-      return await apiFetch(`${BASE_URL}/api/v1/${resource}?start=0&length=1`, { "X-API-KEY": KEY }) as BazarrResp;
+    const url  = `${BASE_URL}/api/${resource}?start=0&length=1`;
+    const urlV1 = `${BASE_URL}/api/v1/${resource}?start=0&length=1`;
+    const attempts: Array<() => Promise<BazarrResp>> = [
+      () => apiFetch(url,   { "X-API-KEY": KEY }) as Promise<BazarrResp>,
+      () => apiFetch(url,   { "api-key":   KEY }) as Promise<BazarrResp>,
+      () => apiFetch(`${url}&apikey=${KEY}`)       as Promise<BazarrResp>,
+      () => apiFetch(urlV1, { "X-API-KEY": KEY }) as Promise<BazarrResp>,
+    ];
+    for (const attempt of attempts) {
+      try { return await attempt(); } catch { /* try next */ }
     }
+    throw new Error("all Bazarr auth formats failed");
   }
 
   try {
@@ -138,25 +145,21 @@ async function qbittorrent(): Promise<ServiceResult> {
   }
 
   try {
-    // Try unauthenticated first (works when bypass-auth-for-localhost is enabled)
-    return buildResult(await fetchTorrents());
+    // Always login — qBittorrent requires session cookie auth
+    const loginRes = await fetch(`${BASE}/api/v2/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: "username=admin&password=***REMOVED***",
+      signal: AbortSignal.timeout(5000),
+      next: { revalidate: 0 },
+    });
+    const setCookie = loginRes.headers.get("set-cookie") ?? "";
+    const sid = setCookie.split(";").map(p => p.trim()).find(p => p.startsWith("SID="));
+    if (!sid) throw new Error("no SID cookie in login response");
+    return buildResult(await fetchTorrents(sid));
   } catch {
-    try {
-      // Fall back to login with credentials
-      const loginRes = await fetch(`${BASE}/api/v2/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: "username=admin&password=***REMOVED***",
-        signal: AbortSignal.timeout(5000),
-        next: { revalidate: 0 },
-      });
-      const sid = loginRes.headers.get("set-cookie")?.split(";")[0];
-      if (sid) return buildResult(await fetchTorrents(sid));
-      throw new Error("login failed");
-    } catch {
-      const up = await checkReachable(`${BASE}/api/v2/app/version`);
-      return { name: "qbittorrent", up, lines: up ? ["—"] : [] };
-    }
+    const up = await checkReachable(`${BASE}/api/v2/app/version`);
+    return { name: "qbittorrent", up, lines: up ? ["—"] : [] };
   }
 }
 
@@ -180,12 +183,16 @@ async function overseerr(): Promise<ServiceResult> {
   }
 }
 
+let piholeToken: string | null = null;
+let piholeTokenExpiry = 0;
+
 async function pihole(): Promise<ServiceResult> {
   const BASE = `http://${TRUENAS_IP}:20720`;
   const password = process.env.PIHOLE_PASSWORD || "***REMOVED***";
 
-  try {
-    // Pi-hole v6: POST password → receive JWT → fetch stats
+  async function getToken(): Promise<string> {
+    const now = Date.now();
+    if (piholeToken && now < piholeTokenExpiry) return piholeToken;
     const authRes = await fetch(`${BASE}/api/auth`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -197,7 +204,13 @@ async function pihole(): Promise<ServiceResult> {
     const authJson = await authRes.json() as { session?: { token?: string }; token?: string };
     const token = authJson.session?.token ?? authJson.token;
     if (!token) throw new Error("no token in auth response");
+    piholeToken = token;
+    piholeTokenExpiry = now + 30 * 60 * 1000;
+    return token;
+  }
 
+  try {
+    const token = await getToken();
     const data = await apiFetch(`${BASE}/api/stats/summary`, { Authorization: `Bearer ${token}` }) as {
       queries?: { total?: number; percent_blocked?: number };
     };
@@ -205,6 +218,8 @@ async function pihole(): Promise<ServiceResult> {
     const blocked = (data.queries?.percent_blocked ?? 0).toFixed(1);
     return { name: "pihole", up: true, lines: [`${total.toLocaleString()} queries · ${blocked}% blocked`] };
   } catch {
+    piholeToken = null;
+    piholeTokenExpiry = 0;
     const up = await checkReachable(BASE);
     return { name: "pihole", up, lines: up ? ["—"] : [] };
   }
