@@ -1392,23 +1392,11 @@ function MikrotikTab() {
 
 // ── GrafanaCard ───────────────────────────────────────────────────────────────
 
-const GRAFANA_BASE   = "http://192.168.88.196:30037";
-const GRAFANA_PANEL  = `${GRAFANA_BASE}/d-solo/rYdddlPWk/node-exporter-full?orgId=1&panelId=77&theme=dark&refresh=10s`;
-const GRAFANA_LINKS  = [
-  { label: "Node Exporter Dashboard", url: `${GRAFANA_BASE}/d/rYdddlPWk` },
-  { label: "Prometheus Targets",      url: "http://192.168.88.196:30104/targets" },
-  { label: "Prometheus Graph",        url: "http://192.168.88.196:30104/graph" },
-];
+const GRAFANA_BASE  = "http://192.168.88.196:30037";
+const GRAFANA_PANEL = `${GRAFANA_BASE}/d-solo/rYdddlPWk/node-exporter-full?orgId=1&timezone=browser&var-ds_prometheus=bfkupt1hj588wa&var-job=node&var-nodename=truenas&var-node=truenas&refresh=30s&panelId=panel-77&theme=dark`;
 
 function GrafanaCard() {
-  const [status, setStatus] = useState<"loading" | "loaded" | "fallback">("loading");
-
-  useEffect(() => {
-    const t = setTimeout(() => {
-      setStatus(s => s === "loading" ? "fallback" : s);
-    }, 8000);
-    return () => clearTimeout(t);
-  }, []);
+  const [loaded, setLoaded] = useState(false);
 
   return (
     <div style={{
@@ -1421,7 +1409,7 @@ function GrafanaCard() {
         <div className="flex items-center gap-2">
           <span style={{ color: "#f97316" }}><IconGrafana /></span>
           <span className="text-[10px] uppercase tracking-widest font-semibold" style={{ color: "rgba(255,255,255,0.45)", letterSpacing: "0.15em" }}>grafana</span>
-          {status === "loading" && (
+          {!loaded && (
             <span className="text-[9px]" style={{ color: "rgba(255,255,255,0.2)" }}>loading…</span>
           )}
         </div>
@@ -1430,43 +1418,34 @@ function GrafanaCard() {
           style={{ color: "rgba(255,255,255,0.3)", textDecoration: "none", transition: "color 0.15s" }}
           onMouseEnter={e => (e.currentTarget.style.color = "#f97316")}
           onMouseLeave={e => (e.currentTarget.style.color = "rgba(255,255,255,0.3)")}>
-          open ↗
+          open grafana ↗
         </a>
       </div>
 
-      {/* iframe or fallback */}
-      {status !== "fallback" ? (
+      {/* Loading skeleton shown until iframe fires onLoad */}
+      <div style={{ position: "relative", height: 220 }}>
+        {!loaded && (
+          <div style={{
+            position: "absolute", inset: 0, borderRadius: 8,
+            background: "rgba(255,255,255,0.03)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
+            <span className="text-[11px]" style={{ color: "rgba(255,255,255,0.2)" }}>loading panel…</span>
+          </div>
+        )}
         <iframe
           src={GRAFANA_PANEL}
+          width="100%"
+          height="220"
+          frameBorder={0}
           style={{
-            width: "100%", height: 200, border: "none",
-            borderRadius: 8, background: "transparent",
-            opacity: status === "loaded" ? 1 : 0.4,
-            transition: "opacity 0.3s",
+            borderRadius: 8, border: "none", display: "block",
+            opacity: loaded ? 1 : 0,
+            transition: "opacity 0.4s",
           }}
-          onLoad={() => setStatus("loaded")}
-          onError={() => setStatus("fallback")}
+          onLoad={() => setLoaded(true)}
         />
-      ) : (
-        <div className="flex flex-col gap-1">
-          <span className="text-[10px] mb-1" style={{ color: "rgba(255,255,255,0.3)" }}>Panel unavailable — quick links:</span>
-          {GRAFANA_LINKS.map(({ label, url }) => (
-            <a key={url} href={url} target="_blank" rel="noopener noreferrer"
-              className="flex items-center justify-between group"
-              style={{
-                padding: "8px 10px", borderRadius: 8,
-                background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)",
-                textDecoration: "none", transition: "background 0.15s, border-color 0.15s",
-              }}
-              onMouseEnter={e => { e.currentTarget.style.background = "rgba(249,115,22,0.08)"; e.currentTarget.style.borderColor = "rgba(249,115,22,0.25)"; }}
-              onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.03)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.07)"; }}
-            >
-              <span className="text-[11px] font-medium" style={{ color: "rgba(255,255,255,0.7)" }}>{label}</span>
-              <span style={{ color: "#f97316", fontSize: 12 }}>→</span>
-            </a>
-          ))}
-        </div>
-      )}
+      </div>
     </div>
   );
 }
