@@ -1,11 +1,16 @@
 import { NextResponse } from "next/server";
 
+interface QueueItem { title: string; pct: number }
+interface Stream    { title: string; user: string; progress: number; posStr: string }
+
 interface ServiceResult {
   name: string;
   up: boolean;
   lines: string[];
   pct?: number;
   downCount?: number;
+  queueItem?: QueueItem | null;
+  streams?: Stream[];
 }
 
 let servicesCache: { data: { services: ServiceResult[]; timestamp: number }; ts: number } | null = null;
@@ -43,35 +48,55 @@ async function checkReachable(baseUrl: string): Promise<boolean> {
 }
 
 async function radarr(): Promise<ServiceResult> {
+  const KEY = "***REMOVED***";
+  const BASE = `http://${TRUENAS_IP}:30025`;
   try {
-    const data = await apiFetch(
-      `http://${TRUENAS_IP}:30025/api/v3/movie?apiKey=***REMOVED***`
-    ) as { hasFile: boolean; monitored: boolean }[];
-    const total   = data.length;
-    const missing = data.filter(m => !m.hasFile && m.monitored).length;
-    const pct = total > 0 ? Math.round(((total - missing) / total) * 100) : 100;
-    return { name: "radarr", up: true, pct, lines: [`${total} movies · ${missing} missing`, `${pct}% complete`] };
+    const [moviesData, queueData] = await Promise.all([
+      apiFetch(`${BASE}/api/v3/movie?apiKey=${KEY}`) as Promise<{ hasFile: boolean; monitored: boolean }[]>,
+      apiFetch(`${BASE}/api/v3/queue?apiKey=${KEY}&pageSize=1`) as Promise<{
+        totalRecords: number;
+        records: { title: string; size: number; sizeleft: number }[];
+      }>,
+    ]);
+    const total   = moviesData.length;
+    const missing = moviesData.filter(m => !m.hasFile && m.monitored).length;
+    const pct     = total > 0 ? Math.round(((total - missing) / total) * 100) : 100;
+    const qFirst  = queueData.records?.[0];
+    const queueItem: QueueItem | null = qFirst
+      ? { title: qFirst.title, pct: qFirst.size > 0 ? Math.round(((qFirst.size - qFirst.sizeleft) / qFirst.size) * 100) : 0 }
+      : null;
+    const lines = [`${total} movies · ${missing} missing`];
+    if ((queueData.totalRecords ?? 0) > 0) lines.push(`${queueData.totalRecords} in queue`);
+    return { name: "radarr", up: true, pct, queueItem, lines };
   } catch {
-    const up = await checkReachable(`http://${TRUENAS_IP}:30025`);
+    const up = await checkReachable(BASE);
     return { name: "radarr", up, lines: up ? ["—"] : [] };
   }
 }
 
 async function sonarr(): Promise<ServiceResult> {
+  const KEY = "***REMOVED***";
+  const BASE = `http://${TRUENAS_IP}:33027`;
   try {
     const [seriesData, wantedData, queueData] = await Promise.all([
-      apiFetch(`http://${TRUENAS_IP}:33027/api/v3/series?apiKey=***REMOVED***`) as Promise<{ monitored: boolean }[]>,
-      apiFetch(`http://${TRUENAS_IP}:33027/api/v3/wanted/missing?apiKey=***REMOVED***&pageSize=1`) as Promise<{ totalRecords: number }>,
-      apiFetch(`http://${TRUENAS_IP}:33027/api/v3/queue?apiKey=***REMOVED***&pageSize=1`) as Promise<{ totalRecords: number }>,
+      apiFetch(`${BASE}/api/v3/series?apiKey=${KEY}`) as Promise<{ monitored: boolean }[]>,
+      apiFetch(`${BASE}/api/v3/wanted/missing?apiKey=${KEY}&pageSize=1`) as Promise<{ totalRecords: number }>,
+      apiFetch(`${BASE}/api/v3/queue?apiKey=${KEY}&pageSize=1`) as Promise<{
+        totalRecords: number;
+        records: { title: string; size: number; sizeleft: number }[];
+      }>,
     ]);
     const total   = seriesData.length;
     const missing = wantedData.totalRecords ?? 0;
-    const queue   = queueData.totalRecords ?? 0;
+    const qFirst  = queueData.records?.[0];
+    const queueItem: QueueItem | null = qFirst
+      ? { title: qFirst.title, pct: qFirst.size > 0 ? Math.round(((qFirst.size - qFirst.sizeleft) / qFirst.size) * 100) : 0 }
+      : null;
     const lines = [`${total} series · ${missing} missing eps`];
-    if (queue > 0) lines.push(`+${queue} downloading`);
-    return { name: "sonarr", up: true, lines };
+    if ((queueData.totalRecords ?? 0) > 0) lines.push(`${queueData.totalRecords} in queue`);
+    return { name: "sonarr", up: true, lines, queueItem };
   } catch {
-    const up = await checkReachable(`http://${TRUENAS_IP}:33027`);
+    const up = await checkReachable(BASE);
     return { name: "sonarr", up, lines: up ? ["—"] : [] };
   }
 }
@@ -95,13 +120,48 @@ async function bazarr(): Promise<ServiceResult> {
   }
 }
 
+interface TautulliSession {
+  title?: string;
+  grandparent_title?: string;
+  parent_media_index?: string;
+  media_index?: string;
+  user?: string;
+  progress_percent?: string;
+  duration?: number;
+  view_offset?: number;
+  media_type?: string;
+}
+
+function fmtMs(ms: number): string {
+  const s = Math.floor(ms / 1000);
+  const m = Math.floor(s / 60), ss = s % 60;
+  return `${m}:${String(ss).padStart(2, "0")}`;
+}
+
 async function tautulli(): Promise<ServiceResult> {
   try {
     const data = await apiFetch(
       `http://${TRUENAS_IP}:30047/api/v2?apikey=***REMOVED***&cmd=get_activity`
-    ) as { response: { data: { stream_count: string } } };
-    const count = parseInt(data?.response?.data?.stream_count ?? "0", 10);
-    return { name: "tautulli", up: true, lines: [count > 0 ? `${count} active stream${count !== 1 ? "s" : ""}` : "no active streams"] };
+    ) as { response: { data: { stream_count: string; sessions?: TautulliSession[] } } };
+    const count    = parseInt(data?.response?.data?.stream_count ?? "0", 10);
+    const sessions = data?.response?.data?.sessions ?? [];
+    const streams: Stream[] = sessions.map(s => {
+      let title = s.title ?? "Unknown";
+      if (s.media_type === "episode" && s.grandparent_title) {
+        const se = `S${String(s.parent_media_index ?? "0").padStart(2, "0")}E${String(s.media_index ?? "0").padStart(2, "0")}`;
+        title = `${s.grandparent_title} ${se}`;
+      }
+      const progress = parseInt(s.progress_percent ?? "0", 10);
+      const durMs    = (s.duration ?? 0) * 1000;      // Tautulli duration is seconds
+      const offMs    = s.view_offset ?? 0;             // view_offset is milliseconds
+      const posStr   = durMs > 0 ? `${fmtMs(offMs)} / ${fmtMs(durMs)}` : "";
+      return { title, user: s.user ?? "—", progress, posStr };
+    });
+    return {
+      name: "tautulli", up: true,
+      lines: [count > 0 ? `${count} active stream${count !== 1 ? "s" : ""}` : "no active streams"],
+      streams,
+    };
   } catch {
     const up = await checkReachable(`http://${TRUENAS_IP}:30047`);
     return { name: "tautulli", up, lines: up ? ["—"] : [] };

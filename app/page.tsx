@@ -23,6 +23,7 @@ interface Metrics {
   memory: { total: number | null; used: number | null; available: number | null; sReclaimable: number | null };
   uptime: number | null;
   disks: DiskEntry[];
+  pool?: { total: number | null; used: number | null; avail: number | null };
   network: {
     rxBytesPerSec: number | null; txBytesPerSec: number | null;
     rxBytesTotal:  number | null; txBytesTotal:  number | null;
@@ -34,6 +35,11 @@ interface Metrics {
     memUsed: number | null; memTotal: number | null;
     temperature: number | null;
     powerDraw: number | null; powerLimit: number | null;
+    coreClock: number | null;
+    memClock:  number | null;
+    fanSpeed:  number | null;
+    encUtil:   number | null;
+    decUtil:   number | null;
   };
   sysInfo?: {
     os: string | null;
@@ -41,6 +47,12 @@ interface Metrics {
     arch: string | null;
     hostname: string | null;
     cpuCores: number | null;
+    cpuModel: string | null;
+    cpuFreqGhz: number | null;
+    load1: number | null;
+    load5: number | null;
+    load15: number | null;
+    tcpEstab: number | null;
   };
   timestamp: number;
 }
@@ -70,6 +82,8 @@ interface ServiceResult {
   lines: string[];
   pct?: number;
   downCount?: number;
+  queueItem?: { title: string; pct: number } | null;
+  streams?: { title: string; user: string; progress: number; posStr: string }[];
 }
 
 // ── module constants ──────────────────────────────────────────────────────────
@@ -1395,7 +1409,7 @@ export default function Dashboard() {
 
 
   const [weather,            setWeather]            = useState<{ temp: number | null; condition: string | null } | null>(null);
-  const [services,           setServices]           = useState<{ name: string; up: boolean; lines: string[]; pct?: number; downCount?: number }[] | null>(null);
+  const [services,           setServices]           = useState<{ name: string; up: boolean; lines: string[]; pct?: number; downCount?: number; queueItem?: { title: string; pct: number } | null; streams?: { title: string; user: string; progress: number; posStr: string }[] }[] | null>(null);
   const [servicesLoading,    setServicesLoading]    = useState(true);
   const [servicesUpdatedAt,  setServicesUpdatedAt]  = useState<number | null>(null);
   const [speedtestResults, setSpeedtestResults] = useState<SpeedtestResult[]>([]);
@@ -1671,20 +1685,37 @@ export default function Dashboard() {
 
             {/* CPU */}
             {isVisible("cpu") && (
-              <Card label="cpu" accent="#06b6d4" alertLevel={cpuAlert} icon={<IconCPU />}
+              <Card label="cpu" accent="#06b6d4"
+                subtitle={!loading ? (metrics?.sysInfo?.cpuModel ?? undefined) : undefined}
+                alertLevel={cpuAlert} icon={<IconCPU />}
                 animDelay={0} expanded={expandedCard === "cpu"} onToggle={() => toggleCard("cpu")}>
                 <div className="flex items-end justify-between gap-2">
                   <BigValue value={fmtPct(metrics?.cpu ?? null)} loading={loading} />
-                  {!loading && metrics?.sysInfo?.cpuCores != null && (
-                    <span className="mb-1 tabular-nums" style={{
-                      background: "rgba(6,182,212,0.1)", border: "1px solid rgba(6,182,212,0.25)",
-                      borderRadius: 5, padding: "2px 7px", fontSize: 10, color: "#06b6d4",
-                    }}>{metrics.sysInfo.cpuCores} cores</span>
+                  {!loading && (
+                    <div className="flex flex-wrap gap-1 mb-1 justify-end">
+                      {metrics?.sysInfo?.cpuCores != null && (
+                        <span className="tabular-nums" style={{
+                          background: "rgba(6,182,212,0.1)", border: "1px solid rgba(6,182,212,0.25)",
+                          borderRadius: 5, padding: "2px 7px", fontSize: 10, color: "#06b6d4",
+                        }}>{metrics.sysInfo.cpuCores} cores</span>
+                      )}
+                      {metrics?.sysInfo?.cpuFreqGhz != null && (
+                        <span className="tabular-nums font-mono" style={{
+                          background: "rgba(6,182,212,0.07)", border: "1px solid rgba(6,182,212,0.18)",
+                          borderRadius: 5, padding: "2px 7px", fontSize: 10, color: "rgba(6,182,212,0.8)",
+                        }}>@ {metrics.sysInfo.cpuFreqGhz.toFixed(2)} GHz</span>
+                      )}
+                    </div>
                   )}
                 </div>
-                <Sparkline data={cpuHistory} color={barColor(cpuPct)} height={44} />
+                <Sparkline data={cpuHistory} color={barColor(cpuPct)} height={48} />
                 <GaugeBar percent={cpuPct} color={barColor(cpuPct)}
                   gradient={`linear-gradient(90deg, #0891b2, #06b6d4 60%, ${barColor(cpuPct)})`} />
+                {!loading && (metrics?.sysInfo?.load1 != null) && (
+                  <span className="text-[10px] tabular-nums font-mono" style={{ color: "rgba(255,255,255,0.35)" }}>
+                    Load: {metrics.sysInfo.load1?.toFixed(2)} · {metrics.sysInfo.load5?.toFixed(2)} · {metrics.sysInfo.load15?.toFixed(2)}
+                  </span>
+                )}
                 {expandedCard === "cpu" && (() => {
                   const s = histStats(cpuHistory);
                   return (
@@ -1741,41 +1772,54 @@ export default function Dashboard() {
                 ) : (() => {
                   const PREFIX = "/mnt/Pool/Media/";
                   const folderName = (mp: string) => mp.startsWith(PREFIX) ? mp.slice(PREFIX.length) : (mp.split("/").pop() ?? mp);
-                  const fsBarColor = (p: number) => p > 85 ? "#ef4444" : p > 70 ? "#f59e0b" : "#10b981";
+                  const folderColors = ["#f59e0b","#06b6d4","#10b981","#8b5cf6","#ef4444","#f97316","#3b82f6"];
+                  const fsBarColor  = (p: number) => p > 85 ? "#ef4444" : p > 70 ? "#f59e0b" : "#10b981";
                   const sorted = [...metrics.disks].sort((a, b) => b.total - a.total);
                   return (
-                    <div className="flex flex-col gap-0"
-                      style={{ overflowY: sorted.length > 4 ? "auto" : "visible", maxHeight: sorted.length > 4 ? 230 : undefined }}>
-                      {sorted.map((disk, idx) => {
-                        const name = folderName(disk.mountpoint);
-                        const barC = fsBarColor(disk.usedPct);
-                        return (
-                          <div key={disk.mountpoint} className="flex flex-col gap-1.5"
-                            style={{
-                              padding: "8px 0",
-                              borderBottom: idx < sorted.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none",
-                            }}>
-                            <div className="flex items-center justify-between gap-2">
-                              <div className="flex items-center gap-1.5 min-w-0">
-                                <span style={{ color: barC, opacity: 0.85, flexShrink: 0 }}><IconFolder /></span>
-                                <span className="text-xs font-medium truncate" style={{ color: "rgba(255,255,255,0.8)" }}>{name}</span>
+                    <div className="flex flex-col gap-0">
+                      {/* Pool summary */}
+                      {metrics.pool?.total && (
+                        <div className="flex justify-between items-center pb-2 mb-1"
+                          style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                          <span className="text-[10px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.3)" }}>pool total</span>
+                          <span className="text-[10px] tabular-nums font-mono" style={{ color: "rgba(255,255,255,0.5)" }}>
+                            {fmtBytes(metrics.pool.used, 1, du)} / {fmtBytes(metrics.pool.total, 1, du)}
+                          </span>
+                        </div>
+                      )}
+                      <div style={{ overflowY: sorted.length > 4 ? "auto" : "visible", maxHeight: sorted.length > 4 ? 220 : undefined }}>
+                        {sorted.map((disk, idx) => {
+                          const name = folderName(disk.mountpoint);
+                          const accentC = folderColors[idx % folderColors.length];
+                          const barC    = fsBarColor(disk.usedPct);
+                          return (
+                            <div key={disk.mountpoint} className="flex flex-col gap-1.5"
+                              style={{
+                                padding: "7px 0",
+                                borderBottom: idx < sorted.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none",
+                              }}>
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <span style={{ color: accentC, opacity: 0.85, flexShrink: 0 }}><IconFolder /></span>
+                                  <span className="text-xs font-medium truncate" style={{ color: "rgba(255,255,255,0.85)" }}>{name}</span>
+                                </div>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  <span className="text-[10px] tabular-nums font-mono" style={{ color: "rgba(255,255,255,0.4)" }}>
+                                    {fmtBytes(disk.used, 1, du)} / {fmtBytes(disk.total, 1, du)}
+                                  </span>
+                                  <span className="tabular-nums font-mono font-medium" style={{ fontSize: 10, color: barC, minWidth: "2.5ch" }}>
+                                    {disk.usedPct.toFixed(0)}%
+                                  </span>
+                                </div>
                               </div>
-                              <span className="text-[10px] tabular-nums shrink-0 font-mono" style={{ color: "rgba(255,255,255,0.4)" }}>
-                                {fmtBytes(disk.used, 1, du)} / {fmtBytes(disk.total, 1, du)}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <div className="flex-1 relative rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.08)", height: 4 }}>
+                              <div className="flex-1 relative rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.08)", height: 8 }}>
                                 <div className="h-full rounded-full transition-all duration-700"
-                                  style={{ width: `${disk.usedPct}%`, background: barC, boxShadow: `0 0 4px ${barC}55` }} />
+                                  style={{ width: `${disk.usedPct}%`, background: barC, boxShadow: `0 0 6px ${barC}55` }} />
                               </div>
-                              <span className="tabular-nums font-mono shrink-0" style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", minWidth: "2.5ch" }}>
-                                {disk.usedPct.toFixed(0)}%
-                              </span>
                             </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
+                      </div>
                     </div>
                   );
                 })()}
@@ -1819,6 +1863,14 @@ export default function Dashboard() {
                     ↑ {fmtBytes(metrics?.network.txBytesTotal ?? null, 1, du)} total
                   </span>
                 </div>
+                {!loading && metrics?.sysInfo?.tcpEstab != null && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.3)" }}>tcp</span>
+                    <span className="text-[11px] tabular-nums font-mono font-medium" style={{ color: "rgba(255,255,255,0.65)" }}>
+                      {metrics.sysInfo.tcpEstab} established
+                    </span>
+                  </div>
+                )}
                 {expandedCard === "network" && rxHistory.length > 0 && (
                   <div className="flex flex-col gap-0.5 pt-2" style={{ borderTop: "1px solid #181818" }}>
                     <StatRow label="peak rx" value={`${fmtBytes(Math.max(...rxHistory), 1, du)}/s`} />
@@ -1877,6 +1929,44 @@ export default function Dashboard() {
                         gradient="linear-gradient(90deg, #ea580c, #f59e0b)"
                       />
                     )}
+                    {/* Clocks + fan row */}
+                    {(metrics?.gpu?.coreClock != null || metrics?.gpu?.memClock != null || metrics?.gpu?.fanSpeed != null) && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {metrics?.gpu?.coreClock != null && (
+                          <span className="tabular-nums font-mono" style={{
+                            background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)",
+                            borderRadius: 4, padding: "2px 6px", fontSize: 9, color: "rgba(239,68,68,0.8)",
+                          }}>{metrics.gpu.coreClock} MHz core</span>
+                        )}
+                        {metrics?.gpu?.memClock != null && (
+                          <span className="tabular-nums font-mono" style={{
+                            background: "rgba(168,85,247,0.1)", border: "1px solid rgba(168,85,247,0.2)",
+                            borderRadius: 4, padding: "2px 6px", fontSize: 9, color: "rgba(168,85,247,0.8)",
+                          }}>{metrics.gpu.memClock} MHz mem</span>
+                        )}
+                        {metrics?.gpu?.fanSpeed != null && (
+                          <span className="tabular-nums font-mono" style={{
+                            background: "rgba(6,182,212,0.1)", border: "1px solid rgba(6,182,212,0.2)",
+                            borderRadius: 4, padding: "2px 6px", fontSize: 9, color: "rgba(6,182,212,0.8)",
+                          }}>🌀 {metrics.gpu.fanSpeed}%</span>
+                        )}
+                      </div>
+                    )}
+                    {/* Encoder / decoder */}
+                    {(metrics?.gpu?.encUtil != null || metrics?.gpu?.decUtil != null) && (
+                      <div className="flex gap-2">
+                        {metrics?.gpu?.encUtil != null && (
+                          <span className="text-[10px] tabular-nums font-mono" style={{ color: "rgba(255,255,255,0.35)" }}>
+                            ENC {metrics.gpu.encUtil}%
+                          </span>
+                        )}
+                        {metrics?.gpu?.decUtil != null && (
+                          <span className="text-[10px] tabular-nums font-mono" style={{ color: "rgba(255,255,255,0.35)" }}>
+                            DEC {metrics.gpu.decUtil}%
+                          </span>
+                        )}
+                      </div>
+                    )}
                     {gpuTempHistory.length >= 2 && (
                       <div className="flex flex-col gap-1.5">
                         <div className="flex justify-between items-center">
@@ -1920,22 +2010,36 @@ export default function Dashboard() {
                     : diff < 3600 ? `${Math.round(diff / 60)}m ago`
                     : diff < 86400 ? `${Math.round(diff / 3600)}h ago`
                     : `${Math.round(diff / 86400)}d ago`;
+                  const dl = latest.download;
+                  const quality = dl == null ? null
+                    : dl >= 500 ? { label: "Excellent", color: "#10b981", bg: "rgba(16,185,129,0.12)", border: "rgba(16,185,129,0.3)" }
+                    : dl >= 200 ? { label: "Good",      color: "#06b6d4", bg: "rgba(6,182,212,0.12)",  border: "rgba(6,182,212,0.3)"  }
+                    : dl >= 50  ? { label: "Fair",      color: "#f59e0b", bg: "rgba(245,158,11,0.12)", border: "rgba(245,158,11,0.3)" }
+                    :             { label: "Poor",      color: "#ef4444", bg: "rgba(239,68,68,0.12)",  border: "rgba(239,68,68,0.3)"  };
                   return (
                     <div className="flex flex-col gap-2">
-                      {(latest.isp || latest.serverLocation) && (
-                        <div className="flex flex-col gap-0.5">
-                          {latest.isp && (
-                            <span className="text-[11px] font-medium" style={{ color: "rgba(255,255,255,0.6)" }}>{latest.isp}</span>
-                          )}
-                          {latest.serverLocation && (
-                            <span className="text-[9px]" style={{ color: "rgba(255,255,255,0.3)" }}>{latest.serverLocation}</span>
-                          )}
-                        </div>
-                      )}
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        {(latest.isp || latest.serverLocation) && (
+                          <div className="flex flex-col gap-0">
+                            {latest.isp && (
+                              <span className="text-[11px] font-medium" style={{ color: "rgba(255,255,255,0.6)" }}>{latest.isp}</span>
+                            )}
+                            {latest.serverLocation && (
+                              <span className="text-[9px]" style={{ color: "rgba(255,255,255,0.3)" }}>{latest.serverLocation}</span>
+                            )}
+                          </div>
+                        )}
+                        {quality && (
+                          <span className="text-[9px] font-semibold uppercase tracking-wider shrink-0"
+                            style={{ color: quality.color, background: quality.bg, border: `1px solid ${quality.border}`, borderRadius: 5, padding: "2px 7px" }}>
+                            {quality.label}
+                          </span>
+                        )}
+                      </div>
                       <div className="flex items-end gap-3">
                         <div className="flex flex-col">
                           <span className="font-medium tabular-nums font-mono" style={{ fontSize: 44, lineHeight: 1, color: "#06b6d4" }}>
-                            {latest.download != null ? latest.download.toFixed(0) : "—"}
+                            {dl != null ? dl.toFixed(0) : "—"}
                           </span>
                           <span className="text-[9px] uppercase tracking-widest mt-0.5" style={{ color: "rgba(255,255,255,0.35)" }}>Mbps ↓</span>
                         </div>
@@ -1946,16 +2050,26 @@ export default function Dashboard() {
                           <span className="text-[9px] uppercase tracking-widest mt-0.5" style={{ color: "rgba(255,255,255,0.35)" }}>Mbps ↑</span>
                         </div>
                       </div>
-                      {latest.ping != null && (
-                        <div className="flex items-center gap-1.5">
-                          <span className="w-1.5 h-1.5 rounded-full shrink-0"
-                            style={{ background: "#10b981", boxShadow: "0 0 4px #10b98166" }} />
-                          <span className="text-[11px] tabular-nums font-medium font-mono" style={{ color: "#10b981" }}>
-                            {latest.ping < 10 ? latest.ping.toFixed(1) : latest.ping.toFixed(0)} ms
-                          </span>
-                          <span className="text-[9px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.3)" }}>ping</span>
-                        </div>
-                      )}
+                      <div className="flex items-center gap-3 flex-wrap">
+                        {latest.ping != null && (
+                          <div className="flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full shrink-0"
+                              style={{ background: "#10b981", boxShadow: "0 0 4px #10b98166" }} />
+                            <span className="text-[11px] tabular-nums font-medium font-mono" style={{ color: "#10b981" }}>
+                              {latest.ping < 10 ? latest.ping.toFixed(1) : latest.ping.toFixed(0)} ms
+                            </span>
+                            <span className="text-[9px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.3)" }}>ping</span>
+                          </div>
+                        )}
+                        {latest.jitter != null && (
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[11px] tabular-nums font-medium font-mono" style={{ color: "rgba(255,255,255,0.45)" }}>
+                              ±{latest.jitter < 10 ? latest.jitter.toFixed(1) : latest.jitter.toFixed(0)} ms
+                            </span>
+                            <span className="text-[9px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.3)" }}>jitter</span>
+                          </div>
+                        )}
+                      </div>
                       {rel && (
                         <span className="text-[9px] tabular-nums" style={{ color: "rgba(255,255,255,0.3)" }}>
                           last tested {rel}
@@ -1979,6 +2093,7 @@ export default function Dashboard() {
                       { emoji: "🖥️", label: "arch",    value: metrics?.sysInfo?.arch     ?? "—", mono: false },
                       { emoji: "🌐", label: "host",    value: metrics?.sysInfo?.hostname ?? "—", mono: false },
                       { emoji: "⚡", label: "cores",   value: metrics?.sysInfo?.cpuCores != null ? `${metrics.sysInfo.cpuCores} cores` : "—", mono: false },
+                      { emoji: "🕐", label: "up since", value: fmtSince(metrics?.uptime ?? null), mono: true  },
                     ] as { emoji: string; label: string; value: string; mono: boolean }[]).map(({ emoji, label, value, mono }, i, arr) => (
                       <div key={label}>
                         <div className="flex items-center gap-2 py-2">
@@ -1997,6 +2112,53 @@ export default function Dashboard() {
 
 
           </div>
+
+          {/* ── NOW PLAYING banner ── */}
+          {(() => {
+            const tautulliSvc = services?.find(s => s.name === "tautulli");
+            const streams = tautulliSvc?.streams ?? [];
+            if (!streams.length) return null;
+            return (
+              <div style={{
+                background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.25)",
+                borderRadius: 14, padding: "14px 20px",
+              }}>
+                <div className="flex items-center gap-3 mb-3">
+                  <span style={{
+                    width: 8, height: 8, borderRadius: "50%", background: "#ef4444", flexShrink: 0,
+                    boxShadow: "0 0 6px #ef4444",
+                    animation: "pulseDot 1.5s ease-in-out infinite",
+                  }} />
+                  <span className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: "#c4b5fd" }}>
+                    Now Playing · {streams.length} stream{streams.length !== 1 ? "s" : ""}
+                  </span>
+                </div>
+                <div className="flex flex-col gap-2">
+                  {streams.map((st, i) => (
+                    <div key={i} className="flex flex-col gap-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[12px] font-medium truncate" style={{ color: "rgba(255,255,255,0.85)" }}>{st.title}</span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {st.posStr && (
+                            <span className="text-[10px] tabular-nums font-mono" style={{ color: "rgba(255,255,255,0.4)" }}>{st.posStr}</span>
+                          )}
+                          <span className="text-[10px]" style={{ color: "#a78bfa" }}>{st.user}</span>
+                        </div>
+                      </div>
+                      <div style={{ height: 3, background: "rgba(255,255,255,0.08)", borderRadius: 2 }}>
+                        <div style={{
+                          height: "100%", borderRadius: 2,
+                          width: `${Math.min(100, st.progress)}%`,
+                          background: "linear-gradient(90deg, #8b5cf6, #a78bfa)",
+                          boxShadow: "0 0 6px rgba(139,92,246,0.5)",
+                        }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* ── services (full width) ── */}
           {isVisible("services") && (
@@ -2019,7 +2181,7 @@ export default function Dashboard() {
                 <span style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>unavailable</span>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-                  {services.map(({ name, up, lines, pct: svcPct, downCount }) => {
+                  {services.map(({ name, up, lines, pct: svcPct, downCount, queueItem, streams: svcStreams }) => {
                     const color = SVC_COLORS[name] ?? "#666";
                     const icon  = SVC_ICONS[name]  ?? "";
                     const label = SVC_LABELS[name]  ?? name;
@@ -2057,8 +2219,39 @@ export default function Dashboard() {
                           }}>{line}</span>
                         ))}
                         {!up && <span style={{ fontSize: 10, color: "rgba(255,255,255,0.3)" }}>offline</span>}
+                        {/* Radarr: library completion + active download */}
                         {name === "radarr" && svcPct != null && up && (
                           <GaugeBar percent={svcPct} color={svcPct > 90 ? "#10b981" : svcPct > 70 ? "#f59e0b" : "#ef4444"} thin />
+                        )}
+                        {name === "radarr" && queueItem && up && (
+                          <div className="flex flex-col gap-1 mt-0.5">
+                            <span className="text-[10px] truncate font-medium" style={{ color: "#f59e0b" }}>↓ {queueItem.title}</span>
+                            <GaugeBar percent={queueItem.pct} color="#f59e0b" thin />
+                          </div>
+                        )}
+                        {/* Sonarr: active download */}
+                        {name === "sonarr" && queueItem && up && (
+                          <div className="flex flex-col gap-1 mt-0.5">
+                            <span className="text-[10px] truncate font-medium" style={{ color: "#3b82f6" }}>↓ {queueItem.title}</span>
+                            <GaugeBar percent={queueItem.pct} color="#3b82f6" thin />
+                          </div>
+                        )}
+                        {/* Tautulli: active streams inline */}
+                        {name === "tautulli" && svcStreams && svcStreams.length > 0 && up && (
+                          <div className="flex flex-col gap-1.5 mt-0.5">
+                            {svcStreams.slice(0, 3).map((st, si) => (
+                              <div key={si} className="flex flex-col gap-0.5">
+                                <span className="text-[10px] truncate" style={{ color: "rgba(255,255,255,0.7)" }}>{st.title}</span>
+                                <div style={{ height: 2, background: "rgba(255,255,255,0.08)", borderRadius: 1 }}>
+                                  <div style={{
+                                    height: "100%", borderRadius: 1,
+                                    width: `${Math.min(100, st.progress)}%`,
+                                    background: "#8b5cf6",
+                                  }} />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
                         )}
                       </div>
                     );

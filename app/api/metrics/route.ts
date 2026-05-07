@@ -62,6 +62,18 @@ export async function GET() {
     netTxTotal,
     unameResults,
     cpuCoreCount,
+    // new queries — appended at end to preserve positional order
+    load1,
+    load5,
+    load15,
+    cpuFreqAvg,
+    tcpEstab,
+    gpuCoreClock,
+    gpuMemClock,
+    gpuFanRatio,
+    gpuEncRatio,
+    gpuDecRatio,
+    cpuInfoResults,
   ] = await Promise.all([
     query(`avg(rate(node_cpu_seconds_total{mode="idle"}[2m])) * 100`),
     query(`node_memory_MemTotal_bytes`),
@@ -83,6 +95,18 @@ export async function GET() {
     query(`sum(node_network_transmit_bytes_total{device!~"lo|veth.*|docker.*|br.*"})`),
     queryAll(`node_uname_info`),
     query(`count(node_cpu_seconds_total{mode="idle"})`),
+    // new
+    query(`node_load1`),
+    query(`node_load5`),
+    query(`node_load15`),
+    query(`avg(node_cpu_scaling_frequency_hertz)`),
+    query(`node_netstat_Tcp_CurrEstab`),
+    query(`nvidia_smi_clocks_current_graphics_clock_hz`),
+    query(`nvidia_smi_clocks_current_memory_clock_hz`),
+    query(`nvidia_smi_fan_speed_ratio`),
+    query(`nvidia_smi_utilization_encoder_ratio`),
+    query(`nvidia_smi_utilization_decoder_ratio`),
+    queryAll(`node_cpu_info{cpu="0"}`),
   ]);
 
   const cpuUsed = cpuIdle != null ? 100 - cpuIdle : null;
@@ -91,12 +115,37 @@ export async function GET() {
   const gpuName = gpuInfoResults[0]?.metric?.modelName ?? gpuInfoResults[0]?.metric?.name ?? null;
 
   const uname = unameResults[0]?.metric ?? {};
+  const cpuModelRaw = cpuInfoResults[0]?.metric?.model_name ?? null;
+
+  // CPU frequency: metric may be Hz or already MHz — normalise to GHz
+  let cpuFreqGhz: number | null = null;
+  if (cpuFreqAvg != null) {
+    if (cpuFreqAvg > 1e8) cpuFreqGhz = parseFloat((cpuFreqAvg / 1e9).toFixed(2));        // Hz
+    else if (cpuFreqAvg > 1e5) cpuFreqGhz = parseFloat((cpuFreqAvg / 1e6).toFixed(2));   // kHz
+    else if (cpuFreqAvg > 100) cpuFreqGhz = parseFloat((cpuFreqAvg / 1000).toFixed(2));  // MHz
+    else cpuFreqGhz = parseFloat(cpuFreqAvg.toFixed(2));                                  // GHz
+  }
+
+  // GPU clock: metric may be Hz or MHz — normalise to MHz for display
+  const toMhz = (v: number | null): number | null => {
+    if (v == null) return null;
+    if (v > 1e8) return Math.round(v / 1e6);   // Hz → MHz
+    if (v > 10)  return Math.round(v);           // already MHz
+    return null;
+  };
+
   const sysInfo = {
-    os:       uname.pretty_name ?? uname.sysname ?? null,
-    kernel:   uname.release     ?? null,
-    arch:     uname.machine     ?? null,
-    hostname: uname.nodename    ?? null,
-    cpuCores: cpuCoreCount != null ? Math.round(cpuCoreCount) : null,
+    os:         uname.pretty_name ?? uname.sysname ?? null,
+    kernel:     uname.release     ?? null,
+    arch:       uname.machine     ?? null,
+    hostname:   uname.nodename    ?? null,
+    cpuCores:   cpuCoreCount != null ? Math.round(cpuCoreCount) : null,
+    cpuModel:   cpuModelRaw,
+    cpuFreqGhz,
+    load1:      load1  ?? null,
+    load5:      load5  ?? null,
+    load15:     load15 ?? null,
+    tcpEstab:   tcpEstab != null ? Math.round(tcpEstab) : null,
   };
 
   const availMap = new Map(diskAvailResults.map((r) => [r.metric.mountpoint, r.value]));
@@ -105,18 +154,22 @@ export async function GET() {
     .map((r) => {
       const total = r.value;
       const avail = availMap.get(r.metric.mountpoint) ?? 0;
-      const used = total - avail;
+      const used  = total - avail;
       return {
         mountpoint: r.metric.mountpoint,
-        device: r.metric.device ?? "",
-        fstype: r.metric.fstype ?? "",
-        total,
-        avail,
-        used,
+        device:  r.metric.device  ?? "",
+        fstype:  r.metric.fstype  ?? "",
+        total, avail, used,
         usedPct: total > 0 ? Math.min(100, (used / total) * 100) : 0,
       };
     })
     .sort((a, b) => a.mountpoint.localeCompare(b.mountpoint));
+
+  // Also grab total pool size from /mnt/Pool (non-Media)
+  const poolEntry = diskSizeResults.find(r => r.metric.mountpoint === "/mnt/Pool");
+  const poolAvail  = poolEntry ? (availMap.get("/mnt/Pool") ?? 0) : null;
+  const poolSize   = poolEntry?.value ?? null;
+  const poolUsed   = poolSize != null && poolAvail != null ? poolSize - poolAvail : null;
 
   const netRx = netRxResults.reduce((s, r) => s + (isNaN(r.value) ? 0 : r.value), 0);
   const netTx = netTxResults.reduce((s, r) => s + (isNaN(r.value) ? 0 : r.value), 0);
@@ -129,15 +182,25 @@ export async function GET() {
     memory: { total: memTotal, used: memUsed, available: memAvailable, sReclaimable: memSReclaimable },
     uptime,
     disks,
-    network: { rxBytesPerSec: netRx, txBytesPerSec: netTx, rxBytesTotal: netRxTotal, txBytesTotal: netTxTotal, interfaceName: primaryIface },
+    pool: { total: poolSize, used: poolUsed, avail: poolAvail },
+    network: {
+      rxBytesPerSec: netRx, txBytesPerSec: netTx,
+      rxBytesTotal: netRxTotal, txBytesTotal: netTxTotal,
+      interfaceName: primaryIface,
+    },
     gpu: {
-      name: gpuName,
+      name:        gpuName,
       utilization: gpuUtil,
-      memUsed: gpuMemUsed,
-      memTotal: gpuMemTotal,
+      memUsed:     gpuMemUsed,
+      memTotal:    gpuMemTotal,
       temperature: gpuTemp,
-      powerDraw: gpuPower,
-      powerLimit: gpuPowerLimit,
+      powerDraw:   gpuPower,
+      powerLimit:  gpuPowerLimit,
+      coreClock:   toMhz(gpuCoreClock),
+      memClock:    toMhz(gpuMemClock),
+      fanSpeed:    gpuFanRatio != null ? Math.round(gpuFanRatio * 100) : null,
+      encUtil:     gpuEncRatio != null ? Math.round(gpuEncRatio * 100) : null,
+      decUtil:     gpuDecRatio != null ? Math.round(gpuDecRatio * 100) : null,
     },
     sysInfo,
     timestamp: Date.now(),
