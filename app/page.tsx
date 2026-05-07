@@ -476,6 +476,16 @@ function fmtPct(v: number | null): string {
   return v === null ? "—" : `${v.toFixed(1)}%`;
 }
 
+function cleanTitle(s: string): string {
+  return s
+    .replace(/\s*[\(\[]?(2160p|1080p|1080i|720p|480p|4K|UHD).*$/i, "")
+    .replace(/\s*[\(\[]?(BluRay|BDRip|BRRip|WEB[\-\.]?DL|WEBRip|HDTV|DVDRip|HDRip|REMUX|PROPER|REPACK).*$/i, "")
+    .replace(/\s*[\(\[]?(x264|x265|H\.26[45]|HEVC|AVC|AAC|AC3|DTS|Atmos|TrueHD).*$/i, "")
+    .replace(/\.\w{2,4}$/, "")
+    .replace(/\./g, " ")
+    .trim();
+}
+
 function pct(used: number | null, total: number | null): number {
   if (used === null || total === null || total === 0) return 0;
   return Math.min(100, (used / total) * 100);
@@ -2248,24 +2258,29 @@ export default function Dashboard() {
                     Now Playing · {streams.length} stream{streams.length !== 1 ? "s" : ""}
                   </span>
                 </div>
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-3">
                   {streams.map((st, i) => (
-                    <div key={i} className="flex flex-col gap-1">
-                      <div className="flex items-center justify-between gap-2">
+                    <div key={i} className="flex flex-col gap-1.5">
+                      {/* Title row */}
+                      <div className="flex items-baseline justify-between gap-2">
                         <span className="text-[12px] font-medium truncate" style={{ color: "rgba(255,255,255,0.85)" }}>{st.title}</span>
-                        <div className="flex items-center gap-2 shrink-0">
-                          {st.posStr && (
-                            <span className="text-[10px] tabular-nums font-mono" style={{ color: "rgba(255,255,255,0.4)" }}>{st.posStr}</span>
-                          )}
-                          <span className="text-[10px]" style={{ color: "#a78bfa" }}>{st.user}</span>
-                        </div>
+                        {st.posStr && (
+                          <span className="text-[10px] tabular-nums font-mono shrink-0" style={{ color: "rgba(255,255,255,0.35)" }}>{st.posStr}</span>
+                        )}
                       </div>
-                      <div style={{ height: 3, background: "rgba(255,255,255,0.08)", borderRadius: 2 }}>
+                      {/* User row */}
+                      <div className="flex items-center gap-1">
+                        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "rgba(255,255,255,0.3)", flexShrink: 0 }}>
+                          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+                        </svg>
+                        <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>{st.user}</span>
+                      </div>
+                      {/* Progress bar */}
+                      <div style={{ height: 3, background: "rgba(255,255,255,0.07)", borderRadius: 2 }}>
                         <div style={{
                           height: "100%", borderRadius: 2,
                           width: `${Math.min(100, st.progress)}%`,
-                          background: "linear-gradient(90deg, #8b5cf6, #a78bfa)",
-                          boxShadow: "0 0 6px rgba(139,92,246,0.5)",
+                          background: "linear-gradient(90deg, #7c3aed, #a78bfa)",
                         }} />
                       </div>
                     </div>
@@ -2329,6 +2344,8 @@ export default function Dashboard() {
                           <span key={i} style={{
                             color: name === "uptimekuma"
                               ? ((downCount ?? 0) > 0 ? "#ef4444" : "#10b981")
+                              : name === "qbittorrent" && i === 1
+                              ? "#06b6d4"
                               : "rgba(255,255,255,0.55)",
                             fontSize: 11, lineHeight: 1.6,
                           }}>{line}</span>
@@ -2340,26 +2357,36 @@ export default function Dashboard() {
                         )}
                         {name === "radarr" && queueItem && up && (
                           <div className="flex flex-col gap-1 mt-0.5">
-                            <span className="text-[10px] truncate font-medium" style={{ color: "#f59e0b" }}>↓ {queueItem.title}</span>
+                            <span style={{
+                              fontSize: 10, fontWeight: 500, color: "#f59e0b",
+                              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "90%",
+                            }}>↓ {cleanTitle(queueItem.title)}</span>
                             <GaugeBar percent={queueItem.pct} color="#f59e0b" thin />
                           </div>
                         )}
                         {/* Sonarr: active download */}
                         {name === "sonarr" && queueItem && up && (
                           <div className="flex flex-col gap-1 mt-0.5">
-                            <span className="text-[10px] truncate font-medium" style={{ color: "#3b82f6" }}>↓ {queueItem.title}</span>
+                            <span style={{
+                              fontSize: 10, fontWeight: 500, color: "#3b82f6",
+                              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "90%",
+                            }}>↓ {cleanTitle(queueItem.title)}</span>
                             <GaugeBar percent={queueItem.pct} color="#3b82f6" thin />
                           </div>
                         )}
                         {/* Tautulli: active streams inline */}
                         {name === "tautulli" && svcStreams && svcStreams.length > 0 && up && (
-                          <div className="flex flex-col gap-1.5 mt-0.5">
+                          <div className="flex flex-col gap-2 mt-0.5">
                             {svcStreams.slice(0, 3).map((st, si) => (
-                              <div key={si} className="flex flex-col gap-0.5">
-                                <span className="text-[10px] truncate" style={{ color: "rgba(255,255,255,0.7)" }}>{st.title}</span>
-                                <div style={{ height: 2, background: "rgba(255,255,255,0.08)", borderRadius: 1 }}>
+                              <div key={si} className="flex flex-col gap-1">
+                                <span style={{
+                                  fontSize: 12, color: "rgba(255,255,255,0.6)",
+                                  fontStyle: "italic",
+                                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                                }}>{st.title}</span>
+                                <div style={{ height: 3, background: "rgba(255,255,255,0.07)", borderRadius: 2 }}>
                                   <div style={{
-                                    height: "100%", borderRadius: 1,
+                                    height: "100%", borderRadius: 2,
                                     width: `${Math.min(100, st.progress)}%`,
                                     background: "#8b5cf6",
                                   }} />

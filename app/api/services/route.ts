@@ -133,9 +133,12 @@ interface TautulliSession {
 }
 
 function fmtMs(ms: number): string {
-  const s = Math.floor(ms / 1000);
-  const m = Math.floor(s / 60), ss = s % 60;
-  return `${m}:${String(ss).padStart(2, "0")}`;
+  const totalMins = Math.floor(ms / 1000 / 60);
+  const hours     = Math.floor(totalMins / 60);
+  const mins      = totalMins % 60;
+  const secs      = Math.floor((ms / 1000) % 60);
+  if (hours > 0) return `${hours}h ${String(mins).padStart(2, "0")}m`;
+  return `${mins}:${String(secs).padStart(2, "0")}`;
 }
 
 async function tautulli(): Promise<ServiceResult> {
@@ -152,8 +155,8 @@ async function tautulli(): Promise<ServiceResult> {
         title = `${s.grandparent_title} ${se}`;
       }
       const progress = parseInt(s.progress_percent ?? "0", 10);
-      const durMs    = (s.duration ?? 0) * 1000;      // Tautulli duration is seconds
-      const offMs    = s.view_offset ?? 0;             // view_offset is milliseconds
+      const durMs    = s.duration   ?? 0;   // Tautulli duration is milliseconds
+      const offMs    = s.view_offset ?? 0;  // view_offset is milliseconds
       const posStr   = durMs > 0 ? `${fmtMs(offMs)} / ${fmtMs(durMs)}` : "";
       return { title, user: s.user ?? "—", progress, posStr };
     });
@@ -179,8 +182,8 @@ async function qbittorrent(): Promise<ServiceResult> {
       t.state === "uploading" || t.state === "forcedUP" || t.state === "stalledUP"
     ).length;
     const totalDlSpeed = data.reduce((s, t) => s + (t.dlspeed ?? 0), 0);
-    const lines = [`${downloading} downloading · ${seeding} seeding · ${data.length} total`];
-    if (totalDlSpeed > 0) lines.push(`${fmtMB(totalDlSpeed)}/s`);
+    const lines = [`${downloading} downloading · ${seeding} seeding`];
+    if (totalDlSpeed > 1000) lines.push(`↓ ${fmtMB(totalDlSpeed)}/s`);
     return { name: "qbittorrent", up: true, lines };
   }
 
