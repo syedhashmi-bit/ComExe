@@ -694,6 +694,14 @@ function IconFolder() {
   );
 }
 
+function IconGrafana() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/>
+    </svg>
+  );
+}
+
 function ServiceIcon({ src, label, color }: { src: string; label: string; color: string }) {
   const [err, setErr] = useState(false);
   if (!src || err) {
@@ -1132,7 +1140,7 @@ function GoogleSearch({ inputRef }: { inputRef: React.RefObject<HTMLInputElement
 
 // ── settings panel ─────────────────────────────────────────────────────────────
 
-const CARD_KEYS = ["cpu", "memory", "filesystems", "network", "gpu", "speedtest", "system", "services"] as const;
+const CARD_KEYS = ["cpu", "memory", "filesystems", "network", "gpu", "speedtest", "system", "grafana", "services"] as const;
 
 function SettingsPanel({ settings, onUpdate, onClose }: {
   settings: Settings; onUpdate: (s: Settings) => void; onClose: () => void;
@@ -1379,6 +1387,87 @@ function MikrotikTab() {
       {data.temp != null && <>{sep()}{pill("Temp", `${data.temp}°C`, undefined, data.temp)}</>}
       <span style={{ color: "rgba(255,255,255,0.2)", fontSize: 10, marginLeft: "auto", flexShrink: 0 }}>tap to open ↗</span>
     </a>
+  );
+}
+
+// ── GrafanaCard ───────────────────────────────────────────────────────────────
+
+const GRAFANA_BASE   = "http://192.168.88.196:30037";
+const GRAFANA_PANEL  = `${GRAFANA_BASE}/d-solo/rYdddlPWk/node-exporter-full?orgId=1&panelId=77&theme=dark&refresh=10s`;
+const GRAFANA_LINKS  = [
+  { label: "Node Exporter Dashboard", url: `${GRAFANA_BASE}/d/rYdddlPWk` },
+  { label: "Prometheus Targets",      url: "http://192.168.88.196:30104/targets" },
+  { label: "Prometheus Graph",        url: "http://192.168.88.196:30104/graph" },
+];
+
+function GrafanaCard() {
+  const [status, setStatus] = useState<"loading" | "loaded" | "fallback">("loading");
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setStatus(s => s === "loading" ? "fallback" : s);
+    }, 8000);
+    return () => clearTimeout(t);
+  }, []);
+
+  return (
+    <div style={{
+      background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
+      borderRadius: 14, padding: 18, backdropFilter: "blur(6px)",
+      display: "flex", flexDirection: "column", gap: 12,
+    }}>
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span style={{ color: "#f97316" }}><IconGrafana /></span>
+          <span className="text-[10px] uppercase tracking-widest font-semibold" style={{ color: "rgba(255,255,255,0.45)", letterSpacing: "0.15em" }}>grafana</span>
+          {status === "loading" && (
+            <span className="text-[9px]" style={{ color: "rgba(255,255,255,0.2)" }}>loading…</span>
+          )}
+        </div>
+        <a href={GRAFANA_BASE} target="_blank" rel="noopener noreferrer"
+          className="text-[10px]"
+          style={{ color: "rgba(255,255,255,0.3)", textDecoration: "none", transition: "color 0.15s" }}
+          onMouseEnter={e => (e.currentTarget.style.color = "#f97316")}
+          onMouseLeave={e => (e.currentTarget.style.color = "rgba(255,255,255,0.3)")}>
+          open ↗
+        </a>
+      </div>
+
+      {/* iframe or fallback */}
+      {status !== "fallback" ? (
+        <iframe
+          src={GRAFANA_PANEL}
+          style={{
+            width: "100%", height: 200, border: "none",
+            borderRadius: 8, background: "transparent",
+            opacity: status === "loaded" ? 1 : 0.4,
+            transition: "opacity 0.3s",
+          }}
+          onLoad={() => setStatus("loaded")}
+          onError={() => setStatus("fallback")}
+        />
+      ) : (
+        <div className="flex flex-col gap-1">
+          <span className="text-[10px] mb-1" style={{ color: "rgba(255,255,255,0.3)" }}>Panel unavailable — quick links:</span>
+          {GRAFANA_LINKS.map(({ label, url }) => (
+            <a key={url} href={url} target="_blank" rel="noopener noreferrer"
+              className="flex items-center justify-between group"
+              style={{
+                padding: "8px 10px", borderRadius: 8,
+                background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)",
+                textDecoration: "none", transition: "background 0.15s, border-color 0.15s",
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = "rgba(249,115,22,0.08)"; e.currentTarget.style.borderColor = "rgba(249,115,22,0.25)"; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.03)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.07)"; }}
+            >
+              <span className="text-[11px] font-medium" style={{ color: "rgba(255,255,255,0.7)" }}>{label}</span>
+              <span style={{ color: "#f97316", fontSize: 12 }}>→</span>
+            </a>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -2081,35 +2170,42 @@ export default function Dashboard() {
               </Card>
             )}
 
-            {/* System Info — row 3 */}
-            {isVisible("system") && (
-              <Card label="system" accent="#d946ef" icon={<IconTerminal />}
-                expanded={expandedCard === "system"} onToggle={() => toggleCard("system")}>
-                {loading ? <Skeleton /> : (
-                  <div className="flex flex-col gap-0">
-                    {([
-                      { emoji: "🐧", label: "os",      value: metrics?.sysInfo?.os       ?? "—", mono: false },
-                      { emoji: "⚙️", label: "kernel",  value: metrics?.sysInfo?.kernel   ?? "—", mono: true  },
-                      { emoji: "🖥️", label: "arch",    value: metrics?.sysInfo?.arch     ?? "—", mono: false },
-                      { emoji: "🌐", label: "host",    value: metrics?.sysInfo?.hostname ?? "—", mono: false },
-                      { emoji: "⚡", label: "cores",   value: metrics?.sysInfo?.cpuCores != null ? `${metrics.sysInfo.cpuCores} cores` : "—", mono: false },
-                      { emoji: "🕐", label: "up since", value: fmtSince(metrics?.uptime ?? null), mono: true  },
-                    ] as { emoji: string; label: string; value: string; mono: boolean }[]).map(({ emoji, label, value, mono }, i, arr) => (
-                      <div key={label}>
-                        <div className="flex items-center gap-2 py-2">
-                          <span style={{ fontSize: 13, width: 18, textAlign: "center", flexShrink: 0 }}>{emoji}</span>
-                          <span className="text-[10px] uppercase tracking-widest shrink-0" style={{ color: "rgba(255,255,255,0.3)", minWidth: 38 }}>{label}</span>
-                          <span className={`text-[11px] font-medium ml-auto truncate${mono ? " font-mono" : ""}`}
-                            style={{ color: "rgba(255,255,255,0.75)" }}>{value}</span>
-                        </div>
-                        {i < arr.length - 1 && <div style={{ height: 1, background: "rgba(255,255,255,0.05)" }} />}
+            {/* Row 3: System + Grafana — each takes half of the 3-col width */}
+            {(isVisible("system") || isVisible("grafana")) && (
+              <div className="lg:col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
+                {isVisible("system") && (
+                  <Card label="system" accent="#d946ef" icon={<IconTerminal />}
+                    expanded={expandedCard === "system"} onToggle={() => toggleCard("system")}>
+                    {loading ? <Skeleton /> : (
+                      <div className="flex flex-col gap-0">
+                        {([
+                          { emoji: "🐧", label: "os",       value: metrics?.sysInfo?.os       ?? "—", mono: false },
+                          { emoji: "⚙️", label: "kernel",   value: metrics?.sysInfo?.kernel   ?? "—", mono: true  },
+                          { emoji: "🖥️", label: "arch",     value: metrics?.sysInfo?.arch     ?? "—", mono: false },
+                          { emoji: "🌐", label: "host",     value: metrics?.sysInfo?.hostname ?? "—", mono: false },
+                          { emoji: "⚡", label: "cores",    value: metrics?.sysInfo?.cpuCores != null ? `${metrics.sysInfo.cpuCores} cores` : "—", mono: false },
+                          { emoji: "🕐", label: "up since", value: fmtSince(metrics?.uptime ?? null), mono: true  },
+                        ] as { emoji: string; label: string; value: string; mono: boolean }[]).map(({ emoji, label, value, mono }, i, arr) => (
+                          <div key={label}>
+                            <div className="flex items-center gap-2 py-2">
+                              <span style={{ fontSize: 13, width: 18, textAlign: "center", flexShrink: 0 }}>{emoji}</span>
+                              <span className="text-[10px] uppercase tracking-widest shrink-0" style={{ color: "rgba(255,255,255,0.3)", minWidth: 46 }}>{label}</span>
+                              <span className={`text-[11px] font-medium ml-auto truncate${mono ? " font-mono" : ""}`}
+                                style={{ color: "rgba(255,255,255,0.75)" }}>{value}</span>
+                            </div>
+                            {i < arr.length - 1 && <div style={{ height: 1, background: "rgba(255,255,255,0.05)" }} />}
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
+                    )}
+                  </Card>
                 )}
-              </Card>
-            )}
 
+                {isVisible("grafana") && (
+                  <GrafanaCard />
+                )}
+              </div>
+            )}
 
           </div>
 
