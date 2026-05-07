@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 
-const MAX_HISTORY = 30;
+const MAX_HISTORY = 60;
 
 // ── types ─────────────────────────────────────────────────────────────────────
 
@@ -672,6 +672,14 @@ function IconTerminal() {
   );
 }
 
+function IconFolder() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+    </svg>
+  );
+}
+
 function ServiceIcon({ src, label, color }: { src: string; label: string; color: string }) {
   const [err, setErr] = useState(false);
   if (!src || err) {
@@ -729,12 +737,12 @@ function BookmarkItem({ name, url, icon }: { name: string; url: string; icon: st
 
 // ── primitive components ──────────────────────────────────────────────────────
 
-function GaugeBar({ percent, color, thin = false }: { percent: number; color: string; thin?: boolean }) {
+function GaugeBar({ percent, color, thin = false, gradient }: { percent: number; color: string; thin?: boolean; gradient?: string }) {
   return (
-    <div className={`relative w-full rounded-full overflow-hidden`} style={{ background: "rgba(255,255,255,0.08)", height: thin ? 3 : 5 }}>
+    <div className="relative w-full rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.08)", height: thin ? 3 : 5 }}>
       <div
         className="h-full rounded-full transition-all duration-700 ease-out"
-        style={{ width: `${percent}%`, background: color, boxShadow: `0 0 ${thin ? 3 : 6}px ${color}55` }}
+        style={{ width: `${percent}%`, background: gradient ?? color, boxShadow: `0 0 ${thin ? 3 : 6}px ${color}55` }}
       />
     </div>
   );
@@ -814,6 +822,22 @@ function DonutChart({ used, total, color, size = 72 }: { used: number; total: nu
   );
 }
 
+function RadialGauge({ percent, color, size = 88 }: { percent: number; color: string; size?: number }) {
+  const r = 32, circ = 2 * Math.PI * r;
+  const filled = (Math.min(100, Math.max(0, percent)) / 100) * circ;
+  return (
+    <div className="relative flex items-center justify-center shrink-0" style={{ width: size, height: size }}>
+      <svg width={size} height={size} viewBox="0 0 88 88" style={{ transform: "rotate(-90deg)", position: "absolute", inset: 0 }}>
+        <circle cx="44" cy="44" r={r} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="6" />
+        <circle cx="44" cy="44" r={r} fill="none" stroke={color} strokeWidth="6"
+          strokeDasharray={`${filled.toFixed(2)} ${(circ - filled).toFixed(2)}`} strokeLinecap="round"
+          style={{ filter: `drop-shadow(0 0 5px ${color}66)`, transition: "stroke-dasharray 0.7s ease" }}
+        />
+      </svg>
+    </div>
+  );
+}
+
 function ThreeSegmentDonut({ usedBytes, cacheBytes, freeBytes, totalBytes, du }: {
   usedBytes: number; cacheBytes: number; freeBytes: number; totalBytes: number; du: DataUnit;
 }) {
@@ -871,7 +895,7 @@ function ThreeSegmentDonut({ usedBytes, cacheBytes, freeBytes, totalBytes, du }:
         ].map(({ label, color, bytes }) => (
           <div key={label} className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
+              <span className="w-2 h-2 rounded-sm shrink-0" style={{ background: color }} />
               <span className="text-[10px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.4)" }}>{label}</span>
             </div>
             <span className="text-[10px] tabular-nums font-medium" style={{ color: "rgba(255,255,255,0.65)" }}>
@@ -884,8 +908,8 @@ function ThreeSegmentDonut({ usedBytes, cacheBytes, freeBytes, totalBytes, du }:
   );
 }
 
-function LabeledBar({ label, right, percent, color }: {
-  label: string; right: string; percent: number; color: string;
+function LabeledBar({ label, right, percent, color, gradient }: {
+  label: string; right: string; percent: number; color: string; gradient?: string;
 }) {
   return (
     <div className="flex flex-col gap-1.5">
@@ -893,7 +917,7 @@ function LabeledBar({ label, right, percent, color }: {
         <span className="text-[10px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.4)" }}>{label}</span>
         <span className="text-xs font-medium tabular-nums" style={{ color: "rgba(255,255,255,0.65)" }}>{right}</span>
       </div>
-      <GaugeBar percent={percent} color={color} />
+      <GaugeBar percent={percent} color={color} gradient={gradient} />
     </div>
   );
 }
@@ -1649,10 +1673,18 @@ export default function Dashboard() {
             {isVisible("cpu") && (
               <Card label="cpu" accent="#06b6d4" alertLevel={cpuAlert} icon={<IconCPU />}
                 animDelay={0} expanded={expandedCard === "cpu"} onToggle={() => toggleCard("cpu")}>
-                <BigValue value={fmtPct(metrics?.cpu ?? null)} loading={loading} />
-                <Sparkline data={cpuHistory} color={barColor(cpuPct)} height={36} />
-                <GaugeBar percent={cpuPct} color={barColor(cpuPct)} />
-                <SubRow label="utilization" value={fmtPct(metrics?.cpu ?? null)} />
+                <div className="flex items-end justify-between gap-2">
+                  <BigValue value={fmtPct(metrics?.cpu ?? null)} loading={loading} />
+                  {!loading && metrics?.sysInfo?.cpuCores != null && (
+                    <span className="mb-1 tabular-nums" style={{
+                      background: "rgba(6,182,212,0.1)", border: "1px solid rgba(6,182,212,0.25)",
+                      borderRadius: 5, padding: "2px 7px", fontSize: 10, color: "#06b6d4",
+                    }}>{metrics.sysInfo.cpuCores} cores</span>
+                  )}
+                </div>
+                <Sparkline data={cpuHistory} color={barColor(cpuPct)} height={44} />
+                <GaugeBar percent={cpuPct} color={barColor(cpuPct)}
+                  gradient={`linear-gradient(90deg, #0891b2, #06b6d4 60%, ${barColor(cpuPct)})`} />
                 {expandedCard === "cpu" && (() => {
                   const s = histStats(cpuHistory);
                   return (
@@ -1679,6 +1711,11 @@ export default function Dashboard() {
                       totalBytes={memTotal ?? 0}
                       du={du}
                     />
+                    {realMemPct > 0 && (
+                      <span className="text-[10px] tabular-nums text-center" style={{ color: "rgba(255,255,255,0.3)" }}>
+                        actual pressure: {realMemPct.toFixed(1)}%
+                      </span>
+                    )}
                     {expandedCard === "memory" && (() => {
                       const s = histStats(memHistory);
                       return (
@@ -1702,50 +1739,43 @@ export default function Dashboard() {
                 {loading ? <Skeleton /> : !metrics?.disks.length ? (
                   <span className="text-xs" style={{ color: "#444" }}>no filesystems found</span>
                 ) : (() => {
+                  const PREFIX = "/mnt/Pool/Media/";
+                  const folderName = (mp: string) => mp.startsWith(PREFIX) ? mp.slice(PREFIX.length) : (mp.split("/").pop() ?? mp);
+                  const fsBarColor = (p: number) => p > 85 ? "#ef4444" : p > 70 ? "#f59e0b" : "#10b981";
                   const sorted = [...metrics.disks].sort((a, b) => b.total - a.total);
-                  const largest = sorted[0];
-                  const rest = sorted.slice(1);
-                  const lvl = diskAlertLevel(largest.usedPct);
-                  const col = lvl === "critical" ? "#ff1744" : lvl === "warning" ? "#ff9100" : barColor(largest.usedPct);
                   return (
-                    <div className="flex flex-col gap-3">
-                      <div className="flex items-center gap-4">
-                        <DonutChart used={largest.used} total={largest.total} color={col} size={72} />
-                        <div className="flex flex-col gap-1 min-w-0">
-                          <span className="text-xs font-medium truncate" style={{ color: lvl ? col : "#777" }}>
-                            {largest.mountpoint}
-                          </span>
-                          <span className="text-[10px] tabular-nums" style={{ color: "#444" }}>
-                            {fmtBytes(largest.used, 1, du)} / {fmtBytes(largest.total, 1, du)}
-                          </span>
-                          {expandedCard === "filesystems" && (
-                            <span className="text-[10px]" style={{ color: "#2e2e2e" }}>
-                              {fmtBytes(largest.avail, 1, du)} free
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      {rest.length > 0 && (
-                        <div className="flex flex-col gap-2">
-                          {rest.map(disk => {
-                            const l = diskAlertLevel(disk.usedPct);
-                            const c = l === "critical" ? "#ff1744" : l === "warning" ? "#ff9100" : barColor(disk.usedPct);
-                            return (
-                              <div key={disk.mountpoint} className="flex flex-col gap-1">
-                                <div className="flex justify-between items-baseline gap-2">
-                                  <span className="text-xs font-medium truncate" style={{ color: l ? c : "#666", maxWidth: "55%" }}>
-                                    {disk.mountpoint}
-                                  </span>
-                                  <span className="text-[10px] tabular-nums shrink-0" style={{ color: "#444" }}>
-                                    {fmtBytes(disk.used, 1, du)} / {fmtBytes(disk.total, 1, du)}
-                                  </span>
-                                </div>
-                                <GaugeBar percent={disk.usedPct} color={c} thin />
+                    <div className="flex flex-col gap-0"
+                      style={{ overflowY: sorted.length > 4 ? "auto" : "visible", maxHeight: sorted.length > 4 ? 230 : undefined }}>
+                      {sorted.map((disk, idx) => {
+                        const name = folderName(disk.mountpoint);
+                        const barC = fsBarColor(disk.usedPct);
+                        return (
+                          <div key={disk.mountpoint} className="flex flex-col gap-1.5"
+                            style={{
+                              padding: "8px 0",
+                              borderBottom: idx < sorted.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none",
+                            }}>
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <span style={{ color: barC, opacity: 0.85, flexShrink: 0 }}><IconFolder /></span>
+                                <span className="text-xs font-medium truncate" style={{ color: "rgba(255,255,255,0.8)" }}>{name}</span>
                               </div>
-                            );
-                          })}
-                        </div>
-                      )}
+                              <span className="text-[10px] tabular-nums shrink-0 font-mono" style={{ color: "rgba(255,255,255,0.4)" }}>
+                                {fmtBytes(disk.used, 1, du)} / {fmtBytes(disk.total, 1, du)}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 relative rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.08)", height: 4 }}>
+                                <div className="h-full rounded-full transition-all duration-700"
+                                  style={{ width: `${disk.usedPct}%`, background: barC, boxShadow: `0 0 4px ${barC}55` }} />
+                              </div>
+                              <span className="tabular-nums font-mono shrink-0" style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", minWidth: "2.5ch" }}>
+                                {disk.usedPct.toFixed(0)}%
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   );
                 })()}
@@ -1754,35 +1784,39 @@ export default function Dashboard() {
 
             {/* Network */}
             {isVisible("network") && (
-              <Card label="network"
-                subtitle={metrics?.network?.interfaceName ?? undefined}
-                accent="#3b82f6" icon={<IconNetwork />}
+              <Card label="network" accent="#3b82f6" icon={<IconNetwork />}
                 animDelay={150} expanded={expandedCard === "network"} onToggle={() => toggleCard("network")}>
+                {!loading && metrics?.network?.interfaceName && (
+                  <span className="self-start font-mono" style={{
+                    background: "rgba(59,130,246,0.12)", border: "1px solid rgba(59,130,246,0.25)",
+                    borderRadius: 4, padding: "2px 7px", fontSize: 9, color: "#3b82f6",
+                  }}>{metrics.network.interfaceName}</span>
+                )}
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center gap-2">
-                    <span className="text-[11px] font-medium" style={{ color: "#3b82f6" }}>↓</span>
+                    <span className="text-[11px] font-bold" style={{ color: "#3b82f6" }}>↓</span>
                     <span className="text-[10px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.3)" }}>rx</span>
-                    <span className="text-xs font-medium tabular-nums ml-auto font-mono" style={{ color: "rgba(255,255,255,0.7)" }}>
+                    <span className="text-xs font-medium tabular-nums ml-auto font-mono" style={{ color: "rgba(255,255,255,0.8)" }}>
                       {loading ? "—" : `${fmtBytes(metrics?.network.rxBytesPerSec ?? null, 1, du)}/s`}
                     </span>
                   </div>
-                  <Sparkline data={rxHistory} color="#3b82f6" autoMax height={36} />
-                  <span className="text-[10px] tabular-nums" style={{ color: "#2a2a2a" }}>
-                    {fmtBytes(metrics?.network.rxBytesTotal ?? null, 1, du)} total
+                  <Sparkline data={rxHistory} color="#3b82f6" autoMax height={50} />
+                  <span className="text-[10px] tabular-nums font-medium" style={{ color: "rgba(255,255,255,0.35)" }}>
+                    ↓ {fmtBytes(metrics?.network.rxBytesTotal ?? null, 1, du)} total
                   </span>
                 </div>
-                <div style={{ height: 1, background: "#161616" }} />
+                <div style={{ height: 1, background: "rgba(255,255,255,0.05)" }} />
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center gap-2">
-                    <span className="text-[11px] font-medium" style={{ color: "#f59e0b" }}>↑</span>
+                    <span className="text-[11px] font-bold" style={{ color: "#f59e0b" }}>↑</span>
                     <span className="text-[10px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.3)" }}>tx</span>
-                    <span className="text-xs font-medium tabular-nums ml-auto font-mono" style={{ color: "rgba(255,255,255,0.7)" }}>
+                    <span className="text-xs font-medium tabular-nums ml-auto font-mono" style={{ color: "rgba(255,255,255,0.8)" }}>
                       {loading ? "—" : `${fmtBytes(metrics?.network.txBytesPerSec ?? null, 1, du)}/s`}
                     </span>
                   </div>
-                  <Sparkline data={txHistory} color="#f59e0b" autoMax height={36} />
-                  <span className="text-[10px] tabular-nums" style={{ color: "#2a2a2a" }}>
-                    {fmtBytes(metrics?.network.txBytesTotal ?? null, 1, du)} total
+                  <Sparkline data={txHistory} color="#f59e0b" autoMax height={50} />
+                  <span className="text-[10px] tabular-nums font-medium" style={{ color: "rgba(255,255,255,0.35)" }}>
+                    ↑ {fmtBytes(metrics?.network.txBytesTotal ?? null, 1, du)} total
                   </span>
                 </div>
                 {expandedCard === "network" && rxHistory.length > 0 && (
@@ -1796,53 +1830,61 @@ export default function Dashboard() {
 
             {/* GPU */}
             {isVisible("gpu") && (
-              <Card label="gpu"
-                subtitle={loading ? undefined : (metrics?.gpu?.name ?? "NVIDIA GPU")}
-                accent={gpuColor} alertLevel={gpuTempAlert} icon={<IconGPU />}
+              <Card label="gpu" accent={gpuColor} alertLevel={gpuTempAlert} icon={<IconGPU />}
                 animDelay={200} expanded={expandedCard === "gpu"} onToggle={() => toggleCard("gpu")}>
                 {loading ? <Skeleton /> : (
                   <>
-                    <div className="flex items-baseline justify-between">
-                      <BigValue value={fmtPct(gpuUtil)} />
-                      {metrics?.gpu?.temperature != null && (
-                        <span className="text-sm font-medium tabular-nums"
-                          style={{ color: tempColor(metrics.gpu.temperature) }}>
-                          {fmtTemp(metrics.gpu.temperature, tu)}
-                        </span>
-                      )}
+                    <div className="flex items-center gap-4">
+                      <div className="relative flex items-center justify-center shrink-0" style={{ width: 88, height: 88 }}>
+                        <RadialGauge percent={gpuUtil ?? 0} color={gpuColor} size={88} />
+                        <div className="absolute inset-0 flex flex-col items-center justify-center">
+                          <span className="font-medium tabular-nums font-mono" style={{ fontSize: 22, lineHeight: 1, color: "#ffffff" }}>
+                            {gpuUtil != null ? gpuUtil.toFixed(0) : "—"}
+                          </span>
+                          <span className="text-[9px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.35)" }}>%</span>
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-1 min-w-0">
+                        {metrics?.gpu?.name && (
+                          <span className="text-[10px] font-medium truncate" style={{ color: "#06b6d4" }}>{metrics.gpu.name}</span>
+                        )}
+                        {metrics?.gpu?.temperature != null && (
+                          <span className="font-medium tabular-nums font-mono"
+                            style={{ fontSize: 22, lineHeight: 1, color: tempColor(metrics.gpu.temperature), transition: "color 0.3s ease" }}>
+                            {fmtTemp(metrics.gpu.temperature, tu)}
+                          </span>
+                        )}
+                        {metrics?.gpu?.powerDraw != null && (
+                          <span className="text-[10px] tabular-nums" style={{ color: "rgba(255,255,255,0.4)" }}>
+                            {metrics.gpu.powerDraw.toFixed(1)} W
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <MiniBarChart data={gpuHistory} color={gpuColor} height={32} />
                     <LabeledBar
                       label="vram"
                       right={`${fmtBytes(metrics?.gpu?.memUsed ?? null, 1, du)} / ${fmtBytes(metrics?.gpu?.memTotal ?? null, 1, du)}`}
                       percent={gpuMemPct}
-                      color={barColor(gpuMemPct)}
+                      color="#a855f7"
+                      gradient="linear-gradient(90deg, #7c3aed, #a855f7)"
                     />
                     {metrics?.gpu?.powerDraw != null && metrics?.gpu?.powerLimit != null && (
                       <LabeledBar
                         label="power"
                         right={`${metrics.gpu.powerDraw.toFixed(1)} / ${metrics.gpu.powerLimit.toFixed(0)} W`}
                         percent={gpuPwrPct}
-                        color={barColor(gpuPwrPct)}
+                        color="#f59e0b"
+                        gradient="linear-gradient(90deg, #ea580c, #f59e0b)"
                       />
                     )}
-                    {metrics?.gpu?.powerDraw != null && metrics?.gpu?.powerLimit == null && (
-                      <SubRow label="power draw" value={`${metrics.gpu.powerDraw.toFixed(1)} W`} />
-                    )}
-                    {/* temp sparkline — always visible */}
                     {gpuTempHistory.length >= 2 && (
                       <div className="flex flex-col gap-1.5">
                         <div className="flex justify-between items-center">
-                          <span className="text-[10px] uppercase tracking-widest" style={{ color: "#333" }}>temp</span>
-                          {metrics?.gpu?.temperature != null && (
-                            <span className="text-[10px] tabular-nums" style={{ color: tempColor(metrics.gpu.temperature) }}>
-                              {fmtTemp(metrics.gpu.temperature, tu)}
-                            </span>
-                          )}
+                          <span className="text-[10px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.25)" }}>temp history</span>
                         </div>
                         <Sparkline data={gpuTempHistory}
                           color={metrics?.gpu?.temperature != null ? tempColor(metrics.gpu.temperature) : "#555"}
-                          autoMax height={24} />
+                          autoMax height={28} />
                       </div>
                     )}
                     {expandedCard === "gpu" && (() => {
@@ -1880,18 +1922,25 @@ export default function Dashboard() {
                     : `${Math.round(diff / 86400)}d ago`;
                   return (
                     <div className="flex flex-col gap-2">
-                      {latest.isp && (
-                        <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.45)" }}>{latest.isp}</span>
+                      {(latest.isp || latest.serverLocation) && (
+                        <div className="flex flex-col gap-0.5">
+                          {latest.isp && (
+                            <span className="text-[11px] font-medium" style={{ color: "rgba(255,255,255,0.6)" }}>{latest.isp}</span>
+                          )}
+                          {latest.serverLocation && (
+                            <span className="text-[9px]" style={{ color: "rgba(255,255,255,0.3)" }}>{latest.serverLocation}</span>
+                          )}
+                        </div>
                       )}
                       <div className="flex items-end gap-3">
                         <div className="flex flex-col">
-                          <span className="font-medium tabular-nums font-mono" style={{ fontSize: 36, lineHeight: 1, color: "#06b6d4" }}>
+                          <span className="font-medium tabular-nums font-mono" style={{ fontSize: 44, lineHeight: 1, color: "#06b6d4" }}>
                             {latest.download != null ? latest.download.toFixed(0) : "—"}
                           </span>
                           <span className="text-[9px] uppercase tracking-widest mt-0.5" style={{ color: "rgba(255,255,255,0.35)" }}>Mbps ↓</span>
                         </div>
-                        <div className="flex flex-col mb-[2px]">
-                          <span className="font-medium tabular-nums font-mono" style={{ fontSize: 26, lineHeight: 1, color: "#f59e0b" }}>
+                        <div className="flex flex-col mb-[4px]">
+                          <span className="font-medium tabular-nums font-mono" style={{ fontSize: 28, lineHeight: 1, color: "#f59e0b" }}>
                             {latest.upload != null ? latest.upload.toFixed(0) : "—"}
                           </span>
                           <span className="text-[9px] uppercase tracking-widest mt-0.5" style={{ color: "rgba(255,255,255,0.35)" }}>Mbps ↑</span>
@@ -1923,12 +1972,24 @@ export default function Dashboard() {
               <Card label="system" accent="#d946ef" icon={<IconTerminal />}
                 expanded={expandedCard === "system"} onToggle={() => toggleCard("system")}>
                 {loading ? <Skeleton /> : (
-                  <div className="flex flex-col gap-2.5">
-                    <StatRow label="os"        value={metrics?.sysInfo?.os       ?? "—"} />
-                    <StatRow label="kernel"    value={metrics?.sysInfo?.kernel   ?? "—"} />
-                    <StatRow label="arch"      value={metrics?.sysInfo?.arch     ?? "—"} />
-                    <StatRow label="hostname"  value={metrics?.sysInfo?.hostname ?? "—"} />
-                    <StatRow label="cpu cores" value={metrics?.sysInfo?.cpuCores != null ? String(metrics.sysInfo.cpuCores) : "—"} />
+                  <div className="flex flex-col gap-0">
+                    {([
+                      { emoji: "🐧", label: "os",      value: metrics?.sysInfo?.os       ?? "—", mono: false },
+                      { emoji: "⚙️", label: "kernel",  value: metrics?.sysInfo?.kernel   ?? "—", mono: true  },
+                      { emoji: "🖥️", label: "arch",    value: metrics?.sysInfo?.arch     ?? "—", mono: false },
+                      { emoji: "🌐", label: "host",    value: metrics?.sysInfo?.hostname ?? "—", mono: false },
+                      { emoji: "⚡", label: "cores",   value: metrics?.sysInfo?.cpuCores != null ? `${metrics.sysInfo.cpuCores} cores` : "—", mono: false },
+                    ] as { emoji: string; label: string; value: string; mono: boolean }[]).map(({ emoji, label, value, mono }, i, arr) => (
+                      <div key={label}>
+                        <div className="flex items-center gap-2 py-2">
+                          <span style={{ fontSize: 13, width: 18, textAlign: "center", flexShrink: 0 }}>{emoji}</span>
+                          <span className="text-[10px] uppercase tracking-widest shrink-0" style={{ color: "rgba(255,255,255,0.3)", minWidth: 38 }}>{label}</span>
+                          <span className={`text-[11px] font-medium ml-auto truncate${mono ? " font-mono" : ""}`}
+                            style={{ color: "rgba(255,255,255,0.75)" }}>{value}</span>
+                        </div>
+                        {i < arr.length - 1 && <div style={{ height: 1, background: "rgba(255,255,255,0.05)" }} />}
+                      </div>
+                    ))}
                   </div>
                 )}
               </Card>
