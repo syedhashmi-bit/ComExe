@@ -74,6 +74,7 @@ interface SpeedtestResult {
   jitter:         number | null;
   serverName:     string | null;
   serverLocation: string | null;
+  serverHost:     string | null;
 }
 
 interface ServiceResult {
@@ -411,25 +412,31 @@ async function nginxSvc(): Promise<ServiceResult> {
 }
 
 interface SpeedtestRaw {
-  ping?: number | null;
-  download?: number | null;
-  upload?: number | null;
-  server_name?: string | null;
-  server_host?: string | null;
-  created_at?: string | null;
+  ping?:           number | null;
+  download?:       number | null;
+  upload?:         number | null;
+  jitter?:         number | null;
+  server_name?:    string | null;
+  server_host?:    string | null;
+  created_at?:     string | null;
+  timestamp?:      string | null;
+  isp?:            string | null;
+  serverLocation?: string | null;
+  serverHost?:     string | null;
 }
 
 function normalizeSpeedResult(r: SpeedtestRaw): SpeedtestResult {
   return {
-    ping:           r.ping        ?? null,
-    download:       r.download    ?? null,
-    upload:         r.upload      ?? null,
-    created_at:     r.created_at  ?? null,
-    timestamp:      r.created_at  ?? null,
-    jitter:         null,
-    isp:            r.server_name ?? null,
-    serverName:     r.server_name ?? null,
-    serverLocation: r.server_host ?? null,
+    ping:           r.ping           ?? null,
+    download:       r.download       ?? null,
+    upload:         r.upload         ?? null,
+    created_at:     r.created_at     ?? r.timestamp ?? null,
+    timestamp:      r.timestamp      ?? r.created_at ?? null,
+    jitter:         r.jitter         ?? null,
+    isp:            r.isp            ?? r.server_name ?? null,
+    serverName:     r.server_name    ?? r.isp ?? null,
+    serverLocation: r.serverLocation ?? r.server_host ?? null,
+    serverHost:     r.serverHost     ?? null,
   };
 }
 
@@ -1480,8 +1487,10 @@ export default function Dashboard() {
   const [services,           setServices]           = useState<{ name: string; up: boolean; lines: string[]; pct?: number; downCount?: number; queueItem?: { title: string; pct: number } | null; streams?: { title: string; user: string; progress: number; posStr: string }[] }[] | null>(null);
   const [servicesLoading,    setServicesLoading]    = useState(true);
   const [servicesUpdatedAt,  setServicesUpdatedAt]  = useState<number | null>(null);
-  const [speedtestResults, setSpeedtestResults] = useState<SpeedtestResult[]>([]);
-  const [speedtestLoading, setSpeedtestLoading] = useState(true);
+  const [speedtestResults,    setSpeedtestResults]    = useState<SpeedtestResult[]>([]);
+  const [speedtestLoading,    setSpeedtestLoading]    = useState(true);
+  const [speedtestHistory,    setSpeedtestHistory]    = useState<number[]>([]);
+  const [speedtestTotalTests, setSpeedtestTotalTests] = useState<number | null>(null);
   const [clockDate,        setClockDate]        = useState("");
   const [clockTime,        setClockTime]        = useState("");
 
@@ -1532,7 +1541,10 @@ export default function Dashboard() {
       const res = await fetch("/api/speedtest", { cache: "no-store" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      setSpeedtestResults(data.results ?? []);
+      const raw: SpeedtestRaw[] = data.results ?? [];
+      setSpeedtestResults(raw.map(normalizeSpeedResult));
+      if (Array.isArray(data.history))    setSpeedtestHistory(data.history);
+      if (data.totalTests != null)        setSpeedtestTotalTests(data.totalTests);
     } catch {
       setSpeedtestResults([]);
     } finally {
@@ -2071,11 +2083,11 @@ export default function Dashboard() {
                   <span className="text-xs" style={{ color: "rgba(255,255,255,0.4)" }}>no data</span>
                 ) : (() => {
                   const latest = speedtestResults[0];
-                  const ts = latest.timestamp ?? latest.created_at;
+                  const ts   = latest.timestamp ?? latest.created_at;
                   const diff = ts ? (Date.now() - new Date(ts).getTime()) / 1000 : null;
-                  const rel = diff == null ? null
-                    : diff < 60 ? "just now"
-                    : diff < 3600 ? `${Math.round(diff / 60)}m ago`
+                  const rel  = diff == null ? null
+                    : diff < 60    ? "just now"
+                    : diff < 3600  ? `${Math.round(diff / 60)}m ago`
                     : diff < 86400 ? `${Math.round(diff / 3600)}h ago`
                     : `${Math.round(diff / 86400)}d ago`;
                   const dl = latest.download;
@@ -2085,26 +2097,31 @@ export default function Dashboard() {
                     : dl >= 50  ? { label: "Fair",      color: "#f59e0b", bg: "rgba(245,158,11,0.12)", border: "rgba(245,158,11,0.3)" }
                     :             { label: "Poor",      color: "#ef4444", bg: "rgba(239,68,68,0.12)",  border: "rgba(239,68,68,0.3)"  };
                   return (
-                    <div className="flex flex-col gap-2">
-                      <div className="flex items-center justify-between gap-2 flex-wrap">
-                        {(latest.isp || latest.serverLocation) && (
-                          <div className="flex flex-col gap-0">
-                            {latest.isp && (
-                              <span className="text-[11px] font-medium" style={{ color: "rgba(255,255,255,0.6)" }}>{latest.isp}</span>
-                            )}
-                            {latest.serverLocation && (
-                              <span className="text-[9px]" style={{ color: "rgba(255,255,255,0.3)" }}>{latest.serverLocation}</span>
-                            )}
-                          </div>
-                        )}
+                    <div className="flex flex-col gap-2.5">
+
+                      {/* ISP / location / quality badge row */}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex flex-col gap-0.5">
+                          {latest.isp && (
+                            <span className="text-[12px] font-semibold" style={{ color: "rgba(255,255,255,0.75)" }}>{latest.isp}</span>
+                          )}
+                          {latest.serverLocation && (
+                            <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.4)" }}>{latest.serverLocation}</span>
+                          )}
+                          {latest.serverHost && (
+                            <span className="text-[9px] font-mono truncate" style={{ color: "rgba(255,255,255,0.22)", maxWidth: 160 }}>{latest.serverHost}</span>
+                          )}
+                        </div>
                         {quality && (
-                          <span className="text-[9px] font-semibold uppercase tracking-wider shrink-0"
+                          <span className="text-[9px] font-semibold uppercase tracking-wider shrink-0 mt-0.5"
                             style={{ color: quality.color, background: quality.bg, border: `1px solid ${quality.border}`, borderRadius: 5, padding: "2px 7px" }}>
                             {quality.label}
                           </span>
                         )}
                       </div>
-                      <div className="flex items-end gap-3">
+
+                      {/* Big numbers: download + upload */}
+                      <div className="flex items-end gap-4">
                         <div className="flex flex-col">
                           <span className="font-medium tabular-nums font-mono" style={{ fontSize: 44, lineHeight: 1, color: "#06b6d4" }}>
                             {dl != null ? dl.toFixed(0) : "—"}
@@ -2118,31 +2135,54 @@ export default function Dashboard() {
                           <span className="text-[9px] uppercase tracking-widest mt-0.5" style={{ color: "rgba(255,255,255,0.35)" }}>Mbps ↑</span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-3 flex-wrap">
-                        {latest.ping != null && (
-                          <div className="flex items-center gap-1.5">
-                            <span className="w-1.5 h-1.5 rounded-full shrink-0"
-                              style={{ background: "#10b981", boxShadow: "0 0 4px #10b98166" }} />
-                            <span className="text-[11px] tabular-nums font-medium font-mono" style={{ color: "#10b981" }}>
-                              {latest.ping < 10 ? latest.ping.toFixed(1) : latest.ping.toFixed(0)} ms
-                            </span>
-                            <span className="text-[9px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.3)" }}>ping</span>
-                          </div>
+
+                      {/* Ping · jitter on one line */}
+                      {(latest.ping != null || latest.jitter != null) && (
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="w-1.5 h-1.5 rounded-full shrink-0"
+                            style={{ background: "#10b981", boxShadow: "0 0 4px #10b98166" }} />
+                          {latest.ping != null && (
+                            <>
+                              <span className="text-[11px] tabular-nums font-medium font-mono" style={{ color: "#10b981" }}>
+                                {latest.ping < 10 ? latest.ping.toFixed(1) : latest.ping.toFixed(0)} ms
+                              </span>
+                              <span className="text-[9px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.28)" }}>ping</span>
+                            </>
+                          )}
+                          {latest.jitter != null && (
+                            <>
+                              <span style={{ color: "rgba(255,255,255,0.2)", fontSize: 9 }}>·</span>
+                              <span className="text-[11px] tabular-nums font-medium font-mono" style={{ color: "rgba(255,255,255,0.45)" }}>
+                                {latest.jitter < 10 ? latest.jitter.toFixed(1) : latest.jitter.toFixed(0)} ms
+                              </span>
+                              <span className="text-[9px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.28)" }}>jitter</span>
+                            </>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Download history sparkline */}
+                      {speedtestHistory.length >= 2 && (
+                        <div className="flex flex-col gap-1">
+                          <span className="text-[9px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.25)" }}>download history</span>
+                          <Sparkline data={speedtestHistory} color="#8b5cf6" height={40} />
+                        </div>
+                      )}
+
+                      {/* Footer: last tested + total count */}
+                      <div className="flex items-center justify-between flex-wrap gap-1">
+                        {rel && (
+                          <span className="text-[9px] tabular-nums" style={{ color: "rgba(255,255,255,0.3)" }}>
+                            auto-tested · {rel}
+                          </span>
                         )}
-                        {latest.jitter != null && (
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[11px] tabular-nums font-medium font-mono" style={{ color: "rgba(255,255,255,0.45)" }}>
-                              ±{latest.jitter < 10 ? latest.jitter.toFixed(1) : latest.jitter.toFixed(0)} ms
-                            </span>
-                            <span className="text-[9px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.3)" }}>jitter</span>
-                          </div>
+                        {speedtestTotalTests != null && (
+                          <span className="text-[9px] tabular-nums" style={{ color: "rgba(255,255,255,0.22)" }}>
+                            {speedtestTotalTests.toLocaleString()} tests recorded
+                          </span>
                         )}
                       </div>
-                      {rel && (
-                        <span className="text-[9px] tabular-nums" style={{ color: "rgba(255,255,255,0.3)" }}>
-                          last tested {rel}
-                        </span>
-                      )}
+
                     </div>
                   );
                 })()}
