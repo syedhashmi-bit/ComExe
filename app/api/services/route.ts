@@ -11,6 +11,8 @@ interface ServiceResult {
 let servicesCache: { data: { services: ServiceResult[]; timestamp: number }; ts: number } | null = null;
 const CACHE_TTL = 10_000;
 
+let piholeSession: { sid: string; expiry: number } | null = null;
+
 const TRUENAS_IP = process.env.TRUENAS_IP || "192.168.88.196";
 
 function fmtMB(b: number): string {
@@ -178,30 +180,48 @@ async function overseerr(): Promise<ServiceResult> {
 
 async function pihole(): Promise<ServiceResult> {
   const BASE = `http://${TRUENAS_IP}:20720`;
-  const API_KEY = "***REMOVED***";
-  type PiholeSummary = {
-    queries?: { total?: number; blocked?: number; percent_blocked?: number };
-    gravity?: { domains_being_blocked?: number };
-    queries_today?: number;
-    blocked_today?: number;
-    percent_blocked?: number;
-    gravity_size?: number;
-  };
+
+  async function getSid(): Promise<string> {
+    const now = Date.now();
+    if (piholeSession && now < piholeSession.expiry) return piholeSession.sid;
+    const authRes = await fetch(`${BASE}/api/auth`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: "***REMOVED***" }),
+      signal: AbortSignal.timeout(5000),
+    });
+    const authData = await authRes.json() as { session?: { sid?: string; validity?: number } };
+    const sid = authData?.session?.sid;
+    if (!sid) throw new Error("no sid in auth response");
+    const validity = authData.session?.validity ?? 1800;
+    piholeSession = { sid, expiry: now + validity * 1000 };
+    return sid;
+  }
 
   try {
-    let data: PiholeSummary;
-    try {
-      data = await apiFetch(`${BASE}/api/stats/summary`, { "X-API-Key": API_KEY }) as PiholeSummary;
-    } catch {
-      data = await apiFetch(`${BASE}/api/v6/stats/summary`, { "X-API-Key": API_KEY }) as PiholeSummary;
-    }
-    const total   = data.queries?.total ?? data.queries_today ?? 0;
-    const pct     = (data.queries?.percent_blocked ?? data.percent_blocked ?? 0).toFixed(1);
-    const gravity = data.gravity?.domains_being_blocked ?? data.gravity_size ?? 0;
-    const lines   = [`${total.toLocaleString()} queries · ${pct}% blocked`];
-    if (gravity > 0) lines.push(`${gravity.toLocaleString()} domains blocked`);
-    return { name: "pihole", up: true, lines };
+    const sid = await getSid();
+    const statsRes = await fetch(`${BASE}/api/stats/summary`, {
+      headers: { sid },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!statsRes.ok) throw new Error(`stats HTTP ${statsRes.status}`);
+    const stats = await statsRes.json() as {
+      queries?: { total?: number; blocked?: number; percent_blocked?: number };
+      gravity?: { domains_being_blocked?: number };
+    };
+    const total   = stats.queries?.total ?? 0;
+    const blocked = stats.queries?.blocked ?? 0;
+    const pct     = (stats.queries?.percent_blocked ?? 0).toFixed(1);
+    const gravity = stats.gravity?.domains_being_blocked ?? 0;
+    return {
+      name: "pihole", up: true, lines: [
+        `${total.toLocaleString()} queries today`,
+        `${blocked.toLocaleString()} blocked (${pct}%)`,
+        `${gravity.toLocaleString()} domains in gravity`,
+      ],
+    };
   } catch {
+    piholeSession = null;
     const up = await checkReachable(BASE);
     return { name: "pihole", up, lines: up ? ["—"] : [] };
   }

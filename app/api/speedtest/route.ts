@@ -35,26 +35,30 @@ function extractArray(json: unknown): RawResult[] {
   const j = json as Record<string, unknown>;
   // { data: [...] }
   if (Array.isArray(j.data)) return j.data as RawResult[];
-  // { data: { data: [...] } }
+  // { data: { data: [...] } } or { data: { results: [...] } }
   if (j.data && typeof j.data === "object") {
-    const inner = (j.data as Record<string, unknown>);
+    const inner = j.data as Record<string, unknown>;
     if (Array.isArray(inner.data)) return inner.data as RawResult[];
     if (Array.isArray(inner.results)) return inner.results as RawResult[];
+    // { data: { id, download, ... } } — single result object
+    if (inner.id != null || inner.download != null) return [inner as RawResult];
   }
   // { results: [...] }
   if (Array.isArray(j.results)) return j.results as RawResult[];
+  // { message: "ok", data: { ... } } already handled above; last resort
   return [];
 }
 
 export async function GET() {
   try {
-    const res = await fetch(`${BASE}/api/speedtest/results?limit=20`, {
+    const res = await fetch(`${BASE}/api/speedtest/results?limit=20&page=1`, {
       next: { revalidate: 0 },
       signal: AbortSignal.timeout(5000),
     });
+    console.log("speedtest status:", res.status);
     if (res.ok) {
       const json = await res.json();
-      console.log("[speedtest] raw response shape:", JSON.stringify(json)?.slice(0, 300));
+      console.log("speedtest data:", JSON.stringify(json).slice(0, 500));
       const results = extractArray(json).filter(r => !r.failed);
       if (results.length > 0) {
         return NextResponse.json({ results: results.map(normalize), timestamp: Date.now() });

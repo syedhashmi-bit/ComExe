@@ -1,5 +1,18 @@
 import { NextResponse } from "next/server";
 
+function formatMikrotikUptime(uptime: string): string {
+  const weeks = uptime.match(/(\d+)w/)?.[1];
+  const days  = uptime.match(/(\d+)d/)?.[1];
+  const hours = uptime.match(/(\d+)h/)?.[1];
+  const mins  = uptime.match(/(\d+)m/)?.[1];
+  const parts: string[] = [];
+  if (weeks) parts.push(weeks + "w");
+  if (days)  parts.push(days  + "d");
+  if (hours) parts.push(hours + "h");
+  if (mins)  parts.push(mins  + "m");
+  return parts.join(" ") || uptime;
+}
+
 let mikrotikCache: { data: unknown; ts: number } | null = null;
 const CACHE_TTL = 10_000;
 
@@ -58,7 +71,7 @@ export async function GET() {
       ramPct,
       hddUsed:  hddTotal !== null && freeHdd !== null ? hddTotal - freeHdd : null,
       hddTotal,
-      uptime:   str("uptime"),
+      uptime:   str("uptime") ? formatMikrotikUptime(str("uptime")!) : null,
       temp:     num("temperature"),
     };
     mikrotikCache = { data: responseData, ts: Date.now() };
