@@ -57,6 +57,7 @@ interface SpeedtestResult {
   download:       number | null;
   upload:         number | null;
   created_at:     string | null;
+  timestamp:      string | null;
   isp:            string | null;
   jitter:         number | null;
   serverName:     string | null;
@@ -410,6 +411,7 @@ function normalizeSpeedResult(r: SpeedtestRaw): SpeedtestResult {
     download:       r.download    ?? null,
     upload:         r.upload      ?? null,
     created_at:     r.created_at  ?? null,
+    timestamp:      r.created_at  ?? null,
     jitter:         null,
     isp:            r.server_name ?? null,
     serverName:     r.server_name ?? null,
@@ -490,8 +492,8 @@ function memAlertLevel(total: number | null, available: number | null, sReclaima
   if (total === null || available === null || total === 0) return null;
   const realUsed = total - available - (sReclaimable ?? 0);
   const realPct  = (Math.max(0, realUsed) / total) * 100;
-  if (realPct > 95) return "critical";
-  if (realPct > 85) return "warning";
+  if (realPct > 97) return "critical";
+  if (realPct > 93) return "warning";
   return null;
 }
 
@@ -667,141 +669,6 @@ function IconTerminal() {
       <polyline points="4 17 10 11 4 5"/>
       <line x1="12" y1="19" x2="20" y2="19"/>
     </svg>
-  );
-}
-
-function SpeedtestBarChart({ results }: { results: SpeedtestResult[] }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const tooltipRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const data = [...results].reverse(); // oldest first
-
-    function draw() {
-      if (!canvas) return;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-      const dpr = window.devicePixelRatio || 1;
-      const rect = canvas.getBoundingClientRect();
-      const W = rect.width, H = rect.height;
-      if (W === 0 || H === 0) return;
-      canvas.width = W * dpr; canvas.height = H * dpr;
-      ctx.scale(dpr, dpr);
-
-      const PAD_L = 40, PAD_R = 8, PAD_T = 8, PAD_B = 32;
-      const chartW = W - PAD_L - PAD_R;
-      const chartH = H - PAD_T - PAD_B;
-
-      const dlVals = data.map(r => r.download ?? 0);
-      const ulVals = data.map(r => r.upload ?? 0);
-      const maxVal = Math.max(...dlVals, ...ulVals, 1) * 1.12;
-
-      ctx.clearRect(0, 0, W, H);
-
-      for (let i = 0; i <= 4; i++) {
-        const y = PAD_T + (1 - i / 4) * chartH;
-        ctx.strokeStyle = "rgba(255,255,255,0.05)";
-        ctx.lineWidth = 1;
-        ctx.beginPath(); ctx.moveTo(PAD_L, y); ctx.lineTo(W - PAD_R, y); ctx.stroke();
-        ctx.fillStyle = "rgba(255,255,255,0.28)";
-        ctx.font = `9px monospace`;
-        ctx.textAlign = "right";
-        ctx.fillText(`${Math.round(maxVal * i / 4)}`, PAD_L - 4, y + 3);
-      }
-
-      const n = data.length;
-      const groupW = chartW / Math.max(n, 1);
-      const barW = Math.max(3, Math.min(14, groupW * 0.38));
-
-      data.forEach((r, i) => {
-        const cx = PAD_L + i * groupW + groupW / 2;
-        const dlH = ((r.download ?? 0) / maxVal) * chartH;
-        ctx.fillStyle = "rgba(6,182,212,0.82)";
-        ctx.fillRect(cx - barW - 1, PAD_T + chartH - dlH, barW, Math.max(2, dlH));
-        const ulH = ((r.upload ?? 0) / maxVal) * chartH;
-        ctx.fillStyle = "rgba(245,158,11,0.82)";
-        ctx.fillRect(cx + 1, PAD_T + chartH - ulH, barW, Math.max(2, ulH));
-        if (r.created_at && n <= 20) {
-          const t = new Date(r.created_at);
-          const label = `${String(t.getHours()).padStart(2,"0")}:${String(t.getMinutes()).padStart(2,"0")}`;
-          ctx.save();
-          ctx.translate(cx, PAD_T + chartH + 5);
-          ctx.rotate(-Math.PI / 4);
-          ctx.fillStyle = "rgba(255,255,255,0.2)";
-          ctx.font = `8px monospace`;
-          ctx.textAlign = "right";
-          ctx.fillText(label, 0, 0);
-          ctx.restore();
-        }
-      });
-    }
-
-    draw();
-    const ro = new ResizeObserver(draw);
-    ro.observe(canvas);
-    return () => ro.disconnect();
-  }, [results]);
-
-  function handleMouseMove(e: React.MouseEvent<HTMLCanvasElement>) {
-    const canvas = canvasRef.current;
-    const tip = tooltipRef.current;
-    if (!canvas || !tip || !results.length) return;
-    const data = [...results].reverse();
-    const rect = canvas.getBoundingClientRect();
-    const W = rect.width, H = rect.height;
-    const PAD_L = 40, PAD_R = 8, PAD_B = 32;
-    const chartW = W - PAD_L - PAD_R;
-    const relX = e.clientX - rect.left;
-    const n = data.length;
-    const groupW = chartW / Math.max(n, 1);
-    const idx = Math.max(0, Math.min(n - 1, Math.floor((relX - PAD_L) / groupW)));
-    const r = data[idx];
-    const cx = PAD_L + idx * groupW + groupW / 2;
-    const frac = cx / W;
-    tip.style.display = "block";
-    tip.style.left = frac < 0.6 ? `${cx + 6}px` : `${cx - 90}px`;
-    tip.style.top = `${(H - PAD_B) * 0.12}px`;
-    tip.innerHTML = `
-      <div style="color:#06b6d4">↓ ${r.download?.toFixed(0) ?? "—"} Mbps</div>
-      <div style="color:#f59e0b">↑ ${r.upload?.toFixed(0) ?? "—"} Mbps</div>
-      ${r.ping != null ? `<div style="color:#10b981">${r.ping < 10 ? r.ping.toFixed(1) : r.ping.toFixed(0)} ms ping</div>` : ""}
-      ${r.created_at ? `<div style="color:rgba(255,255,255,0.3);margin-top:2px">${new Date(r.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>` : ""}
-    `;
-  }
-
-  function handleMouseLeave() {
-    const tip = tooltipRef.current;
-    if (tip) tip.style.display = "none";
-  }
-
-  return (
-    <div style={{ position: "relative", width: "100%", height: "100%" }}>
-      <canvas ref={canvasRef}
-        style={{ width: "100%", height: "100%", display: "block", cursor: "crosshair" }}
-        onMouseMove={handleMouseMove}
-        onMouseLeave={handleMouseLeave}
-      />
-      {/* Legend */}
-      <div style={{ position: "absolute", top: 4, right: 4, display: "flex", gap: 10, fontSize: 9 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
-          <div style={{ width: 8, height: 8, background: "#00e5ff", borderRadius: 1, opacity: 0.82 }} />
-          <span style={{ color: "rgba(255,255,255,0.4)" }}>Download</span>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
-          <div style={{ width: 8, height: 8, background: "#ff9100", borderRadius: 1, opacity: 0.82 }} />
-          <span style={{ color: "rgba(255,255,255,0.4)" }}>Upload</span>
-        </div>
-      </div>
-      {/* Tooltip */}
-      <div ref={tooltipRef} style={{
-        display: "none", position: "absolute", background: "rgba(10,10,10,0.92)",
-        border: "1px solid rgba(255,255,255,0.1)", borderRadius: 4,
-        padding: "4px 8px", fontSize: 9, pointerEvents: "none", whiteSpace: "nowrap",
-      }} />
-    </div>
   );
 }
 
@@ -1996,7 +1863,62 @@ export default function Dashboard() {
               </Card>
             )}
 
-            {/* System Info — row 2 col 3 */}
+            {/* Speedtest — compact card, row 2 col 3 */}
+            {isVisible("speedtest") && (
+              <Card label="speedtest" accent="#8b5cf6" icon={<IconSpeedtest />}
+                animDelay={250} externalLink="http://192.168.88.196:30220">
+                {speedtestLoading ? <Skeleton /> : !speedtestResults.length ? (
+                  <span className="text-xs" style={{ color: "rgba(255,255,255,0.4)" }}>no data</span>
+                ) : (() => {
+                  const latest = speedtestResults[0];
+                  const ts = latest.timestamp ?? latest.created_at;
+                  const diff = ts ? (Date.now() - new Date(ts).getTime()) / 1000 : null;
+                  const rel = diff == null ? null
+                    : diff < 60 ? "just now"
+                    : diff < 3600 ? `${Math.round(diff / 60)}m ago`
+                    : diff < 86400 ? `${Math.round(diff / 3600)}h ago`
+                    : `${Math.round(diff / 86400)}d ago`;
+                  return (
+                    <div className="flex flex-col gap-2">
+                      {latest.isp && (
+                        <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.45)" }}>{latest.isp}</span>
+                      )}
+                      <div className="flex items-end gap-3">
+                        <div className="flex flex-col">
+                          <span className="font-medium tabular-nums font-mono" style={{ fontSize: 36, lineHeight: 1, color: "#06b6d4" }}>
+                            {latest.download != null ? latest.download.toFixed(0) : "—"}
+                          </span>
+                          <span className="text-[9px] uppercase tracking-widest mt-0.5" style={{ color: "rgba(255,255,255,0.35)" }}>Mbps ↓</span>
+                        </div>
+                        <div className="flex flex-col mb-[2px]">
+                          <span className="font-medium tabular-nums font-mono" style={{ fontSize: 26, lineHeight: 1, color: "#f59e0b" }}>
+                            {latest.upload != null ? latest.upload.toFixed(0) : "—"}
+                          </span>
+                          <span className="text-[9px] uppercase tracking-widest mt-0.5" style={{ color: "rgba(255,255,255,0.35)" }}>Mbps ↑</span>
+                        </div>
+                      </div>
+                      {latest.ping != null && (
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 rounded-full shrink-0"
+                            style={{ background: "#10b981", boxShadow: "0 0 4px #10b98166" }} />
+                          <span className="text-[11px] tabular-nums font-medium font-mono" style={{ color: "#10b981" }}>
+                            {latest.ping < 10 ? latest.ping.toFixed(1) : latest.ping.toFixed(0)} ms
+                          </span>
+                          <span className="text-[9px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.3)" }}>ping</span>
+                        </div>
+                      )}
+                      {rel && (
+                        <span className="text-[9px] tabular-nums" style={{ color: "rgba(255,255,255,0.3)" }}>
+                          last tested {rel}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })()}
+              </Card>
+            )}
+
+            {/* System Info — row 3 */}
             {isVisible("system") && (
               <Card label="system" accent="#d946ef" icon={<IconTerminal />}
                 expanded={expandedCard === "system"} onToggle={() => toggleCard("system")}>
@@ -2010,112 +1932,6 @@ export default function Dashboard() {
                   </div>
                 )}
               </Card>
-            )}
-
-            {/* Speedtest — spans all 3 columns */}
-            {isVisible("speedtest") && (
-              <div className="lg:col-span-3">
-                <div
-                  className="flex flex-col"
-                  style={{
-                    background: "rgba(255,255,255,0.04)",
-                    backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)",
-                    border: "1px solid rgba(255,255,255,0.08)",
-                    borderTop: "2px solid #8b5cf6", minHeight: 220, borderRadius: 14,
-                    animation: "fadeSlideIn 0.45s ease both", animationDelay: "250ms",
-                    transition: "border-color 0.2s ease, transform 0.2s ease",
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.15)"; e.currentTarget.style.transform = "translateY(-2px)"; }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)"; e.currentTarget.style.transform = "translateY(0)"; }}
-                >
-                  {/* Card header */}
-                  <div className="flex items-center gap-2 px-[18px] pt-[18px] pb-0">
-                    <span style={{ color: "#8b5cf6", opacity: 0.8 }}><IconSpeedtest /></span>
-                    <span className="text-[10px] uppercase" style={{ color: "rgba(255,255,255,0.45)", letterSpacing: "0.12em" }}>speedtest</span>
-                    <button
-                      className="ml-auto text-[9px]"
-                      style={{ color: "rgba(255,255,255,0.2)", background: "none", border: "none", cursor: "pointer" }}
-                      onClick={() => window.open("http://192.168.88.196:30220", "_blank")}
-                    >↗</button>
-                  </div>
-                  {/* Card body */}
-                  <div className="px-[18px] pt-3 pb-[18px] flex-1">
-                    {speedtestLoading ? (
-                      <div style={{ height: 100, display: "flex", alignItems: "center" }}><Skeleton /></div>
-                    ) : !speedtestResults.length ? (
-                      <div className="flex items-center gap-2" style={{ height: 80 }}>
-                        <span className="text-xs" style={{ color: "rgba(255,255,255,0.4)" }}>no data · run a test at 192.168.88.196:30220</span>
-                      </div>
-                    ) : (() => {
-                      const latest = speedtestResults[0];
-                      const diff = latest.created_at ? (Date.now() - new Date(latest.created_at).getTime()) / 1000 : null;
-                      const rel = diff == null ? null
-                        : diff < 60 ? "just now"
-                        : diff < 3600 ? `${Math.round(diff / 60)}m ago`
-                        : diff < 86400 ? `${Math.round(diff / 3600)}h ago`
-                        : `${Math.round(diff / 86400)}d ago`;
-                      return (
-                        <div className="flex gap-6" style={{ minHeight: 180 }}>
-                          {/* LEFT: stats (1/3 width) */}
-                          <div className="flex flex-col justify-between shrink-0" style={{ width: "33%" }}>
-                            {latest.isp && (
-                              <div className="flex flex-col gap-0.5 mb-2">
-                                <span className="text-xs font-medium" style={{ color: "rgba(255,255,255,0.7)" }}>{latest.isp}</span>
-                                {latest.serverLocation && (
-                                  <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.35)" }}>{latest.serverLocation}</span>
-                                )}
-                              </div>
-                            )}
-                            <div className="flex flex-col gap-1">
-                              <div className="flex flex-col">
-                                <span className="font-medium tabular-nums" style={{ fontSize: 48, lineHeight: 1, color: "#00e5ff" }}>
-                                  {latest.download != null ? latest.download.toFixed(0) : "—"}
-                                </span>
-                                <span className="text-[10px] uppercase tracking-widest mt-0.5" style={{ color: "rgba(255,255,255,0.4)" }}>Mbps ↓</span>
-                              </div>
-                              <div className="flex flex-col mt-1">
-                                <span className="font-medium tabular-nums" style={{ fontSize: 38, lineHeight: 1, color: "#ff9100" }}>
-                                  {latest.upload != null ? latest.upload.toFixed(0) : "—"}
-                                </span>
-                                <span className="text-[10px] uppercase tracking-widest mt-0.5" style={{ color: "rgba(255,255,255,0.4)" }}>Mbps ↑</span>
-                              </div>
-                            </div>
-                            <div className="flex flex-col gap-1 mt-2">
-                              {latest.ping != null && (
-                                <div className="flex items-center gap-1.5">
-                                  <span className="w-1.5 h-1.5 rounded-full shrink-0"
-                                    style={{ background: "#00e676", boxShadow: "0 0 4px #00e67666" }} />
-                                  <span className="text-[11px] tabular-nums font-medium" style={{ color: "#00e676" }}>
-                                    {latest.ping < 10 ? latest.ping.toFixed(1) : latest.ping.toFixed(0)} ms
-                                  </span>
-                                  <span className="text-[9px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.3)" }}>ping</span>
-                                </div>
-                              )}
-                              {latest.jitter != null && (
-                                <span className="text-[10px] tabular-nums" style={{ color: "rgba(255,255,255,0.4)" }}>
-                                  {latest.jitter.toFixed(1)} ms jitter
-                                </span>
-                              )}
-                              {rel && (
-                                <span className="text-[10px] tabular-nums" style={{ color: "rgba(255,255,255,0.4)" }}>
-                                  Last tested: {rel}
-                                </span>
-                              )}
-                              <span className="text-[9px]" style={{ color: "rgba(255,255,255,0.2)" }}>
-                                auto-tests via SpeedTracker
-                              </span>
-                            </div>
-                          </div>
-                          {/* RIGHT: bar chart (2/3 width) */}
-                          <div className="flex-1 min-w-0" style={{ height: 180 }}>
-                            <SpeedtestBarChart results={speedtestResults} />
-                          </div>
-                        </div>
-                      );
-                    })()}
-                  </div>
-                </div>
-              </div>
             )}
 
 
