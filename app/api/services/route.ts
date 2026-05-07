@@ -8,6 +8,9 @@ interface ServiceResult {
   downCount?: number;
 }
 
+let servicesCache: { data: { services: ServiceResult[]; timestamp: number }; ts: number } | null = null;
+const CACHE_TTL = 10_000;
+
 const TRUENAS_IP = process.env.TRUENAS_IP || "192.168.88.196";
 
 function fmtMB(b: number): string {
@@ -300,9 +303,20 @@ async function nginxProxy(): Promise<ServiceResult> {
 }
 
 export async function GET() {
-  const results = await Promise.all([
+  if (servicesCache && Date.now() - servicesCache.ts < CACHE_TTL) {
+    return NextResponse.json(servicesCache.data);
+  }
+
+  const names = ["radarr","sonarr","bazarr","tautulli","qbittorrent","overseerr","pihole","prowlarr","nginx","uptimekuma"];
+  const settled = await Promise.allSettled([
     radarr(), sonarr(), bazarr(), tautulli(),
     qbittorrent(), overseerr(), pihole(), prowlarr(), nginxProxy(), uptimeKuma(),
   ]);
-  return NextResponse.json({ services: results, timestamp: Date.now() });
+  const results: ServiceResult[] = settled.map((r, i) =>
+    r.status === "fulfilled" ? r.value : { name: names[i], up: false, lines: [] }
+  );
+
+  const data = { services: results, timestamp: Date.now() };
+  servicesCache = { data, ts: Date.now() };
+  return NextResponse.json(data);
 }

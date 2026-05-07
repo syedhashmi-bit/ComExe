@@ -3,6 +3,9 @@ import { NextResponse } from "next/server";
 const TRUENAS_IP = process.env.TRUENAS_IP || "192.168.88.196";
 const PROMETHEUS = `http://${TRUENAS_IP}:30104`;
 
+let metricsCache: { data: unknown; ts: number } | null = null;
+const CACHE_TTL = 10_000;
+
 const FS_EXCLUDE = `fstype!~"tmpfs|devtmpfs|overlay|squashfs|ramfs"`;
 
 async function query(q: string): Promise<number | null> {
@@ -34,6 +37,10 @@ async function queryAll(q: string): Promise<{ metric: Record<string, string>; va
 }
 
 export async function GET() {
+  if (metricsCache && Date.now() - metricsCache.ts < CACHE_TTL) {
+    return NextResponse.json(metricsCache.data);
+  }
+
   const [
     cpuIdle,
     memTotal,
@@ -117,7 +124,7 @@ export async function GET() {
     ? (netRxResults.reduce((a, b) => (a.value > b.value ? a : b)).metric.device ?? null)
     : null;
 
-  return NextResponse.json({
+  const responseData = {
     cpu: cpuUsed,
     memory: { total: memTotal, used: memUsed, available: memAvailable, sReclaimable: memSReclaimable },
     uptime,
@@ -134,5 +141,7 @@ export async function GET() {
     },
     sysInfo,
     timestamp: Date.now(),
-  });
+  };
+  metricsCache = { data: responseData, ts: Date.now() };
+  return NextResponse.json(responseData);
 }

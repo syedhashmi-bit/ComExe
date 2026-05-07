@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
 
+let mikrotikCache: { data: unknown; ts: number } | null = null;
+const CACHE_TTL = 10_000;
+
 export async function GET() {
+  if (mikrotikCache && Date.now() - mikrotikCache.ts < CACHE_TTL) {
+    return NextResponse.json(mikrotikCache.data);
+  }
+
   try {
     const creds = "monitor-only" + ":" + "***REMOVED***";
     const auth = Buffer.from(creds, "utf8").toString("base64");
@@ -42,7 +49,7 @@ export async function GET() {
     const ramPct   = memTotal && freeMem != null
       ? Math.round(((memTotal - freeMem) / memTotal) * 100) : null;
 
-    return NextResponse.json({
+    const responseData = {
       board:    str("board-name"),
       version:  str("version"),
       cpu,
@@ -53,7 +60,9 @@ export async function GET() {
       hddTotal,
       uptime:   str("uptime"),
       temp:     num("temperature"),
-    });
+    };
+    mikrotikCache = { data: responseData, ts: Date.now() };
+    return NextResponse.json(responseData);
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 502 });
   }
