@@ -629,6 +629,36 @@ function AnimatedNumber({ value, decimals = 0, useCommas = true }: { value: numb
   return <>{frac ? `${withCommas}.${frac}` : withCommas}</>;
 }
 
+// Tiny up/down indicator next to a hero metric. Compares `current` against the
+// value `lookback` samples ago in `history`. Renders nothing when the change is
+// negligible. Caller picks `goodDirection` so red/green coloring matches intent
+// (e.g. CPU rising = bad → "down", free RAM rising = good → "up").
+function TrendDelta({
+  history, current, goodDirection = "down", lookback = 6, suffix = "", precision = 1, threshold = 0.1,
+}: {
+  history: (number | null | undefined)[]; current: number | null | undefined;
+  goodDirection?: "up" | "down"; lookback?: number;
+  suffix?: string; precision?: number; threshold?: number;
+}) {
+  if (current == null || history.length < lookback) return null;
+  const past = history[history.length - lookback];
+  if (past == null) return null;
+  const delta = current - past;
+  if (Math.abs(delta) < threshold) return null;
+  const isUp = delta > 0;
+  const isGood = (isUp && goodDirection === "up") || (!isUp && goodDirection === "down");
+  const color = isGood ? "#10b981" : "#ef4444";
+  return (
+    <span style={{
+      fontSize: 11, color, opacity: 0.9, fontWeight: 600,
+      fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap",
+      letterSpacing: "0.01em",
+    }}>
+      {isUp ? "↑" : "↓"} {Math.abs(delta).toFixed(precision)}{suffix}
+    </span>
+  );
+}
+
 // Splits a stat line into "first number" + "rest of line", rendering the
 // number as a hero-sized AnimatedNumber and the rest as small muted text.
 // Falls back to the regular animatedLine() rendering if the line has no
@@ -711,12 +741,15 @@ function Sparkline({ data, color, autoMax = false, height = 32 }: {
     <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="w-full" style={{ height, display: "block" }}>
       <defs>
         <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%"   stopColor={color} stopOpacity="0.3" />
-          <stop offset="100%" stopColor={color} stopOpacity="0.03" />
+          <stop offset="0%"   stopColor={color} stopOpacity="0.5" />
+          <stop offset="60%"  stopColor={color} stopOpacity="0.18" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
         </linearGradient>
       </defs>
       <path d={area} fill={`url(#${gid})`} />
-      <path d={line} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" opacity="0.9" />
+      {/* soft glow under the line */}
+      <path d={line} fill="none" stroke={color} strokeWidth="4" strokeLinejoin="round" strokeLinecap="round" opacity="0.18" />
+      <path d={line} fill="none" stroke={color} strokeWidth="2.2" strokeLinejoin="round" strokeLinecap="round" opacity="1" />
     </svg>
   );
 }
@@ -879,7 +912,7 @@ function Card({
   const borderColor =
     alertLevel === "critical" ? "rgba(239,68,68,0.45)"
     : alertLevel === "warning" ? "rgba(245,158,11,0.4)"
-    : hov ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.08)";
+    : hov ? `${accent}55` : "rgba(255,255,255,0.08)";
 
   const topColor =
     alertLevel === "critical" ? "#ef4444"
@@ -888,24 +921,31 @@ function Card({
 
   return (
     <div
-      className="flex flex-col cursor-pointer h-full"
+      className="flex flex-col cursor-pointer h-full relative overflow-hidden"
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
       onClick={externalLink ? () => window.open(externalLink, "_blank") : onToggle}
       style={{
-        background: "rgba(255,255,255,0.04)",
+        background: `radial-gradient(ellipse at top, ${topColor}14 0%, transparent 55%), rgba(255,255,255,0.04)`,
         backdropFilter: "blur(6px)",
         WebkitBackdropFilter: "blur(6px)",
         border: `1px solid ${borderColor}`,
-        borderTop: `2px solid ${topColor}`,
         borderRadius: 14,
-        transform: hov ? "translateY(-2px)" : "translateY(0)",
-        boxShadow: hov ? "0 8px 32px rgba(0,0,0,0.35)" : "none",
+        transform: hov ? "translateY(-3px)" : "translateY(0)",
+        boxShadow: hov
+          ? `0 12px 36px ${topColor}33, 0 0 0 1px ${topColor}33 inset, 0 8px 32px rgba(0,0,0,0.35)`
+          : "none",
         transition: "border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease",
         animation: "fadeSlideIn 0.45s ease both",
         animationDelay: `${animDelay}ms`,
       }}
     >
+      {/* Brand accent stripe with glow */}
+      <div style={{
+        height: 3,
+        background: `linear-gradient(90deg, ${topColor} 0%, ${topColor}aa 60%, ${topColor}33 100%)`,
+        boxShadow: alertLevel ? `0 0 12px ${topColor}aa` : `0 0 8px ${topColor}66`,
+      }} />
       <div className="flex items-center gap-2 overflow-hidden px-[18px] pt-[18px] pb-0">
         {icon && <span style={{ color: accent, opacity: 0.7 }}>{icon}</span>}
         <span className="text-[10px] uppercase shrink-0" style={{ color: "rgba(255,255,255,0.45)", letterSpacing: "0.12em" }}>{label}</span>
@@ -1685,7 +1725,12 @@ export default function Dashboard() {
                 alertLevel={cpuAlert} icon={<IconCPU />}
                 animDelay={0} expanded={expandedCard === "cpu"} onToggle={() => toggleCard("cpu")}>
                 <div className="flex items-end justify-between gap-2">
-                  <BigValue value={fmtPct(metrics?.cpu ?? null)} loading={loading} />
+                  <div className="flex items-baseline gap-2">
+                    <BigValue value={fmtPct(metrics?.cpu ?? null)} loading={loading} />
+                    {!loading && metrics?.cpu != null && (
+                      <TrendDelta history={cpuHistory} current={metrics.cpu} goodDirection="down" suffix="%" />
+                    )}
+                  </div>
                   {!loading && (
                     <div className="flex flex-wrap gap-1 mb-1 justify-end">
                       {metrics?.sysInfo?.cpuCores != null && (
@@ -1738,9 +1783,12 @@ export default function Dashboard() {
                       du={du}
                     />
                     {realMemPct > 0 && (
-                      <span className="text-[10px] tabular-nums text-center" style={{ color: "rgba(255,255,255,0.3)" }}>
-                        actual pressure: {realMemPct.toFixed(1)}%
-                      </span>
+                      <div className="flex items-center justify-center gap-2">
+                        <span className="text-[10px] tabular-nums" style={{ color: "rgba(255,255,255,0.3)" }}>
+                          actual pressure: {realMemPct.toFixed(1)}%
+                        </span>
+                        <TrendDelta history={memHistory} current={realMemPct} goodDirection="down" suffix="%" />
+                      </div>
                     )}
                     {expandedCard === "memory" && (() => {
                       const s = histStats(memHistory);
@@ -1896,10 +1944,13 @@ export default function Dashboard() {
                           <span className="text-[10px] font-medium truncate" style={{ color: "#06b6d4" }}>{metrics.gpu.name}</span>
                         )}
                         {metrics?.gpu?.temperature != null && (
-                          <span className="font-medium tabular-nums font-mono"
-                            style={{ fontSize: 22, lineHeight: 1, color: tempColor(metrics.gpu.temperature), transition: "color 0.3s ease" }}>
-                            {fmtTemp(metrics.gpu.temperature, tu)}
-                          </span>
+                          <div className="flex items-baseline gap-2">
+                            <span className="font-medium tabular-nums font-mono"
+                              style={{ fontSize: 22, lineHeight: 1, color: tempColor(metrics.gpu.temperature), transition: "color 0.3s ease" }}>
+                              {fmtTemp(metrics.gpu.temperature, tu)}
+                            </span>
+                            <TrendDelta history={gpuTempHistory} current={metrics.gpu.temperature} goodDirection="down" suffix="°" precision={0} threshold={1} />
+                          </div>
                         )}
                         {metrics?.gpu?.powerDraw != null && (
                           <span className="text-[10px] tabular-nums" style={{ color: "rgba(255,255,255,0.4)" }}>
@@ -2038,9 +2089,12 @@ export default function Dashboard() {
                       {/* Big numbers: download + upload */}
                       <div className="flex items-end gap-4">
                         <div className="flex flex-col">
-                          <span className="font-medium tabular-nums font-mono" style={{ fontSize: 44, lineHeight: 1, color: "#06b6d4" }}>
-                            {dl != null ? dl.toFixed(0) : "—"}
-                          </span>
+                          <div className="flex items-baseline gap-2">
+                            <span className="font-medium tabular-nums font-mono" style={{ fontSize: 44, lineHeight: 1, color: "#06b6d4" }}>
+                              {dl != null ? dl.toFixed(0) : "—"}
+                            </span>
+                            <TrendDelta history={speedtestHistory} current={dl ?? null} goodDirection="up" precision={0} threshold={5} suffix="" />
+                          </div>
                           <span className="text-[9px] uppercase tracking-widest mt-0.5" style={{ color: "rgba(255,255,255,0.35)" }}>Mbps ↓</span>
                         </div>
                         <div className="flex flex-col mb-[4px]">

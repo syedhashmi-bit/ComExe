@@ -1,9 +1,9 @@
 {
-  "/api/services/route": "/api/services",
-  "/api/weather/route": "/api/weather",
-  "/api/mikrotik/route": "/api/mikrotik",
   "/_not-found/page": "/_not-found",
-  "/api/speedtest/route": "/api/speedtest",
+  "/api/mikrotik/route": "/api/mikrotik",
+  "/api/services/route": "/api/services",
   "/api/metrics/route": "/api/metrics",
+  "/api/weather/route": "/api/weather",
+  "/api/speedtest/route": "/api/speedtest",
   "/page": "/"
 }
