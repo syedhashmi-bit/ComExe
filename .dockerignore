@@ -1,5 +1,8 @@
 # build artifacts
-.next
+# .next is intentionally NOT ignored — we ship the prebuilt output.
+# Cache and trace inside .next aren't needed at runtime, ignore them.
+.next/cache
+.next/trace
 node_modules
 npm-debug.log
 tsconfig.tsbuildinfo
