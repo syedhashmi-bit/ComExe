@@ -12,8 +12,15 @@
       "static/chunks/4bd1b696-7fb12dfea31143c4.js",
       "static/chunks/684-22dc3f08f4b2cc88.js",
       "static/chunks/main-app-c91dfe490f8d7d4f.js",
-      "static/css/21a75b75614780b6.css",
+      "static/css/4ad5d141e70fda9b.css",
       "static/chunks/app/layout-9475f335e696758a.js"
+    ],
+    "/api/metrics/route": [
+      "static/chunks/webpack-06a82223b7106399.js",
+      "static/chunks/4bd1b696-7fb12dfea31143c4.js",
+      "static/chunks/684-22dc3f08f4b2cc88.js",
+      "static/chunks/main-app-c91dfe490f8d7d4f.js",
+      "static/chunks/app/api/metrics/route-672d6eabfbbb34e7.js"
     ],
     "/api/mikrotik/route": [
       "static/chunks/webpack-06a82223b7106399.js",
@@ -28,13 +35,6 @@
       "static/chunks/684-22dc3f08f4b2cc88.js",
       "static/chunks/main-app-c91dfe490f8d7d4f.js",
       "static/chunks/app/api/services/route-350a2404fb20a153.js"
-    ],
-    "/api/metrics/route": [
-      "static/chunks/webpack-06a82223b7106399.js",
-      "static/chunks/4bd1b696-7fb12dfea31143c4.js",
-      "static/chunks/684-22dc3f08f4b2cc88.js",
-      "static/chunks/main-app-c91dfe490f8d7d4f.js",
-      "static/chunks/app/api/metrics/route-672d6eabfbbb34e7.js"
     ],
     "/api/weather/route": [
       "static/chunks/webpack-06a82223b7106399.js",
@@ -55,7 +55,7 @@
       "static/chunks/4bd1b696-7fb12dfea31143c4.js",
       "static/chunks/684-22dc3f08f4b2cc88.js",
       "static/chunks/main-app-c91dfe490f8d7d4f.js",
-      "static/chunks/app/page-e6c16f126e9dad2d.js"
+      "static/chunks/app/page-e0e6a455c8cb2883.js"
     ]
   }
 }

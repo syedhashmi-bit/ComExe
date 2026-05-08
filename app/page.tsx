@@ -950,7 +950,15 @@ function Card({
         {icon && <span style={{ color: accent, opacity: 0.7 }}>{icon}</span>}
         <span className="text-[10px] uppercase shrink-0" style={{ color: "rgba(255,255,255,0.45)", letterSpacing: "0.12em" }}>{label}</span>
         {subtitle && <span className="text-[10px] truncate" style={{ color: "rgba(255,255,255,0.3)" }}>{subtitle}</span>}
-        <span className="ml-auto text-[9px]" style={{ color: "rgba(255,255,255,0.15)" }}>{externalLink ? "↗" : expanded ? "▲" : "▼"}</span>
+        {/* live status dot, color reflects alertLevel */}
+        <span className="ml-auto w-1.5 h-1.5 rounded-full shrink-0" style={{
+          background: alertLevel === "critical" ? "#ef4444" : alertLevel === "warning" ? "#f59e0b" : "#10b981",
+          boxShadow: alertLevel === "critical" ? "0 0 7px #ef4444aa"
+                   : alertLevel === "warning"  ? "0 0 6px #f59e0baa"
+                                               : "0 0 5px #10b98166",
+          animation: "pulseDot 2s ease-in-out infinite",
+        }} />
+        <span className="text-[9px]" style={{ color: "rgba(255,255,255,0.15)" }}>{externalLink ? "↗" : expanded ? "▲" : "▼"}</span>
       </div>
       <div className="px-[18px] pt-3 pb-[18px] flex flex-col gap-4">
         {children}
@@ -1815,49 +1823,71 @@ export default function Dashboard() {
                 ) : (() => {
                   const PREFIX = "/mnt/Pool/Media/";
                   const folderName = (mp: string) => mp.startsWith(PREFIX) ? mp.slice(PREFIX.length) : (mp.split("/").pop() ?? mp);
-                  const folderColors = ["#f59e0b","#06b6d4","#10b981","#8b5cf6","#ef4444","#f97316","#3b82f6"];
-                  const fsBarColor  = (p: number) => p > 85 ? "#ef4444" : p > 70 ? "#f59e0b" : "#10b981";
-                  const sorted = [...metrics.disks].sort((a, b) => b.total - a.total);
+                  const fsBarColor = (p: number) => p > 85 ? "#ef4444" : p > 70 ? "#f59e0b" : "#10b981";
+                  const sorted = [...metrics.disks].sort((a, b) => b.usedPct - a.usedPct);
+                  const poolUsed  = metrics.pool?.used  ?? null;
+                  const poolTotal = metrics.pool?.total ?? null;
+                  const poolPct   = poolTotal != null && poolUsed != null && poolTotal > 0
+                    ? (poolUsed / poolTotal) * 100 : null;
+                  const poolColor = poolPct == null ? "#666" : fsBarColor(poolPct);
                   return (
-                    <div className="flex flex-col gap-0">
-                      {/* Pool summary */}
-                      {metrics.pool?.total && (
-                        <div className="flex justify-between items-center pb-2 mb-1"
-                          style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-                          <span className="text-[10px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.3)" }}>pool total</span>
-                          <span className="text-[10px] tabular-nums font-mono" style={{ color: "rgba(255,255,255,0.5)" }}>
-                            {fmtBytes(metrics.pool.used, 1, du)} / {fmtBytes(metrics.pool.total, 1, du)}
-                          </span>
+                    <div className="flex flex-col gap-3">
+                      {/* Pool hero — overall fullness */}
+                      {poolTotal != null && poolUsed != null && (
+                        <div className="flex flex-col gap-2">
+                          <div className="flex items-baseline justify-between gap-2">
+                            <div className="flex items-baseline gap-2">
+                              <span className="font-mono tabular-nums" style={{ fontSize: 26, fontWeight: 600, color: "#ffffff", lineHeight: 1.1, letterSpacing: "-0.01em" }}>
+                                {fmtBytes(poolUsed, 1, du)}
+                              </span>
+                              <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.4)" }}>
+                                of {fmtBytes(poolTotal, 1, du)}
+                              </span>
+                            </div>
+                            {poolPct != null && (
+                              <span className="font-mono tabular-nums" style={{ fontSize: 13, fontWeight: 700, color: poolColor }}>
+                                {poolPct.toFixed(0)}%
+                              </span>
+                            )}
+                          </div>
+                          <div className="rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)", height: 6 }}>
+                            <div className="h-full rounded-full transition-all duration-700" style={{
+                              width: `${poolPct ?? 0}%`,
+                              background: `linear-gradient(90deg, ${poolColor}99, ${poolColor})`,
+                              boxShadow: `0 0 8px ${poolColor}55`,
+                            }} />
+                          </div>
                         </div>
                       )}
-                      <div style={{ overflowY: sorted.length > 4 ? "auto" : "visible", maxHeight: sorted.length > 4 ? 220 : undefined }}>
+
+                      {/* Per-mount list — tighter rows, sorted by % so the fullest is on top */}
+                      <div className="flex flex-col" style={{
+                        overflowY: sorted.length > 4 ? "auto" : "visible",
+                        maxHeight: sorted.length > 4 ? 220 : undefined,
+                      }}>
                         {sorted.map((disk, idx) => {
                           const name = folderName(disk.mountpoint);
-                          const accentC = folderColors[idx % folderColors.length];
-                          const barC    = fsBarColor(disk.usedPct);
+                          const barC = fsBarColor(disk.usedPct);
                           return (
-                            <div key={disk.mountpoint} className="flex flex-col gap-1.5"
-                              style={{
-                                padding: "7px 0",
-                                borderBottom: idx < sorted.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none",
-                              }}>
+                            <div key={disk.mountpoint} className="flex flex-col gap-1"
+                              style={{ padding: "5px 0", borderTop: idx > 0 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
                               <div className="flex items-center justify-between gap-2">
                                 <div className="flex items-center gap-1.5 min-w-0">
-                                  <span style={{ color: accentC, opacity: 0.85, flexShrink: 0 }}><IconFolder /></span>
-                                  <span className="text-xs font-medium truncate" style={{ color: "rgba(255,255,255,0.85)" }}>{name}</span>
+                                  <span style={{ color: "#f59e0b", opacity: 0.55, flexShrink: 0 }}><IconFolder /></span>
+                                  <span className="text-[11px] font-medium truncate" style={{ color: "rgba(255,255,255,0.78)" }}>{name}</span>
                                 </div>
-                                <div className="flex items-center gap-1.5 shrink-0">
-                                  <span className="text-[10px] tabular-nums font-mono" style={{ color: "rgba(255,255,255,0.4)" }}>
-                                    {fmtBytes(disk.used, 1, du)} / {fmtBytes(disk.total, 1, du)}
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <span className="text-[9px] tabular-nums font-mono" style={{ color: "rgba(255,255,255,0.32)" }}>
+                                    {fmtBytes(disk.used, 1, du)}
                                   </span>
-                                  <span className="tabular-nums font-mono font-medium" style={{ fontSize: 10, color: barC, minWidth: "2.5ch" }}>
+                                  <span className="tabular-nums font-mono font-semibold" style={{ fontSize: 10, color: barC, minWidth: "2.5ch", textAlign: "right" }}>
                                     {disk.usedPct.toFixed(0)}%
                                   </span>
                                 </div>
                               </div>
-                              <div className="flex-1 relative rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.08)", height: 8 }}>
+                              <div className="rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)", height: 4 }}>
                                 <div className="h-full rounded-full transition-all duration-700"
-                                  style={{ width: `${disk.usedPct}%`, background: barC, boxShadow: `0 0 6px ${barC}55` }} />
+                                  style={{ width: `${disk.usedPct}%`, background: barC, boxShadow: `0 0 4px ${barC}55` }} />
                               </div>
                             </div>
                           );
@@ -1975,44 +2005,39 @@ export default function Dashboard() {
                         gradient="linear-gradient(90deg, #ea580c, #f59e0b)"
                       />
                     )}
-                    {/* Clocks + fan row */}
-                    {(metrics?.gpu?.coreClock != null || metrics?.gpu?.memClock != null || metrics?.gpu?.fanSpeed != null) && (
-                      <div className="flex flex-wrap gap-1.5">
-                        {metrics?.gpu?.coreClock != null && (
-                          <span className="tabular-nums font-mono" style={{
-                            background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)",
-                            borderRadius: 4, padding: "2px 6px", fontSize: 9, color: "rgba(239,68,68,0.8)",
-                          }}>{metrics.gpu.coreClock} MHz core</span>
-                        )}
-                        {metrics?.gpu?.memClock != null && (
-                          <span className="tabular-nums font-mono" style={{
-                            background: "rgba(168,85,247,0.1)", border: "1px solid rgba(168,85,247,0.2)",
-                            borderRadius: 4, padding: "2px 6px", fontSize: 9, color: "rgba(168,85,247,0.8)",
-                          }}>{metrics.gpu.memClock} MHz mem</span>
-                        )}
-                        {metrics?.gpu?.fanSpeed != null && (
-                          <span className="tabular-nums font-mono" style={{
-                            background: "rgba(6,182,212,0.1)", border: "1px solid rgba(6,182,212,0.2)",
-                            borderRadius: 4, padding: "2px 6px", fontSize: 9, color: "rgba(6,182,212,0.8)",
-                          }}>🌀 {metrics.gpu.fanSpeed}%</span>
-                        )}
-                      </div>
-                    )}
-                    {/* Encoder / decoder */}
-                    {(metrics?.gpu?.encUtil != null || metrics?.gpu?.decUtil != null) && (
-                      <div className="flex gap-2">
-                        {metrics?.gpu?.encUtil != null && (
-                          <span className="text-[10px] tabular-nums font-mono" style={{ color: "rgba(255,255,255,0.35)" }}>
-                            ENC {metrics.gpu.encUtil}%
-                          </span>
-                        )}
-                        {metrics?.gpu?.decUtil != null && (
-                          <span className="text-[10px] tabular-nums font-mono" style={{ color: "rgba(255,255,255,0.35)" }}>
-                            DEC {metrics.gpu.decUtil}%
-                          </span>
-                        )}
-                      </div>
-                    )}
+                    {/* Tertiary tier: clocks + fan + ENC/DEC, all in one dim row.
+                        ENC/DEC hidden when both are 0 (encode/decode idle). Pills
+                        share a uniform muted style so the row doesn't look like a
+                        fruit salad of brand colors. */}
+                    {(() => {
+                      const tertiaryItems: { label: string; value: string }[] = [];
+                      if (metrics?.gpu?.coreClock != null) tertiaryItems.push({ label: "core", value: `${metrics.gpu.coreClock} MHz` });
+                      if (metrics?.gpu?.memClock  != null) tertiaryItems.push({ label: "mem",  value: `${metrics.gpu.memClock} MHz`  });
+                      if (metrics?.gpu?.fanSpeed  != null) tertiaryItems.push({ label: "fan",  value: `${metrics.gpu.fanSpeed}%`    });
+                      const enc = metrics?.gpu?.encUtil ?? 0;
+                      const dec = metrics?.gpu?.decUtil ?? 0;
+                      if (enc > 0 || dec > 0) {
+                        if (metrics?.gpu?.encUtil != null) tertiaryItems.push({ label: "enc", value: `${enc}%` });
+                        if (metrics?.gpu?.decUtil != null) tertiaryItems.push({ label: "dec", value: `${dec}%` });
+                      }
+                      if (tertiaryItems.length === 0) return null;
+                      return (
+                        <div className="flex flex-wrap gap-1.5 pt-1" style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}>
+                          {tertiaryItems.map(item => (
+                            <span key={item.label} className="tabular-nums font-mono" style={{
+                              background: "rgba(255,255,255,0.04)",
+                              border: "1px solid rgba(255,255,255,0.08)",
+                              borderRadius: 4, padding: "2px 7px", fontSize: 9,
+                              color: "rgba(255,255,255,0.5)",
+                              letterSpacing: "0.01em",
+                            }}>
+                              <span style={{ color: "rgba(255,255,255,0.32)", marginRight: 4 }}>{item.label}</span>
+                              {item.value}
+                            </span>
+                          ))}
+                        </div>
+                      );
+                    })()}
                     {gpuTempHistory.length >= 2 && (
                       <div className="flex flex-col gap-1.5">
                         <div className="flex justify-between items-center">
