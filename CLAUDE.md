@@ -1,179 +1,212 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for Claude Code working in this repo. **`memory.md`** has past decisions and bug fixes; **`skills.md`** has reusable patterns; **`context.md`** has env-var/infra inventory.
 
-## Commands
+## Build & deploy workflow
 
-npm is at `C:\Program Files\nodejs\npm.cmd` — it is not on PATH by default in this environment.
+> **Important deviation from a normal Next.js setup:** the production build runs on the **PC**, not in the Docker image. The Dockerfile is runtime-only.
+
+Background: `next build` SIGSEGVs non-deterministically inside Docker on the TrueNAS host (different crash points on different runs — confirmed not Alpine vs Debian, not memory, not standalone trace). Building on the PC and shipping the prebuilt `.next/` via git fully sidesteps it.
+
+`/.next/` is checked into git (~1.6 MB / 97 files per build). `.next/cache` and `.next/trace` stay gitignored — they're regenerable and would bloat commits.
+
+### Dev (PC)
 
 ```powershell
-# Development
+# PC (PowerShell) — npm is not on PATH by default
 $env:PATH = "C:\Program Files\nodejs;" + $env:PATH
-npm run dev      # starts dev server (localhost:3000, falls back to :3001 if occupied)
-npm run build    # production build — always run to verify no TypeScript errors before finishing
-npm run start    # production server (after build)
-npm run lint     # ESLint check
+npm run dev      # localhost:3000 (falls back to :3001)
+npm run build    # always run before push — produces .next/ that gets shipped
+npm run lint     # optional
 ```
 
-Docker build (for TrueNAS SCALE / k3s deployment):
-```bash
-docker build -t truenas-dashboard .
-docker run -p 3000:3000 truenas-dashboard
+### Deploy
+
+```powershell
+# PC (PowerShell)
+git add .next app/<your-changes>
+git commit -m "..."
+git push
 ```
+
+```bash
+# TrueNAS (bash)
+/root/update-dashboard.sh
+```
+
+`update-dashboard.sh` does `git fetch && git reset --hard origin/main`, `docker build`, then `docker run` with all required `-e` env vars baked into the script.
 
 ## Architecture
 
-Single-page Next.js 15 App Router dashboard. No database, no auth, no external state management. The entire UI is one `"use client"` component in `app/page.tsx`.
+Single-page Next.js 15 App Router dashboard. No DB, no auth, no state library. Entire UI is one `"use client"` component in `app/page.tsx` (~2100 lines).
 
 ### API routes (server-side proxies)
 
-All four routes proxy requests from the browser to internal services — avoids CORS and keeps credentials server-side.
+Five routes — all proxy from the browser to internal services to avoid CORS and keep credentials server-side. **All credentials read from `process.env.*` — none hardcoded.**
 
 | File | Purpose | Backend |
 |------|---------|---------|
-| `app/api/metrics/route.ts` | Prometheus metrics | `192.168.88.196:30104` |
-| `app/api/services/route.ts` | Homelab service health | Various ports on `192.168.88.196` |
-| `app/api/speedtest/route.ts` | Speedtest history | `192.168.88.196:30220` |
-| `app/api/weather/route.ts` | Weather data | open-meteo.com (lat: -41.4419, lon: 147.1450) |
+| `app/api/metrics/route.ts` | Prometheus metrics | `${TRUENAS_IP}:30104` |
+| `app/api/services/route.ts` | Homelab service health (10 services) | various ports on `${TRUENAS_IP}` |
+| `app/api/speedtest/route.ts` | Speedtest history | `${TRUENAS_IP}:30220` |
+| `app/api/weather/route.ts` | Weather (open-meteo) | api.open-meteo.com |
+| `app/api/mikrotik/route.ts` | Router stats | `192.168.88.1` |
 
-**`app/api/metrics/route.ts`** — Runs ~20 PromQL queries in a single `Promise.all`. The destructuring order of the result array **must stay in sync** with the queries array — they are positional, not named. GPU utilization is converted from 0–1 ratio to 0–100 here.
+`metrics/route.ts` runs ~30 PromQL queries via `Promise.all`. **Destructuring order must stay in sync with the queries array** — positional. New queries get appended at the end to preserve order.
 
-**`app/api/services/route.ts`** — `ServiceResult` interface: `name`, `up`, `lines[]`, optional `pct` (radarr library completion %). Each service function does its own `Promise.all` for parallel sub-requests and falls back to `checkReachable()` on error — so services that fail auth/data fetch still show as "up" with "—" if the server responds at all.
+`services/route.ts` does `Promise.allSettled` over 10 service functions (radarr, sonarr, bazarr, tautulli, qbittorrent, overseerr, pihole, prowlarr, nginx, uptimekuma). Each function falls back to `checkReachable()` on auth/data errors so a service still shows as "up" with `"—"` when the server responds but auth fails. 10s in-memory cache.
 
-**`app/api/speedtest/route.ts`** — Tries four endpoint shapes in order; uses the first that returns data. `extractArray()` handles `{data:[]}`, `{results:[]}`, `{data:{results:[]}}`, and single-item shapes. `normalizeMbps()` converts bps→Mbps if `>1_000_000`, kbps→Mbps if `>1_000`, else passes through. **Never trigger tests** — SpeedTracker handles scheduling.
+`speedtest/route.ts` tries `/api/speedtest/latest` (Mbps) and `/api/v1/results?take=5` (the latter requires `Bearer ${SPEEDTEST_API_KEY}`). **Never trigger tests** — SpeedTracker schedules them. Note: the two endpoints return different units; see `memory.md` → "Speedtest unit mismatch".
 
-### `app/page.tsx` — the entire frontend (~2100 lines)
+`mikrotik/route.ts` uses Basic auth via `MIKROTIK_USERNAME`/`MIKROTIK_PASSWORD`. Has 10s cache.
 
-All UI components are defined in this single file. Key components:
+`weather/route.ts` → open-meteo, no auth, hardcoded lat/lon for Launceston, TAS.
 
-- **Primitive components**: `GaugeBar`, `Sparkline`, `MiniBarChart`, `DonutChart`, `ThreeSegmentDonut`, `BigValue`, `LabeledBar`, `SubRow`, `StatRow`
-- **Feature components**: `SpeedtestDualChart` (SVG line chart), `SpeedtestBarChart` (canvas grouped bar chart), `GoogleSearch`, `MikrotikTab`, `ServiceIcon`, `BookmarkItem`
-- **Layout components**: `Card`, `StatusBanner`, `SettingsPanel`
+### `app/page.tsx` — the frontend
 
-**Poll intervals** (all managed in the `Dashboard` component via `useEffect` + `setInterval`):
-- `/api/metrics`: every `settings.refreshInterval` seconds (default 10s)
-- `/api/services`: every **10 seconds**
-- `/api/speedtest`: every 300 seconds
-- `/api/weather`: every 600 seconds
-- Clock: every 1 second
+All UI components live in this one file. Categories:
 
-**Page layout structure:**
-1. Fixed elements (z-50/z-40): loading progress bar + 2px cyan healthy-state line at top of viewport
-2. Sticky frosted-glass header (z-30): `position: fixed`, `backdrop-filter: blur(12px)`, `rgba(10,12,20,0.9)` bg. Contains logo, uptime pill, weather pill, split date/time display, status dot, TrueNAS/settings buttons.
-3. Main content (`paddingTop: 80` to clear the fixed header): GoogleSearch → MikrotikTab → StatusBanner → 3-col grid → Speedtest (full width) → Services → Bookmarks → Footer
+**Primitives** (~20 components):
+`GaugeBar`, `Sparkline`, `MiniBarChart`, `DonutChart`, `ThreeSegmentDonut`, `RadialGauge`, `BigValue`, `LabeledBar`, `SubRow`, `StatRow`, `Card`, `StatusBanner`, `SettingsPanel`, `ServiceIcon`, `BookmarkItem`, `AnimatedNumber`, `TrendDelta`, `HeroStat`, plus `animatedLine()` helper.
 
-**Grid layout (3-column):**
+**Feature components**:
+`SpeedtestDualChart` (SVG), `SpeedtestBarChart` (Canvas + DPR + ResizeObserver), `GoogleSearch`, `MikrotikTab`, `GrafanaCard`.
+
+**Polling intervals** (managed in `Dashboard` via `useEffect` + `setInterval`):
+
+| Endpoint | Interval |
+|----------|----------|
+| `/api/metrics` | `settings.refreshInterval`s (default 10s) |
+| `/api/services` | 10s |
+| `/api/speedtest` | 300s |
+| `/api/weather` | 600s |
+| `/api/mikrotik` | 30s |
+| Clock | 1s |
+
+### Components — what to know
+
+**`Card`** — shared shell for every metric card. New behavior since the polish pass:
+- Top border replaced by a 3px gradient stripe (`color → 60% → 20%`) with a colored glow
+- Background has a radial brand-color tint at the top (~8% opacity)
+- Hover: -3px lift, brand-color drop shadow + inner ring
+- Header has a small **status dot** that pulses green/amber/red based on `alertLevel` prop
+
+**`AnimatedNumber`** — interpolates between value changes (~600ms ease-out cubic). Used by `animatedLine()` and `HeroStat`. Preserves comma separators and decimal precision from the source string.
+
+**`animatedLine(line, keyPrefix)`** — parses any string like `"16,173 queries today"` and returns `React.ReactNode[]` where every numeric literal has been wrapped in `<AnimatedNumber>`. Use this whenever rendering pre-formatted stat strings.
+
+**`HeroStat`** — splits `lines[0]` of a service into "leading number + rest" and renders the number large (19px bold) with the rest as small muted suffix. Used by every services-panel card.
+
+**`TrendDelta`** — small ↑/↓ indicator next to a hero metric. Compares `current` against `history[history.length - lookback]`. Caller sets `goodDirection` ("up" or "down") so coloring matches intent. Has a built-in sanity guard: suppresses output if `|delta|/|current| > 5` (catches unit-mismatch bugs like the speedtest one).
+
+**`Sparkline`** — used everywhere. Stronger gradient since the polish pass (`0.5 → 0`), soft glow path under the main line, stroke width 2.2.
+
+**`MikrotikTab`** — calls `/api/mikrotik` server-side (NOT the router directly anymore — that hit CORS). Falls back to a static-info row if the route returns an error.
+
+### Services panel — services rendering
+
+Service cards render in two **categories** (`SVC_CATEGORIES` constant near top of page.tsx):
+
+- **Media stack**: radarr, sonarr, bazarr, tautulli, qbittorrent, overseerr, prowlarr (7 cards)
+- **Infrastructure**: pihole, nginx, uptimekuma (3 cards)
+
+Each category has a header with an accent dot, divider line, and live up-count (turns green at 100%). Each card has:
+- Brand-color gradient stripe at top (3px, with glow)
+- Subtle radial brand-color background
+- Status dot, label, hero stat (lines[0] with big number), other lines, then progress bars / streams as applicable
+- Click anywhere → opens that service's web UI in a new tab (URLs from `SVC_URLS` constant)
+
+### Page layout
+
+1. Fixed elements: 3px loading bar at very top + 2px cyan healthy line
+2. Sticky frosted header (z-30): logo, uptime pill, weather pill, clock, status dot, TrueNAS/settings buttons
+3. Main content: GoogleSearch → MikrotikTab → StatusBanner → 3-col metric grid → Speedtest (full width) → Services → Bookmarks → Footer
+
+**Grid** (3-column on xl):
 - Row 1: CPU · Memory · Filesystems
-- Row 2: Network · GPU · System
-- Row 3: Speedtest (lg:col-span-3)
+- Row 2: Network · GPU · Speedtest
+- Row 3: System · Grafana (each col-span-1, leaves col-span-1 empty)
 
-**`MikrotikTab`** — Self-contained component. Fetches `http://192.168.88.1/rest/system/resource` client-side using Basic auth (`monitor-only:L03m1Tv0@3`). No server-side API route. On CORS failure (always expected in browser), renders a static hardcoded fallback: MikroTik hAP ax³ | RouterOS 7.22.1 | 192.168.88.1 | CPU: — | RAM: — | Uptime: 13d 4h. Both the live and fallback bars are `<a href="http://192.168.88.1">` — entire bar clickable.
+**Filesystems card** — overhauled. Hero (top): pool used / total + colored %. Below: per-mount rows sorted by usage % (fullest at top), each with a thin 4px bar and unified amber folder icon (no more rainbow icons).
 
-**`SpeedtestBarChart`** — Canvas element with `devicePixelRatio` scaling. Uses a `ResizeObserver` inside `useEffect` to redraw when the container is properly laid out (fixes the "only 1 bar drawn" issue that occurs when canvas has zero dimensions on first mount). Tooltip `<div>` is mutated via `ref` directly (not React state) to avoid re-renders on every mouse move. The `results` prop (not a derived `data` array) is the effect dependency.
+**GPU card** — tertiary tier (clocks, fan, ENC/DEC) consolidated into a single divider-prefixed row of muted pills. ENC/DEC only render when at least one is nonzero.
 
-**`SpeedtestDualChart`** — SVG line chart; hover state uses React `useState`.
+## Env vars
 
-**`Sparkline`** — Uses `useId()` for unique SVG `linearGradient` IDs. Never remove this — multiple sparklines on the same page would share gradient colors otherwise.
+Server-side only. **Never** prefix with `NEXT_PUBLIC_` (would expose to client bundle). All listed in `.env.local.example`.
 
-**`GoogleSearch`** — Takes an `inputRef: React.RefObject<HTMLInputElement | null>` prop. The ref is created in `Dashboard` and also used by the keyboard handler to implement the G-key shortcut.
+Currently consumed:
+- `TRUENAS_IP` (default `192.168.88.196`)
+- `RADARR_API_KEY`, `SONARR_API_KEY`, `BAZARR_API_KEY`, `TAUTULLI_API_KEY`, `PROWLARR_API_KEY`, `OVERSEERR_API_KEY`
+- `QBIT_USERNAME`, `QBIT_PASSWORD`
+- `PIHOLE_PASSWORD`
+- `NGINX_USERNAME`, `NGINX_PASSWORD`
+- `UPTIME_KUMA_API_KEY`
+- `MIKROTIK_USERNAME`, `MIKROTIK_PASSWORD`
+- `SPEEDTEST_API_KEY`
 
-**`StatusBanner`** — healthy: renders `null` (the 2px cyan line is a separate fixed element); warning: 36px amber bar; critical: 48px red bar.
-
-**`BOOKMARKS`** constant — each column now has an `accentColor` field used to color the column header dot and title.
-
-**`CARD_KEYS`** — controls which cards appear in Settings visibility toggles. If adding a new card, add its key here.
-
-**Dashboard state:**
-- `showBookmarks` — toggled by H key, hides/shows the bookmarks section
-- `searchInputRef` — `useRef<HTMLInputElement>` passed to `GoogleSearch`, focused by G key
-- `clockDate` / `clockTime` — separate strings for the two-line clock display in the header
-- `showHealth` — kept for backward compat but health line is always shown when healthy
-
-**Keyboard shortcuts:** G = focus search, R = force-refresh metrics, H = toggle bookmarks, Escape = blur input / close settings.
-
-## Key domain knowledge
-
-**Prometheus endpoint**: All server metrics (CPU, memory, disk, network, GPU) come from a single Prometheus instance at `192.168.88.196:30104`. No separate GPU exporter — GPU metrics use `nvidia_smi_*` metric names.
-
-**Network device**: `enp4s0` — used in all network Prometheus queries (`node_network_receive_bytes_total{device="enp4s0"}`).
-
-**GPU metrics**: `nvidia_smi_utilization_gpu_ratio` (0–1, converted to % in route), `nvidia_smi_memory_used_bytes`, `nvidia_smi_memory_total_bytes`, `nvidia_smi_temperature_gpu` (°C), `nvidia_smi_power_draw_watts`, `nvidia_smi_power_limit_watts`. GPU name from `modelName` or `name` label on `nvidia_smi_gpu_info`.
-
-**Memory alerting**: Uses `MemTotal - MemAvailable - SReclaimable` as real used — raw `MemAvailable` reads low on TrueNAS because ZFS ARC is counted as used but is reclaimable. Thresholds: >95% = critical, >85% = warning.
-
-**Filesystem filter**: Only mountpoints under `/mnt/Pool/Media/` are shown. `tmpfs`, `devtmpfs`, `overlay`, `squashfs`, `ramfs` excluded at query level via `FS_EXCLUDE`.
-
-**GPU temp thresholds**: warning >80°C, critical >90°C.
-
-**Service ports** (all on `192.168.88.196`):
-- Radarr :30025, Sonarr :33027, Bazarr :30046, Tautulli :30047
-- qBittorrent :30024, Overseerr :30002, Nginx Proxy Manager :30020
-- PiHole :20720, Prowlarr :30050, Speedtest :30220, Prometheus :30104
-- Uptime Kuma :31050
-
-**Known CORS failures** — these services are checked via server-side proxy or `checkReachable()` fallback; never call them directly from the browser:
-- PiHole API at :20720
-- Bazarr API at :30046
-- qBittorrent API at :30024
-- MikroTik REST API at 192.168.88.1 (client-side only, always CORS-blocked — use hardcoded fallback)
+Production values live in `/root/update-dashboard.sh` on TrueNAS, passed as `-e VAR=value` to `docker run`. **Never** hardcoded in source, never in the image.
 
 ## Hard rules
 
-- **Never trigger speedtests** — SpeedTracker handles scheduling; only fetch existing results.
-- **No external chart libraries** — use Canvas or inline SVG only.
-- **All fetches wrapped in try/catch** — show "—" on failure, never crash.
-- **All external links** open in `_blank`.
-- Mobile responsiveness is not required.
+- Never trigger speedtests — SpeedTracker handles scheduling.
+- No external chart libraries. Canvas or inline SVG only.
+- Wrap external fetches in try/catch. Render `"—"` on failure, never crash.
+- All external links open in `_blank`.
+- `font-variant-numeric: tabular-nums` on all numeric displays.
+- Mobile responsiveness is **not** required.
+- **Run `npm run build` before every commit/push** — the prebuilt `.next/` ships in the commit.
+- Never commit `.env.local` (gitignored).
 
 ## Styling conventions
 
-- **Fonts**: Inter (UI text) + JetBrains Mono (numeric values only — use `font-mono` class or `fontFamily: "monospace"` inline). Both imported in `globals.css` via Google Fonts.
-- **Background**: `#0a0c12` + `radial-gradient(ellipse at 50% 0%, rgba(30,40,80,0.35) 0%, transparent 65%)` on `<main>`.
-- **Card style**: `rgba(255,255,255,0.04)` bg, `rgba(255,255,255,0.08)` border, `blur(6px)` backdrop-filter, `border-radius: 14px`, `padding: 18px`, hover `translateY(-2px)` + `rgba(255,255,255,0.15)` border.
-- **Card accent colors**: CPU `#06b6d4`, Memory `#10b981`, Filesystems `#f59e0b`, Network `#3b82f6`, GPU `#ef4444` (dynamic via `gpuUtilColor`), Speedtest `#8b5cf6`, System `#d946ef`.
-- **Progress bar track**: `rgba(255,255,255,0.08)`, height 5px (3px thin variant). Severity colors: `#10b981` ok, `#06b6d4` mid, `#f59e0b` warn, `#ef4444` critical.
-- **Text palette**: primary `#ffffff`, secondary `rgba(255,255,255,0.65)`, muted `rgba(255,255,255,0.45)`, very muted `rgba(255,255,255,0.25)`.
-- **Pills** (header): `rgba(255,255,255,0.08)` bg, `rgba(255,255,255,0.12)` border, `border-radius: 6px`, `padding: 3px 10px`, `font-size: 11px`.
-- **Status dot animation**: `pulseDot 2s ease-in-out infinite` keyframe defined in `globals.css`.
-- **Card load animation**: `fadeSlideIn 0.45s ease both` keyframe in `globals.css`, staggered via `animationDelay` prop on `Card`.
+- Background: `#0a0c12` + radial gradient overlay
+- Cards: `rgba(255,255,255,0.04)` bg + radial brand-color tint, `border-radius: 14px`, padding 18px
+- Card hover: `translateY(-3px)`, brand-color drop shadow, brand-color inner ring
+- Card brand stripe: 3px gradient bar (full → 60% → 20% with glow)
+- Card status dot: 1.5×1.5 px, pulses on `pulseDot` keyframe (defined in `globals.css`)
+- Severity colors: ok `#10b981`, mid `#06b6d4`, warn `#f59e0b`, critical `#ef4444`
+- Card accent assignments — **don't change without reason**:
+  - CPU `#06b6d4`, Memory `#10b981`, Filesystems `#f59e0b`, Network `#3b82f6`
+  - GPU `#ef4444` (dynamic via `gpuUtilColor`), Speedtest `#8b5cf6`
+  - System `#d946ef`, Grafana `#f97316`
+- Fonts: Inter (UI), JetBrains Mono (numbers — use `font-mono` or inline `fontFamily: "monospace"`)
 - Inline `style` props for colors/sizes; Tailwind for layout/spacing/flex. No CSS modules, no styled-components.
-- `font-variant-numeric: tabular-nums` on all numeric displays to prevent layout shift.
+
+## Domain knowledge
+
+**Prometheus**: single instance at `${TRUENAS_IP}:30104`. GPU metrics use `nvidia_smi_*` names. Network device is `enp4s0`.
+
+**Memory accounting**: TrueNAS ZFS ARC inflates raw `MemAvailable`. Use `MemTotal - MemAvailable - SReclaimable` as real-used. Thresholds: warn >85%, critical >95%.
+
+**Filesystem filter**: only mounts under `/mnt/Pool/Media/` displayed. Exclude `tmpfs|devtmpfs|overlay|squashfs|ramfs` at PromQL via `FS_EXCLUDE`.
+
+**GPU temp thresholds**: warn >80°C, critical >90°C.
+
+**Service ports** — see `context.md` for the full table.
+
+**Known CORS surfaces** — services that must be called via the server-side route, never directly from the browser:
+- PiHole `:20720`, Bazarr `:30046`, qBittorrent `:30024` — server-side proxy in `services/route.ts`
+- MikroTik `192.168.88.1` — server-side proxy in `mikrotik/route.ts`
+
+## MCP tools available
+
+- **Context7** — fetch latest library docs. Use before writing code that touches Next.js, React, Tailwind, Node, etc.
+- **Playwright** — browser automation, useful for verifying UI changes after a build.
+
+Use Context7 by default over WebFetch/WebSearch for library docs.
+
+## Hashmi-homelab skill
+
+`.claude/skills/Hashmi-homelab/SKILL.md` — workflow + style conventions (PC=PowerShell, TrueNAS=bash, concise direct prose, secrets via `-e` flags only). Apply on any task touching this repo, Docker on TrueNAS, MikroTik, or related services.
 
 ## Supplementary files
 
-- `context.md` — infrastructure IPs, hardware specs, service API keys/credentials
-- `skills.md` — historical coding patterns (may be outdated; CLAUDE.md is authoritative)
-- `memory.md` — past bug fixes and decisions (may be outdated; CLAUDE.md is authoritative)
+| File | Purpose |
+|------|---------|
+| `context.md` | Infra inventory — env var names, ports, hardware specs |
+| `memory.md` | Past bug fixes and architectural decisions |
+| `skills.md` | Reusable code patterns (PromQL queries, polling, primitives) |
+| `.env.local.example` | Template for `.env.local` (gitignored) |
 
-## MCP Tools Available
-Always use these MCP tools when relevant:
-
-- **Context7** - Use for looking up latest documentation for any 
-  library or framework. When writing code that uses Next.js, React, 
-  Tailwind, Node.js or any other library, call Context7 first to 
-  get current docs before writing code.
-
-- **Playwright** - Use for browser automation, testing, or 
-  scraping if needed. Can also be used to verify the dashboard 
-  looks correct after changes.
-
-## Instructions for Claude Code
-- At the start of every session, confirm which MCP tools are available
-- Use Context7 when: writing new components, using unfamiliar APIs, 
-  debugging library issues
-- Use Playwright when: testing dashboard UI, automating browser tasks
----
-
-## Skills
-
-This repo ships with a Claude skill that captures my homelab context, stack conventions, and communication preferences. Apply it on every dev/infra task.
-
-- **Hashmi-homelab** — `.claude/skills/Hashmi-homelab/SKILL.md`
-  - Hardware/network: TrueNAS Scale at `192.168.88.196`, MikroTik at `192.168.88.1`, Windows PC dev machine
-  - Stack: Next.js 15, TypeScript, Node 20, npm, Docker on TrueNAS (port 3000, `--network host`)
-  - Repo path on TrueNAS: `/mnt/Pool/Media/homelab-dashboard`
-  - Update workflow: edit on PC → `git push` → run `/root/update-dashboard.sh` on TrueNAS
-  - Secrets: always injected at `docker run` time via `-e` flags, never baked into the image
-  - Command syntax: PowerShell on the PC, bash on TrueNAS, always labeled per machine
-  - Style: concise, direct, no fluff
-  - Read the skill in full before answering anything that touches code, Docker, networking, or the dashboard.
+When `CLAUDE.md` conflicts with `skills.md` or `memory.md`, **CLAUDE.md wins** — those two are historical and may lag.

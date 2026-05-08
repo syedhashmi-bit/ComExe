@@ -46,21 +46,23 @@ Open-Meteo coords: `lat=-41.4419, lon=147.1450`.
 
 | Service | Port | Auth env var |
 |---------|------|--------------|
-| Plex | `32400` | `$PLEX_TOKEN` |
 | Radarr | `30025` | `$RADARR_API_KEY` |
 | Sonarr | `33027` | `$SONARR_API_KEY` |
 | Bazarr | `30046` | `$BAZARR_API_KEY` (header `X-API-KEY`) |
 | Tautulli | `30047` | `$TAUTULLI_API_KEY` |
 | Prowlarr | `30050` | `$PROWLARR_API_KEY` |
-| qBittorrent | `30024` | `$QBIT_USER` / `$QBIT_PASSWORD` (cookie SID auth) |
+| qBittorrent | `30024` | `$QBIT_USERNAME` / `$QBIT_PASSWORD` (cookie SID auth) |
 | Overseerr | `30002` | `$OVERSEERR_API_KEY` |
+| Plex | `32400` | not currently read by dashboard (Tautulli covers Plex sessions) |
 
 ## Network / infra — `192.168.88.196`
 
 | Service | Port | Auth env var |
 |---------|------|--------------|
 | Pi-hole | `20720` | `$PIHOLE_PASSWORD` (v6 two-step: password → SID) |
-| Nginx Proxy Manager | `30020` | `$NPM_USER` / `$NPM_PASSWORD` |
+| Nginx Proxy Manager | `30020` | `$NGINX_USERNAME` / `$NGINX_PASSWORD` |
+| Uptime Kuma | `31050` | `$UPTIME_KUMA_API_KEY` (Bearer) |
+| SpeedTracker | `30220` | `$SPEEDTEST_API_KEY` (Bearer, history endpoint) |
 | Homepage | (separate) | none |
 
 ## MikroTik — `192.168.88.1`
@@ -68,16 +70,31 @@ Open-Meteo coords: `lat=-41.4419, lon=147.1450`.
 | Field | Value |
 |-------|-------|
 | Web UI | `http://192.168.88.1` |
-| REST | `http://192.168.88.1/rest/...` (CORS-blocked from browser, expected) |
-| Read-only user | `monitor-only` |
+| REST | `http://192.168.88.1/rest/...` (called via `/api/mikrotik` server-side route — direct browser calls are CORS-blocked) |
+| User env var | `$MIKROTIK_USERNAME` (typically `monitor-only`) |
 | Password env var | `$MIKROTIK_PASSWORD` |
 
-## Build-time / runtime env vars consumed by the code
+## Env vars consumed by the code
 
-Currently the code reads:
-- `process.env.TRUENAS_IP` (default `"192.168.88.196"`) — used by `metrics`, `services`, `speedtest` routes
+All credentials are now read server-side via `process.env.*`. None are hardcoded. Full list:
 
-The remaining secrets in the table above are **still hardcoded in `app/api/services/route.ts`** (see `memory.md` → tech debt). Migration plan: replace each hardcoded literal with `process.env.<NAME>` and document in `.env.local.example`.
+| Env var | Used by |
+|---------|---------|
+| `TRUENAS_IP` (default `192.168.88.196`) | `metrics`, `services`, `speedtest` routes |
+| `RADARR_API_KEY` | `services/route.ts` → `radarr()` |
+| `SONARR_API_KEY` | `services/route.ts` → `sonarr()` |
+| `BAZARR_API_KEY` | `services/route.ts` → `bazarr()` |
+| `TAUTULLI_API_KEY` | `services/route.ts` → `tautulli()` |
+| `PROWLARR_API_KEY` | `services/route.ts` → `prowlarr()` |
+| `OVERSEERR_API_KEY` | `services/route.ts` → `overseerr()` |
+| `QBIT_USERNAME` / `QBIT_PASSWORD` | `services/route.ts` → `qbittorrent()` |
+| `PIHOLE_PASSWORD` | `services/route.ts` → `pihole()` |
+| `NGINX_USERNAME` / `NGINX_PASSWORD` | `services/route.ts` → `nginxProxy()` |
+| `UPTIME_KUMA_API_KEY` | `services/route.ts` → `uptimeKuma()` |
+| `MIKROTIK_USERNAME` / `MIKROTIK_PASSWORD` | `mikrotik/route.ts` |
+| `SPEEDTEST_API_KEY` | `speedtest/route.ts` |
+
+See `.env.local.example` for the full template with placeholder values.
 
 ## CORS rules
 
@@ -85,7 +102,7 @@ These services must be called via server-side proxy. Direct browser calls fail:
 - Pi-hole (`:20720`)
 - Bazarr (`:30046`)
 - qBittorrent (`:30024`)
-- MikroTik REST (`192.168.88.1`) — **client-side fallback only**, hardcoded values rendered on CORS
+- MikroTik REST (`192.168.88.1`) — proxied via `/api/mikrotik`. The client-side `MikrotikTab` fetches the local route, not the router directly. Falls back to a static-info row on error.
 
 ## Filesystem filter (Prometheus)
 
