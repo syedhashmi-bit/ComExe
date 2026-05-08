@@ -126,9 +126,9 @@ const SVC_LABELS: Record<string, string> = {
 };
 
 // Service grouping for the services panel. Order within each list = render order.
-const SVC_CATEGORIES: { id: string; label: string; services: string[] }[] = [
-  { id: "media", label: "media stack",   services: ["radarr", "sonarr", "bazarr", "tautulli", "qbittorrent", "overseerr", "prowlarr"] },
-  { id: "infra", label: "infrastructure", services: ["pihole", "nginx", "uptimekuma"] },
+const SVC_CATEGORIES: { id: string; label: string; accent: string; services: string[] }[] = [
+  { id: "media", label: "media stack",   accent: "#f59e0b", services: ["radarr", "sonarr", "bazarr", "tautulli", "qbittorrent", "overseerr", "prowlarr"] },
+  { id: "infra", label: "infrastructure", accent: "#06b6d4", services: ["pihole", "nginx", "uptimekuma"] },
 ];
 
 const BOOKMARKS: { title: string; accentColor: string; items: { name: string; url: string; icon: string }[] }[] = [
@@ -627,6 +627,36 @@ function AnimatedNumber({ value, decimals = 0, useCommas = true }: { value: numb
   const [whole, frac] = out.split(".");
   const withCommas = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   return <>{frac ? `${withCommas}.${frac}` : withCommas}</>;
+}
+
+// Splits a stat line into "first number" + "rest of line", rendering the
+// number as a hero-sized AnimatedNumber and the rest as small muted text.
+// Falls back to the regular animatedLine() rendering if the line has no
+// leading numeric value.
+function HeroStat({ line, keyPrefix }: { line: string; keyPrefix: string }) {
+  const m = line.match(/^(.*?)(\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)(.*)$/);
+  if (!m) {
+    return <span style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", lineHeight: 1.4 }}>{line}</span>;
+  }
+  const [, prefix, numStr, rest] = m;
+  const useCommas = numStr.includes(",");
+  const decimals  = numStr.includes(".") ? numStr.split(".")[1].length : 0;
+  const value     = parseFloat(numStr.replace(/,/g, ""));
+  return (
+    <div className="flex items-baseline gap-1.5 flex-wrap">
+      {prefix && <span style={{ fontSize: 11, color: "rgba(255,255,255,0.45)" }}>{prefix.trim()}</span>}
+      <span style={{
+        fontSize: 19, fontWeight: 700, color: "#ffffff",
+        fontVariantNumeric: "tabular-nums", letterSpacing: "-0.01em", lineHeight: 1.1,
+      }}>
+        <AnimatedNumber value={value} decimals={decimals} useCommas={useCommas} />
+      </span>
+      {rest && <span style={{
+        fontSize: 11, color: "rgba(255,255,255,0.55)",
+        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+      }}>{animatedLine(rest, `${keyPrefix}-rest`)}</span>}
+    </div>
+  );
 }
 
 // Replaces every numeric literal in `line` with an <AnimatedNumber>. Preserves
@@ -2192,15 +2222,21 @@ export default function Dashboard() {
                       .filter((s): s is NonNullable<typeof s> => Boolean(s));
                     if (catCards.length === 0) return null;
                     const upCount = catCards.filter(s => s.up).length;
+                    const allUp = upCount === catCards.length;
                     return (
                       <div key={cat.id} className="flex flex-col gap-3">
-                        {/* Category header with subtle divider line */}
+                        {/* Category header with accent dot + brighter divider */}
                         <div className="flex items-center gap-3">
-                          <span className="text-[9px] uppercase" style={{ color: "rgba(255,255,255,0.35)", letterSpacing: "0.2em", fontWeight: 600 }}>
+                          <span className="w-1.5 h-1.5 rounded-full" style={{ background: cat.accent, boxShadow: `0 0 6px ${cat.accent}88` }} />
+                          <span className="text-[10px] uppercase" style={{ color: "rgba(255,255,255,0.55)", letterSpacing: "0.22em", fontWeight: 700 }}>
                             {cat.label}
                           </span>
-                          <span style={{ flex: 1, height: 1, background: "linear-gradient(to right, rgba(255,255,255,0.08), transparent)" }} />
-                          <span style={{ fontSize: 9, color: "rgba(255,255,255,0.28)", fontVariantNumeric: "tabular-nums" }}>
+                          <span style={{ flex: 1, height: 1, background: `linear-gradient(to right, ${cat.accent}33, transparent 70%)` }} />
+                          <span style={{
+                            fontSize: 10, fontWeight: 600,
+                            color: allUp ? "#10b981" : "rgba(255,255,255,0.45)",
+                            fontVariantNumeric: "tabular-nums",
+                          }}>
                             {upCount}/{catCards.length}
                           </span>
                         </div>
@@ -2210,54 +2246,72 @@ export default function Dashboard() {
                             const icon  = SVC_ICONS[name]  ?? "";
                             const label = SVC_LABELS[name]  ?? name;
                             const url   = SVC_URLS[name];
+                            const stripeColor = up ? color : "rgba(255,255,255,0.12)";
                             return (
                               <div key={name}
-                                className="flex flex-col gap-2 cursor-pointer"
+                                className="flex flex-col cursor-pointer relative overflow-hidden"
                                 onClick={() => url && window.open(url, "_blank")}
                                 onMouseDown={e => (e.currentTarget.style.transform = "scale(0.97)")}
-                                onMouseUp={e => (e.currentTarget.style.transform = "translateY(-2px)")}
+                                onMouseUp={e => (e.currentTarget.style.transform = "translateY(-3px)")}
                                 style={{
-                                  background: "rgba(255,255,255,0.03)",
+                                  background: up
+                                    ? `radial-gradient(ellipse at top, ${color}1a 0%, transparent 55%), rgba(255,255,255,0.03)`
+                                    : "rgba(255,255,255,0.03)",
                                   border: "1px solid rgba(255,255,255,0.07)",
-                                  borderTop: `2px solid ${up ? color : "rgba(255,255,255,0.1)"}`,
-                                  borderRadius: 12, padding: "13px 14px 14px",
-                                  minHeight: 100,
-                                  transition: "background 0.15s, transform 0.15s, border-color 0.15s, box-shadow 0.2s",
+                                  borderRadius: 12, padding: 0,
+                                  minHeight: 140,
+                                  transition: "transform 0.15s, border-color 0.15s, box-shadow 0.2s",
                                 }}
                                 onMouseEnter={e => {
-                                  e.currentTarget.style.background = "rgba(255,255,255,0.06)";
-                                  e.currentTarget.style.transform = "translateY(-2px)";
-                                  e.currentTarget.style.borderColor = "rgba(255,255,255,0.15)";
-                                  if (up) e.currentTarget.style.boxShadow = `0 6px 24px ${color}26, 0 0 0 1px ${color}33 inset`;
+                                  e.currentTarget.style.transform = "translateY(-3px)";
+                                  e.currentTarget.style.borderColor = up ? `${color}55` : "rgba(255,255,255,0.18)";
+                                  if (up) e.currentTarget.style.boxShadow = `0 10px 30px ${color}33, 0 0 0 1px ${color}33 inset`;
                                 }}
                                 onMouseLeave={e => {
-                                  e.currentTarget.style.background = "rgba(255,255,255,0.03)";
                                   e.currentTarget.style.transform = "translateY(0)";
                                   e.currentTarget.style.borderColor = "rgba(255,255,255,0.07)";
                                   e.currentTarget.style.boxShadow = "none";
                                 }}
                               >
-                                <div className="flex items-center justify-between">
-                                  <ServiceIcon src={icon} label={label} color={color} />
-                                  <span className="w-1.5 h-1.5 rounded-full shrink-0 animate-pulse-dot"
-                                    style={{
-                                      background: up ? "#10b981" : "#ef4444",
-                                      boxShadow: up ? "0 0 5px #10b98155" : "0 0 4px #ef444455",
-                                      animation: up ? "pulseDot 2s ease-in-out infinite" : "none",
-                                    }} />
-                                </div>
-                                <span style={{ fontSize: 13, color: up ? "#ffffff" : "rgba(255,255,255,0.3)", fontWeight: 600 }}>{label}</span>
-                                {up && lines.map((line, i) => (
-                                  <span key={i} style={{
-                                    color: name === "uptimekuma"
-                                      ? ((downCount ?? 0) > 0 ? "#ef4444" : "#10b981")
-                                      : name === "qbittorrent" && i === 1
-                                      ? "#06b6d4"
-                                      : "rgba(255,255,255,0.55)",
-                                    fontSize: 11, lineHeight: 1.6, fontVariantNumeric: "tabular-nums",
-                                  }}>{animatedLine(line, `${name}-${i}`)}</span>
-                                ))}
-                                {!up && <span style={{ fontSize: 10, color: "rgba(255,255,255,0.3)" }}>offline</span>}
+                                {/* Brand accent stripe — gradient bar with glow */}
+                                <div style={{
+                                  height: 3,
+                                  background: `linear-gradient(90deg, ${stripeColor} 0%, ${stripeColor}88 60%, ${stripeColor}33 100%)`,
+                                  boxShadow: up ? `0 0 8px ${color}77` : "none",
+                                }} />
+
+                                {/* Card body */}
+                                <div className="flex flex-col gap-2" style={{ padding: "13px 14px 14px" }}>
+                                  <div className="flex items-center justify-between">
+                                    <ServiceIcon src={icon} label={label} color={color} />
+                                    <span className="w-1.5 h-1.5 rounded-full shrink-0"
+                                      style={{
+                                        background: up ? "#10b981" : "#ef4444",
+                                        boxShadow: up ? "0 0 6px #10b981aa" : "0 0 4px #ef444455",
+                                        animation: up ? "pulseDot 2s ease-in-out infinite" : "none",
+                                      }} />
+                                  </div>
+                                  <span style={{
+                                    fontSize: 14, fontWeight: 700,
+                                    color: up ? "#ffffff" : "rgba(255,255,255,0.3)",
+                                    letterSpacing: "0.01em",
+                                  }}>{label}</span>
+
+                                  {/* Hero stat — first line gets headline treatment */}
+                                  {up && lines[0] && <HeroStat line={lines[0]} keyPrefix={`${name}-h`} />}
+
+                                  {/* Remaining lines — small muted */}
+                                  {up && lines.slice(1).map((line, i) => (
+                                    <span key={i} style={{
+                                      color: name === "uptimekuma"
+                                        ? ((downCount ?? 0) > 0 ? "#ef4444" : "#10b981")
+                                        : name === "qbittorrent" && i === 0
+                                        ? "#06b6d4"
+                                        : "rgba(255,255,255,0.5)",
+                                      fontSize: 11, lineHeight: 1.5, fontVariantNumeric: "tabular-nums",
+                                    }}>{animatedLine(line, `${name}-${i + 1}`)}</span>
+                                  ))}
+                                  {!up && <span style={{ fontSize: 10, color: "rgba(255,255,255,0.3)" }}>offline</span>}
                                 {/* Radarr: library completion + active download */}
                                 {name === "radarr" && svcPct != null && up && (
                                   <GaugeBar percent={svcPct} color={svcPct > 90 ? "#10b981" : svcPct > 70 ? "#f59e0b" : "#ef4444"} thin />
@@ -2303,6 +2357,7 @@ export default function Dashboard() {
                                     ))}
                                   </div>
                                 )}
+                                </div>
                               </div>
                             );
                           })}
