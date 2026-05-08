@@ -1226,7 +1226,7 @@ function MikrotikTab() {
 // ── GrafanaCard ───────────────────────────────────────────────────────────────
 
 const GRAFANA_BASE  = "http://192.168.88.196:30037";
-const GRAFANA_PANEL = `${GRAFANA_BASE}/d-solo/rYdddlPWk/node-exporter-full?orgId=1&timezone=browser&var-ds_prometheus=bfkupt1hj588wa&var-job=node&var-nodename=truenas&var-node=truenas&refresh=30s&panelId=panel-77&theme=dark`;
+const GRAFANA_PANEL = `${GRAFANA_BASE}/d-solo/rYdddlPWk/node-exporter-full?orgId=1&from=now-24h&to=now&timezone=browser&var-ds_prometheus=cflfv1hjeg9vka&var-job=node&var-nodename=truenas&var-node=truenas&refresh=1m&panelId=panel-77&theme=dark`;
 
 function GrafanaCard() {
   const [loaded, setLoaded] = useState(false);
