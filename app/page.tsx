@@ -645,6 +645,11 @@ function TrendDelta({
   if (past == null) return null;
   const delta = current - past;
   if (Math.abs(delta) < threshold) return null;
+  // Sanity guard: if the magnitude of change is wildly larger than the current
+  // value, we're almost certainly comparing samples with different units (e.g.
+  // SpeedTracker's `download` field is Mbps from /latest but bits/s from
+  // /v1/results). Suppress rather than render nonsense.
+  if (current !== 0 && Math.abs(delta) / Math.abs(current) > 5) return null;
   const isUp = delta > 0;
   const isGood = (isUp && goodDirection === "up") || (!isUp && goodDirection === "down");
   const color = isGood ? "#10b981" : "#ef4444";
@@ -2114,12 +2119,9 @@ export default function Dashboard() {
                       {/* Big numbers: download + upload */}
                       <div className="flex items-end gap-4">
                         <div className="flex flex-col">
-                          <div className="flex items-baseline gap-2">
-                            <span className="font-medium tabular-nums font-mono" style={{ fontSize: 44, lineHeight: 1, color: "#06b6d4" }}>
-                              {dl != null ? dl.toFixed(0) : "—"}
-                            </span>
-                            <TrendDelta history={speedtestHistory} current={dl ?? null} goodDirection="up" precision={0} threshold={5} suffix="" />
-                          </div>
+                          <span className="font-medium tabular-nums font-mono" style={{ fontSize: 44, lineHeight: 1, color: "#06b6d4" }}>
+                            {dl != null ? dl.toFixed(0) : "—"}
+                          </span>
                           <span className="text-[9px] uppercase tracking-widest mt-0.5" style={{ color: "rgba(255,255,255,0.35)" }}>Mbps ↓</span>
                         </div>
                         <div className="flex flex-col mb-[4px]">

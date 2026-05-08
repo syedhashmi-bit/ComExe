@@ -22,13 +22,6 @@
       "static/chunks/main-app-c91dfe490f8d7d4f.js",
       "static/chunks/app/api/metrics/route-672d6eabfbbb34e7.js"
     ],
-    "/api/mikrotik/route": [
-      "static/chunks/webpack-06a82223b7106399.js",
-      "static/chunks/4bd1b696-7fb12dfea31143c4.js",
-      "static/chunks/684-22dc3f08f4b2cc88.js",
-      "static/chunks/main-app-c91dfe490f8d7d4f.js",
-      "static/chunks/app/api/mikrotik/route-30604f765835a80e.js"
-    ],
     "/api/services/route": [
       "static/chunks/webpack-06a82223b7106399.js",
       "static/chunks/4bd1b696-7fb12dfea31143c4.js",
@@ -50,12 +43,19 @@
       "static/chunks/main-app-c91dfe490f8d7d4f.js",
       "static/chunks/app/api/speedtest/route-1122fb087bbb698a.js"
     ],
+    "/api/mikrotik/route": [
+      "static/chunks/webpack-06a82223b7106399.js",
+      "static/chunks/4bd1b696-7fb12dfea31143c4.js",
+      "static/chunks/684-22dc3f08f4b2cc88.js",
+      "static/chunks/main-app-c91dfe490f8d7d4f.js",
+      "static/chunks/app/api/mikrotik/route-30604f765835a80e.js"
+    ],
     "/page": [
       "static/chunks/webpack-06a82223b7106399.js",
       "static/chunks/4bd1b696-7fb12dfea31143c4.js",
       "static/chunks/684-22dc3f08f4b2cc88.js",
       "static/chunks/main-app-c91dfe490f8d7d4f.js",
-      "static/chunks/app/page-e0e6a455c8cb2883.js"
+      "static/chunks/app/page-1144c88dc6623654.js"
     ]
   }
 }
