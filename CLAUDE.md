@@ -51,6 +51,7 @@ Five routes — all proxy from the browser to internal services to avoid CORS an
 | `app/api/mikrotik/route.ts` | Router stats | `${MIKROTIK_URL}` |
 | `app/api/activity/route.ts` | Recent grabs / streams (Sonarr + Radarr + Tautulli history) | `${SONARR_URL}` / `${RADARR_URL}` / `${TAUTULLI_URL}` |
 | `app/api/config/route.ts` | Runtime client-side config (bookmarks, service URLs, Grafana embed UID) | env vars + optional `bookmarks.json` mount |
+| `app/api/test-connection/route.ts` | Setup wizard helper — POST a service spec, returns `{ ok, message }` | upstream services (live auth check) |
 
 `metrics/route.ts` runs ~30 PromQL queries via `Promise.all`. **Destructuring order must stay in sync with the queries array** — positional. New queries get appended at the end to preserve order.
 
@@ -79,6 +80,12 @@ Per-service enrichment:
 `config/route.ts` is the **runtime config endpoint** the client fetches once on mount. Returns: `truenasIp`, `mikrotikUrl`, `weather` coords, `grafana { baseUrl, panelUrl, dashboardUid, datasourceUid }`, `serviceUrls` map, `bookmarks` array (loaded from `bookmarks.json` in cwd by default; override path via `BOOKMARKS_PATH`), and `fsPathPrefix`. **Nothing returned here is a secret** — never include API keys / passwords. Cached server-side for 60s. Lets the same Docker image work for any user without rebuilding.
 
 `activity/route.ts` aggregates three history sources via `Promise.all`: Sonarr `/api/v3/history` filtered to `grabbed`/`downloadFolderImported`, Radarr `/api/v3/history` same filter, Tautulli `cmd=get_history`. Each source is independently try/catched — one failing returns `[]` rather than blanking the feed. 60s in-memory cache. Returns `{ events: ActivityEvent[], timestamp }` sorted newest-first, capped at 30 events.
+
+### `app/setup/page.tsx` — setup wizard
+
+A separate page (route `/setup`) for first-time config. Single-page form with sections for TrueNAS IP, per-service enable/URL/credential fields, MikroTik, and Grafana. Each enabled service has a **Test** button that POSTs to `/api/test-connection`; the wizard renders the result inline (✓ Connected / ✗ message). At the bottom it generates a `docker-compose.yml`, a `docker run` command, and a flat `.env` file from the current form state — three tabs with copy-to-clipboard buttons.
+
+Form state persists in `localStorage` (key `homelab-dashboard:setup-wizard`) so a refresh doesn't clobber inputs. The wizard never writes config back to the server — the user copies the output and applies it via their own deploy method.
 
 ### `app/page.tsx` — the frontend
 

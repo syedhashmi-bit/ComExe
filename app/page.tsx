@@ -1967,12 +1967,15 @@ export default function Dashboard() {
                   Welcome — {configuredCount === 0 ? "no services configured yet" : `only ${configuredCount} of ${totalCount} services configured`}.
                 </span>
                 <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
-                  Open the Settings panel (⚙) → Connections to see what {missingCount} {missingCount === 1 ? "service is" : "services are"} missing, or check{" "}
-                  <a href="https://github.com/syedhashmi-bit/homelab-dashboard/blob/main/INSTALL.md" target="_blank" rel="noopener noreferrer"
-                    style={{ color: "#06b6d4", textDecoration: "underline" }}>
-                    INSTALL.md
+                  {missingCount === 1 ? "1 service is" : `${missingCount} services are`} missing config. Try the{" "}
+                  <a href="/setup" style={{ color: "#06b6d4", textDecoration: "underline", fontWeight: 600 }}>
+                    setup wizard
                   </a>{" "}
-                  for the full setup guide.
+                  to fill in URLs / API keys with live connection-testing, or check{" "}
+                  <a href="https://github.com/syedhashmi-bit/homelab-dashboard/blob/main/INSTALL.md" target="_blank" rel="noopener noreferrer"
+                    style={{ color: "rgba(6,182,212,0.7)", textDecoration: "underline" }}>
+                    INSTALL.md
+                  </a>.
                 </span>
               </div>
             );
