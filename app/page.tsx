@@ -1870,11 +1870,13 @@ export default function Dashboard() {
             <span className="block w-2 h-2 rounded-full shrink-0"
               style={{ background: "#10b981", boxShadow: "0 0 6px #10b98166", animation: "pulseDot 2s ease-in-out infinite", "--dot-color": "#10b981" } as React.CSSProperties} />
             <Link href="/" className="flex items-center gap-2 shrink-0" style={{ textDecoration: "none" }}>
-              {/* Inline ComExe brand mark — a "> _" terminal prompt in a cyan rounded square. */}
+              {/* Minimalist ComExe brand mark — bare "CE" monogram, single-weight strokes, no fills. */}
               <svg width="22" height="22" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
-                <rect x="2" y="5" width="28" height="22" rx="5" fill="#06b6d4" />
-                <path d="M10 12 L14 16 L10 20" stroke="#0a0c12" strokeWidth="2.6" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-                <line x1="17" y1="20" x2="23" y2="20" stroke="#0a0c12" strokeWidth="2.6" strokeLinecap="round" />
+                <path d="M14 8 A 8 8 0 1 0 14 24" stroke="#06b6d4" strokeWidth="2.6" fill="none" strokeLinecap="round" />
+                <path d="M19 8 L25 8"   stroke="#06b6d4" strokeWidth="2.6" fill="none" strokeLinecap="round" />
+                <path d="M19 8 L19 24"  stroke="#06b6d4" strokeWidth="2.6" fill="none" strokeLinecap="round" />
+                <path d="M19 16 L24 16" stroke="#06b6d4" strokeWidth="2.6" fill="none" strokeLinecap="round" />
+                <path d="M19 24 L25 24" stroke="#06b6d4" strokeWidth="2.6" fill="none" strokeLinecap="round" />
               </svg>
               <h1 className="font-mono" style={{ fontSize: 18, fontWeight: 700, color: "#ffffff", letterSpacing: "-0.01em" }}>
                 Com<span style={{ color: "#06b6d4" }}>Exe</span>
