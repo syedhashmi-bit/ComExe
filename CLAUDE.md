@@ -2,6 +2,8 @@
 
 Guidance for Claude Code working in this repo. **`memory.md`** has past decisions and bug fixes; **`skills.md`** has reusable patterns; **`context.md`** has env-var/infra inventory.
 
+> **Branding:** The visible product name is **ComExe**. Repo / image / container names (`homelab-dashboard`, `ghcr.io/syedhashmi-bit/homelab-dashboard`) intentionally stay as-is — renaming would break user deploys. Treat ComExe as a UI label only.
+
 ## Build & deploy workflow
 
 The production image is built by **GitHub Actions on push to `main`** and published to **`ghcr.io/syedhashmi-bit/homelab-dashboard:latest`**. TrueNAS deploys via `docker pull`, never builds locally — that historically SIGSEGV'd on this host (see `memory.md` → "Build moved off Docker"). CI builds on Ubuntu runners, which don't hit it.

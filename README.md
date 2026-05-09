@@ -1,14 +1,16 @@
-# ComExe
+<p align="center">
+  <img src="app/icon.svg" alt="ComExe" width="96" />
+</p>
 
-> Real-time single-page dashboard for a TrueNAS Scale homelab. Aggregates Prometheus metrics, service-health checks, speedtest history, weather, and an embedded Grafana panel into a dark, minimal UI.
+<h1 align="center">ComExe</h1>
 
-```
-┌─────┐
-│ >_  │   ComExe
-└─────┘
-```
+<p align="center">
+  Real-time single-page dashboard for a TrueNAS Scale homelab.
+</p>
 
-No database, no auth, no external state library. Configure everything via a built-in `/setup` wizard with live connection-testing — no env-var editing or compose-file fiddling required.
+Aggregates Prometheus metrics, service-health checks, speedtest history, weather, and an embedded Grafana panel into a dark, minimal UI. No database, no auth, no external state library.
+
+Configure everything via the built-in `/setup` wizard — fill in your service URLs and API keys in a web form with live "Test connection" buttons, click **Save & apply**, and the dashboard picks up the new config within ~3 seconds. No env-var editing, no compose-file fiddling, no redeploys.
 
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?logo=typescript)
@@ -41,14 +43,23 @@ Live status pills for **Radarr · Sonarr · Bazarr · Tautulli · qBittorrent ·
 - Click anywhere on the card to open the underlying service in a new tab
 - Cards grouped into *Media stack* and *Infrastructure* categories with live up-counts
 
+### First-run UX
+
+- **`/setup` wizard** — single-page form with auto-filled URLs, per-row API-key fields, and a **Test** button per service that actually authenticates against your upstream. Concrete error messages on failure ("Wrong API key", "IP banned", "Could not reach …").
+- **Save & apply** — when a writable `/app/data` volume is mounted, the wizard saves your config to disk and the dashboard picks it up within ~3 seconds. No redeploy, no env-var editing.
+- **Hidden cards for unconfigured services** — the dashboard shows only what's been configured. No `—` placeholders cluttering the grid.
+- **First-run banner** — when fewer than 3 services are configured, a friendly hint at the top points at `/setup`.
+- **Settings → Connections** — per-service status (● connected / ● unreachable / ● not configured) with the missing env-var names listed as copy-paste references.
+- **Activity ticker** — rolling feed of recent grabs / imports / streams from Sonarr / Radarr / Tautulli history endpoints.
+
 ### Other
 
 - **Router bar** — MikroTik live stats via a server-side proxy, with graceful fallback to a static info row
 - **Weather** — temperature + condition pill in the header (open-meteo, no API key)
 - **Search** — Google search bar; `G` to focus, opens results in a new tab
-- **Bookmarks** — quick-links section, color-coded by category, toggle with `H`
-- **Settings** — per-card visibility, refresh interval (5/10/30 s), °C/°F, decimal/binary units
-- **Trend deltas** — small `↑X` / `↓X` next to hero numbers when a metric changes meaningfully (CPU %, memory pressure, GPU temp)
+- **Bookmarks** — quick-links section, color-coded by category, toggle with `H`. Edit via mounted `bookmarks.json`.
+- **Settings** — per-card visibility, refresh interval (3/5/10/30 s), °C/°F, decimal/binary units, per-service Connections view
+- **Trend deltas** — small `↑X` / `↓X` next to hero numbers when a metric changes meaningfully (CPU %, memory pressure, GPU temp). Sanity guard suppresses output when the delta-to-current ratio is wildly large (catches unit-mismatch bugs).
 - **Alert system** — 2 px cyan healthy line → 36 px amber warning bar → 48 px red critical bar across the top of the page
 - **Keyboard shortcuts** — `G` focus search · `R` force-refresh · `H` toggle bookmarks · `Esc` blur input / close panels
 
@@ -101,26 +112,33 @@ A prebuilt image is published to **`ghcr.io/syedhashmi-bit/homelab-dashboard:lat
 
 > **Full install guide is in [INSTALL.md](./INSTALL.md)** — TrueNAS Custom App walkthrough, docker-compose, plain `docker run`, bookmarks customization, Grafana embed setup, and troubleshooting.
 
-### Quick start (docker compose)
+### Quick start — no env vars to type
 
 ```bash
-curl -O https://raw.githubusercontent.com/syedhashmi-bit/homelab-dashboard/main/docker-compose.example.yml
-curl -O https://raw.githubusercontent.com/syedhashmi-bit/homelab-dashboard/main/bookmarks.example.json
-mv docker-compose.example.yml docker-compose.yml
-mv bookmarks.example.json     bookmarks.json
-$EDITOR docker-compose.yml      # fill in your env vars
-$EDITOR bookmarks.json          # customize bookmarks
-docker compose up -d
+mkdir -p dashboard-data
+curl -fsSL -o bookmarks.json \
+  https://raw.githubusercontent.com/syedhashmi-bit/homelab-dashboard/main/bookmarks.example.json
+
+docker run -d \
+  --name comexe \
+  --network host \
+  --restart unless-stopped \
+  -v "$(pwd)/bookmarks.json:/app/bookmarks.json:ro" \
+  -v "$(pwd)/dashboard-data:/app/data" \
+  ghcr.io/syedhashmi-bit/homelab-dashboard:latest
 ```
 
-Visit `http://<your-host>:3000`.
+Then visit **`http://<your-host>:3000/setup`** — fill in your TrueNAS IP, tick the services you use, paste each API key, click **Test** to confirm, then **Save & apply**. The cards go green within seconds.
+
+The `dashboard-data` volume is what makes "Save & apply" persist. Skip that mount and the wizard falls back to "copy this docker-compose.yml" mode (still works, just needs a redeploy).
 
 ### Configuration model
 
-- **Required env vars**: `TRUENAS_IP` and the API keys for whichever services you actually use. Full list in [`.env.local.example`](./.env.local.example).
-- **Optional env vars**: per-service URLs (default to `${TRUENAS_IP}:<port>`), Grafana embed UIDs, weather coords, filesystem paths, etc.
-- **Mountable bookmarks file**: `-v /your/path/bookmarks.json:/app/bookmarks.json:ro`. Schema in [`bookmarks.example.json`](./bookmarks.example.json).
-- **No secrets ever in the image**: all credentials are read from env vars at runtime.
+- **Wizard-driven (recommended)** — `/setup` writes `data/config.json` to your mounted volume. Edits via the web form take effect within seconds. No restarts, no compose-file edits.
+- **Env vars** — set anything via `docker run -e VAR=value` for headless / immutable deploys. Full list in [`.env.local.example`](./.env.local.example).
+- **Bookmarks** — mount your own JSON file at `/app/bookmarks.json`. Schema in [`bookmarks.example.json`](./bookmarks.example.json).
+- **Precedence**: file > env vars > built-in defaults. Save & apply wins, so the wizard always reflects what's actually live.
+- **No secrets ever in the image**: every credential is read at request time from the file or env. Nothing baked in.
 
 ---
 
@@ -197,16 +215,21 @@ Memory uses `MemTotal − MemAvailable − SReclaimable` so ZFS ARC (which is re
 .
 ├── app/
 │   ├── api/
-│   │   ├── activity/route.ts     Sonarr/Radarr/Tautulli history → activity ticker
-│   │   ├── config/route.ts       Runtime client config (bookmarks, URLs, Grafana embed)
-│   │   ├── metrics/route.ts      Prometheus proxy
-│   │   ├── mikrotik/route.ts     Router stats
-│   │   ├── services/route.ts     10-service health checks
-│   │   ├── speedtest/route.ts    SpeedTracker history
-│   │   └── weather/route.ts      open-meteo proxy
-│   ├── globals.css               Keyframes, font imports
-│   ├── layout.tsx                Root layout
-│   └── page.tsx                  Entire dashboard UI (~2 300 lines)
+│   │   ├── activity/route.ts         Sonarr/Radarr/Tautulli history → activity ticker
+│   │   ├── config/route.ts           GET runtime client config + POST writes data/config.json
+│   │   ├── metrics/route.ts          Prometheus proxy
+│   │   ├── mikrotik/route.ts         Router stats
+│   │   ├── services/route.ts         10-service health checks
+│   │   ├── speedtest/route.ts        SpeedTracker history
+│   │   ├── test-connection/route.ts  Setup-wizard helper — validates upstream creds live
+│   │   └── weather/route.ts          open-meteo proxy
+│   ├── lib/
+│   │   └── server-config.ts          Single-source loadConfig() — file > env > defaults
+│   ├── setup/page.tsx                /setup wizard — tested form + Save & apply button
+│   ├── globals.css                   Keyframes, font imports
+│   ├── icon.svg                      ComExe favicon (Next.js auto-serves)
+│   ├── layout.tsx                    Root layout
+│   └── page.tsx                      Entire dashboard UI (~2 300 lines)
 ├── .github/workflows/build.yml   CI: build image and push to GHCR
 ├── .env.local.example            Env var template (full inventory)
 ├── bookmarks.example.json        Schema for the bookmarks file

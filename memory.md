@@ -65,6 +65,38 @@ Old commit SHAs are dead. Force-pushed to `main`. Anyone who pulled before the r
 
 **The `the user's git author email` author email** still appears on every commit's author/committer field (`--replace-text` and `--replace-message` don't touch authorship). That's a separate `--email-callback` operation, not done.
 
+### Runtime config store + Save & apply (current)
+
+**Decision:** Config resolution centralized into a server-only `loadConfig()` that merges three layers, highest precedence first:
+1. `data/config.json` — written by the `/setup` wizard via POST `/api/config`
+2. `process.env.*`    — set via `docker run -e`
+3. baked-in defaults
+
+**Why:** Before this, the `/setup` wizard could TEST credentials but had no way to APPLY them — it generated a docker-compose snippet for the user to copy and redeploy. That's friction the project doesn't need on first install. With the file layer, "Save & apply" writes to a mounted volume and the next request to any service route picks up the change within ~3 seconds. No restart, no redeploy.
+
+**Where it lives:** `app/lib/server-config.ts`. The `services/route.ts`, `mikrotik/route.ts`, and `activity/route.ts` handlers were refactored to take resolved `ServiceCreds` as a parameter from a single `loadConfig()` call at the top of `GET()`. `metrics/route.ts` and `weather/route.ts` still read env vars directly — they don't have user-facing config the wizard touches.
+
+**Security:** The POST `/api/config` endpoint has no auth. Anyone with browser access to the dashboard can write config. That's an acceptable LAN homelab assumption; flagged in INSTALL.md and the wizard's security note. Don't expose the dashboard publicly without a reverse proxy doing auth.
+
+### Setup wizard at `/setup` (current)
+
+Single-page React form. Per-service rows with auth-shape-aware fields (apikey / userpass / password / bearer). Each row has a **Test** button that POSTs to `/api/test-connection` — that endpoint actually authenticates against the upstream and returns concrete error messages.
+
+Form state mirrors to `localStorage` (`homelab-dashboard:setup-wizard`) so refresh doesn't lose progress. **Save & apply** button is the primary action; if the writable volume isn't mounted (`writable: false` from `/api/config` GET), the button is disabled with an amber warning showing the exact mount line to add. The legacy "copy this docker-compose.yml" three-tab output is hidden behind a "Show generated config" toggle as a fallback.
+
+### First-run UX cleanup (current)
+
+- Service cards for upstream services with missing credential env vars are HIDDEN from the visible grid (used to show as `—` placeholders, which read as "broken").
+- Each `ServiceResult` now carries `configured: boolean` and `envVar?: string[]` so the frontend knows which to hide and which env vars are missing.
+- A friendly setup banner appears between the MikroTik bar and the metric grid when fewer than 3 services are configured, pointing at `/setup`.
+- Settings panel gained a **Connections** section listing every service with a colored-dot status (`● connected` / `● unreachable` / `● not configured`), plus a "Missing env vars" copy-paste reference block.
+
+### Brand: ComExe (current)
+
+Visible branding renamed from "homelab" to **ComExe**. Repo, Docker image (`ghcr.io/syedhashmi-bit/homelab-dashboard:latest`), container name in `update-dashboard.sh`, and similar infrastructure references kept as-is — renaming them would break user deploys.
+
+Icon at `app/icon.svg` (Next.js auto-serves as favicon). Minimalist letterform: open half-arc C on the left + bare 3-bar E on the right, both in cyan `#06b6d4`, single 2.6px stroke, rounded caps, no fills, no background plate. Same SVG embedded inline in the dashboard's header next to the wordmark "Com**Exe**".
+
 ## Known CORS / quirks
 
 | Service | Symptom | Handled by |
