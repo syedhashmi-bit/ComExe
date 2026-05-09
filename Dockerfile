@@ -28,6 +28,12 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN groupadd --system --gid 1001 nodejs && \
     useradd --system --uid 1001 --gid 1001 --shell /bin/false nextjs
 
+# Writable directory for the /setup wizard's "Save & apply". Create it owned by
+# nextjs so a host-mount or a no-mount fresh install both work without permission
+# pain. If the user mounts a host dir over this, that mount needs to be writable
+# by uid 1001 (or the user can `chmod 777` if they don't care about file ownership).
+RUN mkdir -p /app/data && chown nextjs:nodejs /app/data
+
 # Production deps only — saves ~150 MB vs the full builder node_modules.
 COPY package.json package-lock.json* ./
 RUN npm ci --omit=dev && npm cache clean --force

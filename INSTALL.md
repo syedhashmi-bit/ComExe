@@ -28,6 +28,37 @@ The full env-var list is in [`.env.local.example`](.env.local.example). Most of 
 
 ---
 
+## Recommended path — wizard-driven (no env vars to type)
+
+The fastest install. You don't pre-edit any compose file or env vars. Spin up the container with two volume mounts only, then visit `/setup` and fill in everything via a web form with live "Test connection" buttons.
+
+```bash
+# any-host (bash)
+mkdir -p dashboard-data
+curl -fsSL -o bookmarks.json \
+  https://raw.githubusercontent.com/syedhashmi-bit/homelab-dashboard/main/bookmarks.example.json
+
+docker run -d \
+  --name homelab-dashboard \
+  --network host \
+  --restart unless-stopped \
+  -v "$(pwd)/bookmarks.json:/app/bookmarks.json:ro" \
+  -v "$(pwd)/dashboard-data:/app/data" \
+  ghcr.io/syedhashmi-bit/homelab-dashboard:latest
+```
+
+Then:
+1. Visit `http://<your-host>:3000/setup`
+2. Type your TrueNAS IP — every per-service URL auto-fills
+3. Tick services you have, paste API keys, click **Test** on each row to confirm
+4. Click **Save & apply** — the dashboard picks up the new config in ~3 seconds. No restart.
+
+The **`-v ./dashboard-data:/app/data`** mount is what makes Save & apply work. Skip it and the wizard still works but writes "copy this config and redeploy" output instead of saving directly.
+
+> **Security note:** the `/api/config` POST endpoint that "Save & apply" hits has no auth. Anyone on your LAN with browser access to the dashboard can write config. That's an acceptable assumption for a homelab dashboard. **Don't expose this dashboard to the public internet without a reverse proxy doing auth.**
+
+---
+
 ## Path 1 — TrueNAS Scale Custom App (UI)
 
 Works on TrueNAS Scale 24.10 (Electric Eel) and later.
@@ -40,11 +71,9 @@ Works on TrueNAS Scale 24.10 (Electric Eel) and later.
    - `TRUENAS_IP` = your TrueNAS LAN IP (e.g. `192.168.88.196`)
    - The API keys / passwords for whichever services you use
 6. **Networking** → set **Network mode** to `host`. (Or use a bridge network with port `3000` mapped, if you prefer.)
-7. **Storage** (optional, for custom bookmarks):
-   - Type: `Host Path`
-   - Host Path: path to your `bookmarks.json` (e.g. `/mnt/Pool/Configs/bookmarks.json`)
-   - Mount Path: `/app/bookmarks.json`
-   - Read Only: yes
+7. **Storage** — add two host-path mounts:
+   - **Bookmarks** (optional): `/path/to/bookmarks.json` → `/app/bookmarks.json`, **Read Only**
+   - **Config data** (recommended, for the `/setup` wizard's Save & apply): `/mnt/Pool/Configs/dashboard-data` → `/app/data`, **Writable**
 8. **Save**. TrueNAS pulls the image and starts the container.
 
 Visit **http://&lt;truenas-ip&gt;:3000** to see the dashboard.

@@ -175,15 +175,29 @@ function Btn({ children, onClick, variant = "secondary", disabled }: {
 
 // ── main wizard ─────────────────────────────────────────────────────────────
 
+type SaveStatus = { state: "idle" } | { state: "saving" } | { state: "ok"; msg: string } | { state: "err"; msg: string };
+
 export default function SetupWizard() {
   const [state, setState] = useState<WizardState>(defaultState());
   const [hydrated, setHydrated] = useState(false);
   const [showPasswords, setShowPasswords] = useState(false);
   const [outputTab, setOutputTab] = useState<"compose" | "run" | "env">("compose");
+  const [writable, setWritable] = useState<boolean | null>(null);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>({ state: "idle" });
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   // Load from localStorage on mount (post-hydration to avoid SSR mismatch)
   useEffect(() => { setState(loadState()); setHydrated(true); }, []);
   useEffect(() => { if (hydrated) saveState(state); }, [state, hydrated]);
+
+  // Check whether the writable volume is mounted — disables the Save button
+  // with a friendly message if not.
+  useEffect(() => {
+    fetch("/api/config", { cache: "no-store" })
+      .then(r => r.ok ? r.json() : null)
+      .then((cfg: { writable?: boolean } | null) => { if (cfg) setWritable(cfg.writable ?? false); })
+      .catch(() => setWritable(false));
+  }, []);
 
   function updateRow(id: string, patch: Partial<ServiceRow>) {
     setState(s => ({ ...s, rows: { ...s.rows, [id]: { ...s.rows[id], ...patch } } }));
@@ -260,6 +274,70 @@ export default function SetupWizard() {
     if (!window.confirm("This wipes the form, including any credentials you typed. Continue?")) return;
     localStorage.removeItem(LS_KEY);
     setState(defaultState());
+  }
+
+  // Convert the wizard's ServiceRow shape into the PartialFileConfig shape
+  // POST /api/config expects, then save. On success the dashboard's next poll
+  // (within 3s) picks up the new credentials and the cards go green.
+  async function saveAndApply() {
+    setSaveStatus({ state: "saving" });
+    const body: {
+      truenasIp: string;
+      mikrotik?: { url: string; username: string; password: string };
+      services:  Record<string, { url?: string; apiKey?: string; username?: string; password?: string }>;
+      grafana?:  { baseUrl?: string; dashboardUid?: string; datasourceUid?: string; panelId?: string };
+    } = {
+      truenasIp: state.truenasIp,
+      services:  {},
+    };
+
+    for (const svc of SERVICES) {
+      const row = state.rows[svc.id];
+      if (!row?.enabled) continue;
+      const entry: Record<string, string> = {};
+      if (row.url)      entry.url      = row.url;
+      if (svc.authShape === "apikey" || svc.authShape === "bearer") {
+        if (row.apiKey) entry.apiKey = row.apiKey;
+      }
+      if (svc.authShape === "userpass") {
+        if (row.username) entry.username = row.username;
+        if (row.password) entry.password = row.password;
+      }
+      if (svc.authShape === "password") {
+        if (row.password) entry.password = row.password;
+      }
+      if (Object.keys(entry).length > 0) body.services[svc.id] = entry;
+    }
+
+    if (state.mikrotik.enabled) {
+      body.mikrotik = {
+        url:      state.mikrotik.url,
+        username: state.mikrotik.username,
+        password: state.mikrotik.password,
+      };
+    }
+
+    if (state.grafana.enabled) {
+      body.grafana = {
+        baseUrl:       state.grafana.baseUrl       || undefined,
+        dashboardUid:  state.grafana.dashboardUid  || undefined,
+        datasourceUid: state.grafana.datasourceUid || undefined,
+        panelId:       state.grafana.panelId       || undefined,
+      };
+    }
+
+    try {
+      const res = await fetch("/api/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json() as { ok: boolean; message: string };
+      setSaveStatus(data.ok ? { state: "ok", msg: data.message } : { state: "err", msg: data.message });
+      if (!data.ok && res.status === 503) setWritable(false);
+    } catch (e) {
+      setSaveStatus({ state: "err", msg: (e as Error).message });
+    }
   }
 
   // ── output generation ─────────────────────────────────────────────────────
@@ -407,7 +485,7 @@ export default function SetupWizard() {
       </Section>
 
       {/* ── Action bar ── */}
-      <div style={{ display: "flex", gap: 10, alignItems: "center", margin: "32px 0 16px" }}>
+      <div style={{ display: "flex", gap: 10, alignItems: "center", margin: "32px 0 16px", flexWrap: "wrap" }}>
         <Btn variant="primary" onClick={testAll}>Test every enabled service</Btn>
         <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "rgba(255,255,255,0.4)", cursor: "pointer" }}>
           <input type="checkbox" checked={showPasswords} onChange={e => setShowPasswords(e.target.checked)} />
@@ -418,38 +496,92 @@ export default function SetupWizard() {
         </div>
       </div>
 
-      {/* ── 5. Output ── */}
-      <Section title="5 · Generated config" subtitle="Copy whichever format your deployment uses.">
-        <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
-          {(["compose", "run", "env"] as const).map(t => (
-            <button key={t} onClick={() => setOutputTab(t)}
-              style={{
-                background: outputTab === t ? "rgba(6,182,212,0.15)" : "rgba(255,255,255,0.04)",
-                border: `1px solid ${outputTab === t ? "rgba(6,182,212,0.4)" : "rgba(255,255,255,0.08)"}`,
-                color: outputTab === t ? "#06b6d4" : "rgba(255,255,255,0.6)",
-                padding: "6px 14px", borderRadius: 6, fontSize: 11, cursor: "pointer", fontWeight: 600,
-              }}>
-              {t === "compose" ? "docker-compose.yml" : t === "run" ? "docker run" : ".env"}
-            </button>
-          ))}
-          <div style={{ marginLeft: "auto" }}>
-            <Btn onClick={() => copy(generated[outputTab])}>Copy to clipboard</Btn>
-          </div>
-        </div>
-        <pre style={{
-          background: "#0a0d12",
+      {/* ── 5. Save & apply ── */}
+      <Section title="5 · Save & apply" subtitle="Writes your config to the container's data volume. The dashboard picks up the change within ~3 seconds — no redeploy needed.">
+        <div style={{
+          background: "rgba(255,255,255,0.02)",
           border: "1px solid rgba(255,255,255,0.08)",
-          borderRadius: 8, padding: 16,
-          fontSize: 11, fontFamily: "monospace",
-          color: "rgba(255,255,255,0.85)",
-          overflow: "auto",
-          maxHeight: 480,
-          lineHeight: 1.6,
-          whiteSpace: "pre-wrap",
-          wordBreak: "break-word",
+          borderRadius: 10, padding: 16,
+          display: "flex", flexDirection: "column", gap: 12,
         }}>
-          {generated[outputTab]}
-        </pre>
+          {writable === false && (
+            <div style={{
+              background: "rgba(245,158,11,0.08)",
+              border: "1px solid rgba(245,158,11,0.3)",
+              borderRadius: 6, padding: "10px 12px",
+              fontSize: 11, color: "#f59e0b", lineHeight: 1.6,
+            }}>
+              <strong>Writable data volume not mounted.</strong> Save & apply needs a writable directory at <code style={{ color: "#fde68a" }}>/app/data</code>. Add this to your <code style={{ color: "#fde68a" }}>docker-compose.yml</code>:
+              <pre style={{ marginTop: 8, padding: 8, background: "#1a1300", borderRadius: 4, fontSize: 10, color: "#fcd34d", whiteSpace: "pre-wrap" }}>{`services:
+  homelab-dashboard:
+    volumes:
+      - ./dashboard-data:/app/data`}</pre>
+              Or for plain <code style={{ color: "#fde68a" }}>docker run</code>: <code style={{ color: "#fde68a" }}>-v /root/dashboard-data:/app/data</code>. Restart the container, then come back here. Until then, use the manual config below.
+            </div>
+          )}
+
+          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <Btn variant="primary" onClick={saveAndApply} disabled={writable === false || saveStatus.state === "saving"}>
+              {saveStatus.state === "saving" ? "Saving…" : "Save & apply"}
+            </Btn>
+            {saveStatus.state === "ok" && (
+              <span style={{ fontSize: 12, color: "#10b981", fontWeight: 600 }}>
+                ✓ {saveStatus.msg} · <Link href="/" style={{ color: "#06b6d4", textDecoration: "underline" }}>Back to dashboard</Link>
+              </span>
+            )}
+            {saveStatus.state === "err" && (
+              <span style={{ fontSize: 12, color: "#ef4444", maxWidth: 600 }}>
+                ✗ {saveStatus.msg}
+              </span>
+            )}
+          </div>
+
+          <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 12 }}>
+            <button
+              onClick={() => setShowAdvanced(s => !s)}
+              style={{
+                background: "none", border: "none", color: "rgba(255,255,255,0.5)",
+                fontSize: 11, cursor: "pointer", padding: 0, fontWeight: 500,
+              }}>
+              {showAdvanced ? "▾" : "▸"} Or copy the generated config manually (for env-var-based deployments)
+            </button>
+          </div>
+
+          {showAdvanced && (
+            <div>
+              <div style={{ display: "flex", gap: 6, marginBottom: 10, flexWrap: "wrap" }}>
+                {(["compose", "run", "env"] as const).map(t => (
+                  <button key={t} onClick={() => setOutputTab(t)}
+                    style={{
+                      background: outputTab === t ? "rgba(6,182,212,0.15)" : "rgba(255,255,255,0.04)",
+                      border: `1px solid ${outputTab === t ? "rgba(6,182,212,0.4)" : "rgba(255,255,255,0.08)"}`,
+                      color: outputTab === t ? "#06b6d4" : "rgba(255,255,255,0.6)",
+                      padding: "6px 14px", borderRadius: 6, fontSize: 11, cursor: "pointer", fontWeight: 600,
+                    }}>
+                    {t === "compose" ? "docker-compose.yml" : t === "run" ? "docker run" : ".env"}
+                  </button>
+                ))}
+                <div style={{ marginLeft: "auto" }}>
+                  <Btn onClick={() => copy(generated[outputTab])}>Copy to clipboard</Btn>
+                </div>
+              </div>
+              <pre style={{
+                background: "#0a0d12",
+                border: "1px solid rgba(255,255,255,0.08)",
+                borderRadius: 8, padding: 16,
+                fontSize: 11, fontFamily: "monospace",
+                color: "rgba(255,255,255,0.85)",
+                overflow: "auto",
+                maxHeight: 480,
+                lineHeight: 1.6,
+                whiteSpace: "pre-wrap",
+                wordBreak: "break-word",
+              }}>
+                {generated[outputTab]}
+              </pre>
+            </div>
+          )}
+        </div>
       </Section>
 
       <footer style={{ marginTop: 40, paddingTop: 20, borderTop: "1px solid rgba(255,255,255,0.06)" }}>

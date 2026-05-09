@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { loadConfig, type ServiceCreds } from "@/app/lib/server-config";
 
 interface QueueItem { title: string; pct: number; etaSec?: number | null }
 interface Stream    { title: string; user: string; progress: number; posStr: string }
@@ -37,21 +38,10 @@ const CACHE_TTL = 2_500;
 
 let piholeSession: { sid: string; expiry: number } | null = null;
 
-const TRUENAS_IP = process.env.TRUENAS_IP || "192.168.88.196";
-
-// Per-service base URLs. Default to ${TRUENAS_IP}:<standard-port> for back-compat
-// with the original deployment. Override any of these at deploy time if your
-// services live elsewhere or use non-standard ports.
-const RADARR_URL      = process.env.RADARR_URL      ?? `http://${TRUENAS_IP}:30025`;
-const SONARR_URL      = process.env.SONARR_URL      ?? `http://${TRUENAS_IP}:33027`;
-const BAZARR_URL      = process.env.BAZARR_URL      ?? `http://${TRUENAS_IP}:30046`;
-const TAUTULLI_URL    = process.env.TAUTULLI_URL    ?? `http://${TRUENAS_IP}:30047`;
-const QBIT_URL        = process.env.QBIT_URL        ?? `http://${TRUENAS_IP}:30024`;
-const OVERSEERR_URL   = process.env.OVERSEERR_URL   ?? `http://${TRUENAS_IP}:30002`;
-const PIHOLE_URL      = process.env.PIHOLE_URL      ?? `http://${TRUENAS_IP}:20720`;
-const PROWLARR_URL    = process.env.PROWLARR_URL    ?? `http://${TRUENAS_IP}:30050`;
-const NGINX_URL       = process.env.NGINX_URL       ?? `http://${TRUENAS_IP}:30020`;
-const UPTIME_KUMA_URL = process.env.UPTIME_KUMA_URL ?? `http://${TRUENAS_IP}:31050`;
+// Per-service URL + credential resolution moved to app/lib/server-config.ts.
+// Each service function below takes its resolved creds as a parameter, so the
+// route is a pure function of its input — `loadConfig()` is called exactly once
+// in the GET handler.
 
 function fmtMB(b: number): string {
   if (b === 0) return "0 B";
@@ -130,10 +120,10 @@ function summarizeHealth(records: ArrHealthRecord[] | null): HealthSummary | und
   return { warning, error };
 }
 
-async function radarr(): Promise<ServiceResult> {
-  const KEY = process.env.RADARR_API_KEY ?? "";
-  const BASE = RADARR_URL;
-  if (!KEY) return unconfigured("radarr", ["RADARR_API_KEY"]);
+async function radarr(creds: ServiceCreds): Promise<ServiceResult> {
+  if (!creds.configured) return unconfigured("radarr", creds.envVar ?? ["RADARR_API_KEY"]);
+  const KEY  = creds.apiKey ?? "";
+  const BASE = creds.url;
   try {
     // Primary call (movies) is required. The rest are enrichment — failures don't sink the card.
     const moviesData = await apiFetch(`${BASE}/api/v3/movie?apiKey=${KEY}`) as RadarrMovie[];
@@ -178,10 +168,10 @@ interface SonarrSeries {
   monitored: boolean;
   statistics?: { sizeOnDisk?: number; episodeFileCount?: number; episodeCount?: number };
 }
-async function sonarr(): Promise<ServiceResult> {
-  const KEY = process.env.SONARR_API_KEY ?? "";
-  const BASE = SONARR_URL;
-  if (!KEY) return unconfigured("sonarr", ["SONARR_API_KEY"]);
+async function sonarr(creds: ServiceCreds): Promise<ServiceResult> {
+  if (!creds.configured) return unconfigured("sonarr", creds.envVar ?? ["SONARR_API_KEY"]);
+  const KEY  = creds.apiKey ?? "";
+  const BASE = creds.url;
   try {
     // Series request must succeed; rest are enrichment.
     const seriesData = await apiFetch(
@@ -224,10 +214,10 @@ async function sonarr(): Promise<ServiceResult> {
   }
 }
 
-async function bazarr(): Promise<ServiceResult> {
-  const KEY = process.env.BAZARR_API_KEY ?? "";
-  const BASE_URL = BAZARR_URL;
-  if (!KEY) return unconfigured("bazarr", ["BAZARR_API_KEY"]);
+async function bazarr(creds: ServiceCreds): Promise<ServiceResult> {
+  if (!creds.configured) return unconfigured("bazarr", creds.envVar ?? ["BAZARR_API_KEY"]);
+  const KEY      = creds.apiKey ?? "";
+  const BASE_URL = creds.url;
   const HEADERS = { "X-API-KEY": KEY };
 
   try {
@@ -275,10 +265,10 @@ interface TautulliHomeStat {
   stat_id?: string;
   rows?:    TautulliHomeRow[];
 }
-async function tautulli(): Promise<ServiceResult> {
-  const KEY = process.env.TAUTULLI_API_KEY ?? "";
-  const BASE = `${TAUTULLI_URL}/api/v2`;
-  if (!KEY) return unconfigured("tautulli", ["TAUTULLI_API_KEY"]);
+async function tautulli(creds: ServiceCreds): Promise<ServiceResult> {
+  if (!creds.configured) return unconfigured("tautulli", creds.envVar ?? ["TAUTULLI_API_KEY"]);
+  const KEY  = creds.apiKey ?? "";
+  const BASE = `${creds.url}/api/v2`;
   try {
     const activity = await apiFetch(
       `${BASE}?apikey=${KEY}&cmd=get_activity`
@@ -303,7 +293,7 @@ async function tautulli(): Promise<ServiceResult> {
     // plenty to show).
     if (count > 0) {
       return {
-        name: "tautulli", up: true, configured: true, url: TAUTULLI_URL,
+        name: "tautulli", up: true, configured: true, url: creds.url,
         lines: [`${count} active stream${count !== 1 ? "s" : ""}`],
         streams,
       };
@@ -338,14 +328,14 @@ async function tautulli(): Promise<ServiceResult> {
     if (topUser) lines.push(`top user: ${topUser}`);
 
     return {
-      name: "tautulli", up: true, configured: true, url: TAUTULLI_URL, lines, streams,
+      name: "tautulli", up: true, configured: true, url: creds.url, lines, streams,
       weekly: (playsWk != null || topShow || topUser)
         ? { plays: typeof playsWk === "number" ? playsWk : undefined, topShow, topUser }
         : undefined,
     };
   } catch {
-    const up = await checkReachable(TAUTULLI_URL);
-    return { name: "tautulli", up, configured: true, url: TAUTULLI_URL, lines: up ? ["—"] : [] };
+    const up = await checkReachable(creds.url);
+    return { name: "tautulli", up, configured: true, url: creds.url, lines: up ? ["—"] : [] };
   }
 }
 
@@ -364,11 +354,11 @@ interface QbitTorrent {
 const QBIT_DL_STATES   = new Set(["downloading","forcedDL","stalledDL","metaDL","queuedDL","checkingDL","allocating"]);
 const QBIT_SEED_STATES = new Set(["uploading","forcedUP","stalledUP","queuedUP","checkingUP"]);
 
-async function qbittorrent(): Promise<ServiceResult> {
-  const BASE = QBIT_URL;
-  const USER = process.env.QBIT_USERNAME ?? "";
-  const PASS = process.env.QBIT_PASSWORD ?? "";
-  if (!USER || !PASS) return unconfigured("qbittorrent", ["QBIT_USERNAME", "QBIT_PASSWORD"]);
+async function qbittorrent(creds: ServiceCreds): Promise<ServiceResult> {
+  if (!creds.configured) return unconfigured("qbittorrent", creds.envVar ?? ["QBIT_USERNAME", "QBIT_PASSWORD"]);
+  const BASE = creds.url;
+  const USER = creds.username ?? "";
+  const PASS = creds.password ?? "";
   try {
     const loginRes = await fetch(`${BASE}/api/v2/auth/login`, {
       method: "POST",
@@ -428,30 +418,31 @@ async function qbittorrent(): Promise<ServiceResult> {
   }
 }
 
-async function overseerr(): Promise<ServiceResult> {
-  const KEY = process.env.OVERSEERR_API_KEY ?? "";
-  if (!KEY) return unconfigured("overseerr", ["OVERSEERR_API_KEY"]);
+async function overseerr(creds: ServiceCreds): Promise<ServiceResult> {
+  if (!creds.configured) return unconfigured("overseerr", creds.envVar ?? ["OVERSEERR_API_KEY"]);
+  const KEY = creds.apiKey ?? "";
   try {
     const [pendingData, approvedData, availableData] = await Promise.all([
-      apiFetch(`${OVERSEERR_URL}/api/v1/request?take=1&skip=0&filter=pending`,   { "X-Api-Key": KEY }) as Promise<{ pageInfo: { results: number } }>,
-      apiFetch(`${OVERSEERR_URL}/api/v1/request?take=1&skip=0&filter=approved`,  { "X-Api-Key": KEY }) as Promise<{ pageInfo: { results: number } }>,
-      apiFetch(`${OVERSEERR_URL}/api/v1/request?take=1&skip=0&filter=available`, { "X-Api-Key": KEY }) as Promise<{ pageInfo: { results: number } }>,
+      apiFetch(`${creds.url}/api/v1/request?take=1&skip=0&filter=pending`,   { "X-Api-Key": KEY }) as Promise<{ pageInfo: { results: number } }>,
+      apiFetch(`${creds.url}/api/v1/request?take=1&skip=0&filter=approved`,  { "X-Api-Key": KEY }) as Promise<{ pageInfo: { results: number } }>,
+      apiFetch(`${creds.url}/api/v1/request?take=1&skip=0&filter=available`, { "X-Api-Key": KEY }) as Promise<{ pageInfo: { results: number } }>,
     ]);
     const pending   = pendingData.pageInfo?.results ?? 0;
     const approved  = approvedData.pageInfo?.results ?? 0;
     const available = availableData.pageInfo?.results ?? 0;
     const lines = [`${pending} pending · ${approved} approved`];
     if (available > 0) lines.push(`${available} available`);
-    return { name: "overseerr", up: true, configured: true, url: OVERSEERR_URL, lines };
+    return { name: "overseerr", up: true, configured: true, url: creds.url, lines };
   } catch {
-    const up = await checkReachable(OVERSEERR_URL);
-    return { name: "overseerr", up, configured: true, url: OVERSEERR_URL, lines: up ? ["—"] : [] };
+    const up = await checkReachable(creds.url);
+    return { name: "overseerr", up, configured: true, url: creds.url, lines: up ? ["—"] : [] };
   }
 }
 
-async function pihole(): Promise<ServiceResult> {
-  const BASE = PIHOLE_URL;
-  if (!process.env.PIHOLE_PASSWORD) return unconfigured("pihole", ["PIHOLE_PASSWORD"]);
+async function pihole(creds: ServiceCreds): Promise<ServiceResult> {
+  if (!creds.configured) return unconfigured("pihole", creds.envVar ?? ["PIHOLE_PASSWORD"]);
+  const BASE = creds.url;
+  const PASSWORD = creds.password ?? "";
 
   async function getSid(): Promise<string> {
     const now = Date.now();
@@ -459,7 +450,7 @@ async function pihole(): Promise<ServiceResult> {
     const authRes = await fetch(`${BASE}/api/auth`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password: process.env.PIHOLE_PASSWORD ?? "" }),
+      body: JSON.stringify({ password: PASSWORD }),
       signal: AbortSignal.timeout(5000),
     });
     const authData = await authRes.json() as { session?: { sid?: string; validity?: number } };
@@ -532,10 +523,10 @@ async function pihole(): Promise<ServiceResult> {
   }
 }
 
-async function prowlarr(): Promise<ServiceResult> {
-  const KEY  = process.env.PROWLARR_API_KEY ?? "";
-  const BASE = PROWLARR_URL;
-  if (!KEY) return unconfigured("prowlarr", ["PROWLARR_API_KEY"]);
+async function prowlarr(creds: ServiceCreds): Promise<ServiceResult> {
+  if (!creds.configured) return unconfigured("prowlarr", creds.envVar ?? ["PROWLARR_API_KEY"]);
+  const KEY  = creds.apiKey ?? "";
+  const BASE = creds.url;
   try {
     const [stats, healthData] = await Promise.all([
       apiFetch(`${BASE}/api/v1/indexerstats?apikey=${KEY}`) as Promise<{
@@ -557,8 +548,8 @@ async function prowlarr(): Promise<ServiceResult> {
   }
 }
 
-async function uptimeKuma(): Promise<ServiceResult> {
-  const BASE = UPTIME_KUMA_URL;
+async function uptimeKuma(creds: ServiceCreds): Promise<ServiceResult> {
+  const BASE = creds.url;
 
   function parseHeartbeats(data: unknown): ServiceResult | null {
     const obj = data as { monitors?: { status?: number }[]; heartbeatList?: Record<string, { status?: number }[]> };
@@ -575,7 +566,7 @@ async function uptimeKuma(): Promise<ServiceResult> {
     return { name: "uptimekuma", up: true, configured: true, url: BASE, lines: [line], downCount };
   }
 
-  const AUTH = { Authorization: `Bearer ${process.env.UPTIME_KUMA_API_KEY ?? ""}` };
+  const AUTH = { Authorization: `Bearer ${creds.apiKey ?? ""}` };
 
   // Try the known "services" slug heartbeat endpoint
   try {
@@ -609,11 +600,11 @@ async function uptimeKuma(): Promise<ServiceResult> {
   return { name: "uptimekuma", up, configured: true, url: BASE, lines: up ? ["online"] : [] };
 }
 
-async function nginxProxy(): Promise<ServiceResult> {
-  const BASE = NGINX_URL;
-  const USER = process.env.NGINX_USERNAME ?? "";
-  const PASS = process.env.NGINX_PASSWORD ?? "";
-  if (!USER || !PASS) return unconfigured("nginx", ["NGINX_USERNAME", "NGINX_PASSWORD"]);
+async function nginxProxy(creds: ServiceCreds): Promise<ServiceResult> {
+  if (!creds.configured) return unconfigured("nginx", creds.envVar ?? ["NGINX_USERNAME", "NGINX_PASSWORD"]);
+  const BASE = creds.url;
+  const USER = creds.username ?? "";
+  const PASS = creds.password ?? "";
   try {
     const tokenRes = await fetch(`${BASE}/api/tokens`, {
       method: "POST",
@@ -645,10 +636,21 @@ export async function GET() {
     return NextResponse.json(servicesCache.data);
   }
 
+  // Single config resolve per request — see app/lib/server-config.ts.
+  const cfg = await loadConfig();
+
   const names = ["radarr","sonarr","bazarr","tautulli","qbittorrent","overseerr","pihole","prowlarr","nginx","uptimekuma"];
   const settled = await Promise.allSettled([
-    radarr(), sonarr(), bazarr(), tautulli(),
-    qbittorrent(), overseerr(), pihole(), prowlarr(), nginxProxy(), uptimeKuma(),
+    radarr(cfg.services.radarr),
+    sonarr(cfg.services.sonarr),
+    bazarr(cfg.services.bazarr),
+    tautulli(cfg.services.tautulli),
+    qbittorrent(cfg.services.qbittorrent),
+    overseerr(cfg.services.overseerr),
+    pihole(cfg.services.pihole),
+    prowlarr(cfg.services.prowlarr),
+    nginxProxy(cfg.services.nginx),
+    uptimeKuma(cfg.services.uptimekuma),
   ]);
   const results: ServiceResult[] = settled.map((r, i) =>
     r.status === "fulfilled" ? r.value : { name: names[i], up: false, configured: true, lines: [] }

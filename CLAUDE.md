@@ -83,9 +83,23 @@ Per-service enrichment:
 
 ### `app/setup/page.tsx` — setup wizard
 
-A separate page (route `/setup`) for first-time config. Single-page form with sections for TrueNAS IP, per-service enable/URL/credential fields, MikroTik, and Grafana. Each enabled service has a **Test** button that POSTs to `/api/test-connection`; the wizard renders the result inline (✓ Connected / ✗ message). At the bottom it generates a `docker-compose.yml`, a `docker run` command, and a flat `.env` file from the current form state — three tabs with copy-to-clipboard buttons.
+A separate page (route `/setup`) for first-time config. Single-page form with sections for TrueNAS IP, per-service enable/URL/credential fields, MikroTik, and Grafana. Each enabled service has a **Test** button that POSTs to `/api/test-connection`; the wizard renders the result inline (✓ Connected / ✗ message).
 
-Form state persists in `localStorage` (key `homelab-dashboard:setup-wizard`) so a refresh doesn't clobber inputs. The wizard never writes config back to the server — the user copies the output and applies it via their own deploy method.
+The "Save & apply" button POSTs the form to `/api/config` (which writes to `/app/data/config.json` — a writable mounted volume). The next request to any service route picks up the new credentials within ~3 seconds. No redeploy needed.
+
+If the writable volume isn't mounted, the wizard detects this from the GET `/api/config` `writable: false` field and falls back to "Or copy the generated config manually" — three tabs (`docker-compose.yml`, `docker run`, `.env`) with the same content the user would have edited by hand pre-wizard.
+
+Form state persists in `localStorage` (key `homelab-dashboard:setup-wizard`) so a refresh doesn't clobber inputs. There's a "Clear everything" red button to wipe localStorage on demand.
+
+### Config resolution — `app/lib/server-config.ts`
+
+Single source of truth for "what URL / API key / password should we use for service X right now?". Merges three layers, highest precedence first:
+
+1. `data/config.json` — written by the `/setup` wizard via POST `/api/config`
+2. `process.env.*`    — set via `docker run -e`
+3. baked-in defaults
+
+Service routes call `loadConfig()` once per request and use `cfg.services.<name>.{url,apiKey,…}` instead of reading `process.env` directly. POST `/api/config` calls `invalidateConfigCache()` after a successful write so the next read sees fresh values.
 
 ### `app/page.tsx` — the frontend
 

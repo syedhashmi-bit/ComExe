@@ -19,10 +19,19 @@ services:
     # `ports: ["3000:3000"]` block.
     network_mode: host
 
-    # Mount your bookmarks file. Without this mount the dashboard ships a
-    # generic default set. Edit bookmarks.example.json to start.
+    # Two volume mounts:
+    #
+    #   1. bookmarks.json (read-only) — your custom right-hand-side links.
+    #      Without this mount the dashboard ships a generic default set.
+    #      Edit bookmarks.example.json to start.
+    #
+    #   2. dashboard-data (writable) — needed for the /setup wizard's
+    #      "Save & apply" button to work. Without it the wizard falls back
+    #      to "copy this config and redeploy". The directory is created on
+    #      first save; you can grep it later: `cat ./dashboard-data/config.json`.
     volumes:
       - ./bookmarks.json:/app/bookmarks.json:ro
+      - ./dashboard-data:/app/data
 
     environment:
       # ── Network / hosts ───────────────────────────────────────────────

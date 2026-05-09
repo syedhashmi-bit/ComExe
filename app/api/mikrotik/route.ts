@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { loadConfig } from "@/app/lib/server-config";
 
 function formatMikrotikUptime(uptime: string): string {
   const weeks = uptime.match(/(\d+)w/)?.[1];
@@ -17,19 +18,19 @@ let mikrotikCache: { data: unknown; ts: number } | null = null;
 // Just under the client poll interval (5s) for the same reasons as the other routes.
 const CACHE_TTL = 4_000;
 
-// Default to the original deployment's router IP, but allow override at deploy time.
-const MIKROTIK_URL = process.env.MIKROTIK_URL ?? "http://192.168.88.1";
-
 export async function GET() {
   if (mikrotikCache && Date.now() - mikrotikCache.ts < CACHE_TTL) {
     return NextResponse.json(mikrotikCache.data);
   }
 
+  const cfg = await loadConfig();
+  if (!cfg.mikrotik.configured) {
+    return NextResponse.json({ error: "MikroTik credentials not set", envVar: cfg.mikrotik.envVar ?? [] }, { status: 503 });
+  }
+
   try {
-    const user = process.env.MIKROTIK_USERNAME ?? "";
-    const pass = process.env.MIKROTIK_PASSWORD ?? "";
-    const auth = Buffer.from(`${user}:${pass}`, "utf8").toString("base64");
-    const res = await fetch(`${MIKROTIK_URL}/rest/system/resource`, {
+    const auth = Buffer.from(`${cfg.mikrotik.username}:${cfg.mikrotik.password}`, "utf8").toString("base64");
+    const res = await fetch(`${cfg.mikrotik.url}/rest/system/resource`, {
       method: "GET",
       headers: {
         Authorization: "Basic " + auth,

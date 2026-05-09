@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { loadConfig, type ServiceCreds } from "@/app/lib/server-config";
 
 // ── Activity feed ─────────────────────────────────────────────────────────────
 // Pulls recent events from Sonarr / Radarr (grabbed history) and Tautulli
@@ -19,7 +20,6 @@ interface ActivityEvent {
   timestamp: number;      // unix ms
 }
 
-const TRUENAS_IP = process.env.TRUENAS_IP || "192.168.88.196";
 const CACHE_TTL  = 60_000;
 const MAX_EVENTS = 30;
 
@@ -55,12 +55,12 @@ interface SonarrHistoryRecord {
   series?:  { title?: string };
   episode?: { title?: string; seasonNumber?: number; episodeNumber?: number };
 }
-async function sonarrEvents(): Promise<ActivityEvent[]> {
-  const KEY = process.env.SONARR_API_KEY ?? "";
-  if (!KEY) return [];
+async function sonarrEvents(creds: ServiceCreds): Promise<ActivityEvent[]> {
+  if (!creds.configured) return [];
+  const KEY = creds.apiKey ?? "";
   try {
     const data = await jsonFetch(
-      `http://${TRUENAS_IP}:33027/api/v3/history?pageSize=20&sortKey=date&sortDirection=descending&includeEpisode=true&includeSeries=true&apiKey=${KEY}`
+      `${creds.url}/api/v3/history?pageSize=20&sortKey=date&sortDirection=descending&includeEpisode=true&includeSeries=true&apiKey=${KEY}`
     ) as { records?: SonarrHistoryRecord[] };
     const records = data.records ?? [];
     return records
@@ -98,12 +98,12 @@ interface RadarrHistoryRecord {
   quality?: { quality?: { name?: string } };
   movie?:   { title?: string; year?: number };
 }
-async function radarrEvents(): Promise<ActivityEvent[]> {
-  const KEY = process.env.RADARR_API_KEY ?? "";
-  if (!KEY) return [];
+async function radarrEvents(creds: ServiceCreds): Promise<ActivityEvent[]> {
+  if (!creds.configured) return [];
+  const KEY = creds.apiKey ?? "";
   try {
     const data = await jsonFetch(
-      `http://${TRUENAS_IP}:30025/api/v3/history?pageSize=20&sortKey=date&sortDirection=descending&includeMovie=true&apiKey=${KEY}`
+      `${creds.url}/api/v3/history?pageSize=20&sortKey=date&sortDirection=descending&includeMovie=true&apiKey=${KEY}`
     ) as { records?: RadarrHistoryRecord[] };
     const records = data.records ?? [];
     return records
@@ -143,12 +143,12 @@ interface TautulliHistoryRow {
   media_index?:        string | number;
   title?:         string;
 }
-async function tautulliEvents(): Promise<ActivityEvent[]> {
-  const KEY = process.env.TAUTULLI_API_KEY ?? "";
-  if (!KEY) return [];
+async function tautulliEvents(creds: ServiceCreds): Promise<ActivityEvent[]> {
+  if (!creds.configured) return [];
+  const KEY = creds.apiKey ?? "";
   try {
     const data = await jsonFetch(
-      `http://${TRUENAS_IP}:30047/api/v2?apikey=${KEY}&cmd=get_history&length=20&order_column=date&order_dir=desc`
+      `${creds.url}/api/v2?apikey=${KEY}&cmd=get_history&length=20&order_column=date&order_dir=desc`
     ) as { response?: { data?: { data?: TautulliHistoryRow[] } } };
     const rows = data.response?.data?.data ?? [];
     return rows.map(r => {
@@ -182,10 +182,11 @@ export async function GET() {
     return NextResponse.json(activityCache.data);
   }
 
+  const cfg = await loadConfig();
   const [sonarr, radarr, tautulli] = await Promise.all([
-    sonarrEvents(),
-    radarrEvents(),
-    tautulliEvents(),
+    sonarrEvents(cfg.services.sonarr),
+    radarrEvents(cfg.services.radarr),
+    tautulliEvents(cfg.services.tautulli),
   ]);
 
   const events = [...sonarr, ...radarr, ...tautulli]
