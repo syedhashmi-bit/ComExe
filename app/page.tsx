@@ -87,6 +87,14 @@ interface ServiceResult {
   streams?: { title: string; user: string; progress: number; posStr: string }[];
 }
 
+interface ActivityEvent {
+  source: "sonarr" | "radarr" | "tautulli";
+  type: "grabbed" | "imported" | "watched";
+  title: string;
+  subtitle?: string;
+  timestamp: number;
+}
+
 // ── module constants ──────────────────────────────────────────────────────────
 
 const SVC_COLORS: Record<string, string> = {
@@ -1115,7 +1123,7 @@ function GoogleSearch({ inputRef }: { inputRef: React.RefObject<HTMLInputElement
 
 // ── settings panel ─────────────────────────────────────────────────────────────
 
-const CARD_KEYS = ["cpu", "memory", "filesystems", "network", "gpu", "speedtest", "system", "grafana", "services"] as const;
+const CARD_KEYS = ["cpu", "memory", "filesystems", "network", "gpu", "speedtest", "system", "grafana", "services", "activity"] as const;
 
 function SettingsPanel({ settings, onUpdate, onClose }: {
   settings: Settings; onUpdate: (s: Settings) => void; onClose: () => void;
@@ -1425,6 +1433,119 @@ function GrafanaCard() {
   );
 }
 
+// ── ActivityFeed ──────────────────────────────────────────────────────────────
+// Horizontal scrolling ticker of recent grabs/imports/streams from Sonarr,
+// Radarr, and Tautulli. Hover pauses the scroll. Empty state renders nothing.
+
+function relativeAgo(unixMs: number): string {
+  const sec = Math.max(0, Math.round((Date.now() - unixMs) / 1000));
+  if (sec < 60)    return `${sec}s ago`;
+  if (sec < 3600)  return `${Math.round(sec / 60)}m ago`;
+  if (sec < 86400) return `${Math.round(sec / 3600)}h ago`;
+  return `${Math.round(sec / 86400)}d ago`;
+}
+
+function ActivityEventPill({ ev }: { ev: ActivityEvent }) {
+  const color = SVC_COLORS[ev.source] ?? "#888";
+  const verb  = ev.type === "grabbed"  ? "grabbed"
+              : ev.type === "imported" ? "imported"
+                                       : "watched";
+  return (
+    <span className="flex items-center gap-1.5 shrink-0" style={{ paddingInline: 14 }}>
+      <span className="w-1.5 h-1.5 rounded-full shrink-0"
+        style={{ background: color, boxShadow: `0 0 5px ${color}aa` }} />
+      <span style={{
+        color, fontSize: 9, fontWeight: 700,
+        textTransform: "uppercase", letterSpacing: "0.1em",
+      }}>{ev.source}</span>
+      <span style={{ color: "rgba(255,255,255,0.35)", fontSize: 10 }}>{verb}</span>
+      <span style={{
+        color: "rgba(255,255,255,0.85)", fontSize: 11, fontWeight: 500,
+        maxWidth: 280, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+      }}>{ev.title}</span>
+      {ev.subtitle && (
+        <span style={{
+          color: "rgba(255,255,255,0.32)", fontSize: 10,
+          maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+        }}>· {ev.subtitle}</span>
+      )}
+      <span style={{
+        color: "rgba(255,255,255,0.25)", fontSize: 9,
+        fontVariantNumeric: "tabular-nums",
+      }}>· {relativeAgo(ev.timestamp)}</span>
+    </span>
+  );
+}
+
+function ActivityFeed({ events, loading }: { events: ActivityEvent[]; loading: boolean }) {
+  const [hov, setHov] = useState(false);
+  // Re-render every 30s so the relative timestamps refresh.
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick(t => t + 1), 30_000);
+    return () => clearInterval(id);
+  }, []);
+
+  if (loading && events.length === 0) {
+    return (
+      <div style={{
+        height: 36, background: "rgba(255,255,255,0.02)",
+        border: "1px solid rgba(255,255,255,0.06)", borderRadius: 10,
+        display: "flex", alignItems: "center", padding: "0 14px",
+      }}>
+        <span className="text-[10px] uppercase" style={{ color: "rgba(255,255,255,0.25)", letterSpacing: "0.18em" }}>
+          loading activity…
+        </span>
+      </div>
+    );
+  }
+  if (events.length === 0) return null;
+
+  // Doubled list = seamless loop with the -50% keyframe end position.
+  const looped = [...events, ...events];
+  // Pace: ~6 seconds per unique event, min 30s total.
+  const duration = Math.max(30, events.length * 6);
+
+  return (
+    <div className="relative overflow-hidden"
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      style={{
+        height: 36,
+        background: "rgba(255,255,255,0.02)",
+        border: "1px solid rgba(255,255,255,0.06)",
+        borderRadius: 10,
+      }}>
+      {/* Section label, pinned left, sits above the scrolling content */}
+      <div className="absolute inset-y-0 left-0 z-10 flex items-center pointer-events-none"
+        style={{
+          paddingLeft: 12, paddingRight: 18,
+          background: "linear-gradient(to right, rgba(10,12,18,1) 60%, transparent)",
+        }}>
+        <span className="text-[9px] uppercase" style={{
+          color: "rgba(255,255,255,0.4)", letterSpacing: "0.22em", fontWeight: 700,
+        }}>
+          activity
+        </span>
+      </div>
+      {/* Scrolling content */}
+      <div className="absolute inset-y-0 flex items-center" style={{
+        left: 80,
+        animation: `tickerScroll ${duration}s linear infinite`,
+        animationPlayState: hov ? "paused" : "running",
+        willChange: "transform",
+      }}>
+        {looped.map((ev, i) => (
+          <ActivityEventPill key={`${ev.source}-${ev.timestamp}-${i}`} ev={ev} />
+        ))}
+      </div>
+      {/* Right-edge fade so titles don't hard-cut */}
+      <div className="absolute inset-y-0 right-0 pointer-events-none"
+        style={{ width: 40, background: "linear-gradient(to left, rgba(10,12,18,1), transparent)" }} />
+    </div>
+  );
+}
+
 // ── dashboard ─────────────────────────────────────────────────────────────────
 
 const DEFAULT_SETTINGS: Settings = { refreshInterval: 10, tempUnit: "C", dataUnit: "decimal", visibleCards: {} };
@@ -1455,6 +1576,8 @@ export default function Dashboard() {
   const [services,           setServices]           = useState<{ name: string; up: boolean; lines: string[]; pct?: number; downCount?: number; queueItem?: { title: string; pct: number } | null; streams?: { title: string; user: string; progress: number; posStr: string }[] }[] | null>(null);
   const [servicesLoading,    setServicesLoading]    = useState(true);
   const [servicesUpdatedAt,  setServicesUpdatedAt]  = useState<number | null>(null);
+  const [activityEvents,     setActivityEvents]     = useState<ActivityEvent[]>([]);
+  const [activityLoading,    setActivityLoading]    = useState(true);
   const [speedtestResults,    setSpeedtestResults]    = useState<SpeedtestResult[]>([]);
   const [speedtestLoading,    setSpeedtestLoading]    = useState(true);
   const [speedtestHistory,    setSpeedtestHistory]    = useState<number[]>([]);
@@ -1501,6 +1624,21 @@ export default function Dashboard() {
       setServices(null);
     } finally {
       setServicesLoading(false);
+    }
+  }, []);
+
+  const fetchActivity = useCallback(async () => {
+    try {
+      const res = await fetch("/api/activity", { cache: "no-store" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const events: ActivityEvent[] = Array.isArray(data.events) ? data.events : [];
+      setActivityEvents(events);
+    } catch {
+      // leave previous events in place — empty only on first failure
+      setActivityEvents(prev => prev);
+    } finally {
+      setActivityLoading(false);
     }
   }, []);
 
@@ -1568,6 +1706,13 @@ export default function Dashboard() {
     const id = setInterval(fetchSpeedtest, 300_000);
     return () => clearInterval(id);
   }, [fetchSpeedtest]);
+
+  // Activity feed — refresh every 60s (matches the route's cache TTL)
+  useEffect(() => {
+    fetchActivity();
+    const id = setInterval(fetchActivity, 60_000);
+    return () => clearInterval(id);
+  }, [fetchActivity]);
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   useEffect(() => {
@@ -2275,6 +2420,11 @@ export default function Dashboard() {
               </div>
             );
           })()}
+
+          {/* ── activity feed (rolling ticker of recent grabs / streams) ── */}
+          {isVisible("activity") && (
+            <ActivityFeed events={activityEvents} loading={activityLoading} />
+          )}
 
           {/* ── services (full width) ── */}
           {isVisible("services") && (

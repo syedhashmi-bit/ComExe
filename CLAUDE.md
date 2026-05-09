@@ -51,6 +51,7 @@ Five routes — all proxy from the browser to internal services to avoid CORS an
 | `app/api/speedtest/route.ts` | Speedtest history | `${TRUENAS_IP}:30220` |
 | `app/api/weather/route.ts` | Weather (open-meteo) | api.open-meteo.com |
 | `app/api/mikrotik/route.ts` | Router stats | `192.168.88.1` |
+| `app/api/activity/route.ts` | Recent grabs / streams (Sonarr + Radarr + Tautulli history) | `${TRUENAS_IP}:33027 / :30025 / :30047` |
 
 `metrics/route.ts` runs ~30 PromQL queries via `Promise.all`. **Destructuring order must stay in sync with the queries array** — positional. New queries get appended at the end to preserve order.
 
@@ -62,15 +63,17 @@ Five routes — all proxy from the browser to internal services to avoid CORS an
 
 `weather/route.ts` → open-meteo, no auth, hardcoded lat/lon for Launceston, TAS.
 
+`activity/route.ts` aggregates three history sources via `Promise.all`: Sonarr `/api/v3/history` filtered to `grabbed`/`downloadFolderImported`, Radarr `/api/v3/history` same filter, Tautulli `cmd=get_history`. Each source is independently try/catched — one failing returns `[]` rather than blanking the feed. 60s in-memory cache. Returns `{ events: ActivityEvent[], timestamp }` sorted newest-first, capped at 30 events.
+
 ### `app/page.tsx` — the frontend
 
 All UI components live in this one file. Categories:
 
 **Primitives** (~20 components):
-`GaugeBar`, `Sparkline`, `MiniBarChart`, `DonutChart`, `ThreeSegmentDonut`, `RadialGauge`, `BigValue`, `LabeledBar`, `SubRow`, `StatRow`, `Card`, `StatusBanner`, `SettingsPanel`, `ServiceIcon`, `BookmarkItem`, `AnimatedNumber`, `TrendDelta`, `HeroStat`, plus `animatedLine()` helper.
+`GaugeBar`, `Sparkline`, `MiniBarChart`, `DonutChart`, `ThreeSegmentDonut`, `RadialGauge`, `BigValue`, `LabeledBar`, `SubRow`, `StatRow`, `Card`, `StatusBanner`, `SettingsPanel`, `ServiceIcon`, `BookmarkItem`, `AnimatedNumber`, `TrendDelta`, `HeroStat`, `ActivityEventPill`, plus `animatedLine()` and `relativeAgo()` helpers.
 
 **Feature components**:
-`SpeedtestDualChart` (SVG), `SpeedtestBarChart` (Canvas + DPR + ResizeObserver), `GoogleSearch`, `MikrotikTab`, `GrafanaCard`.
+`SpeedtestDualChart` (SVG), `SpeedtestBarChart` (Canvas + DPR + ResizeObserver), `GoogleSearch`, `MikrotikTab`, `GrafanaCard`, `ActivityFeed`.
 
 **Polling intervals** (managed in `Dashboard` via `useEffect` + `setInterval`):
 
@@ -81,6 +84,7 @@ All UI components live in this one file. Categories:
 | `/api/speedtest` | 300s |
 | `/api/weather` | 600s |
 | `/api/mikrotik` | 30s |
+| `/api/activity` | 60s |
 | Clock | 1s |
 
 ### Components — what to know
@@ -102,6 +106,8 @@ All UI components live in this one file. Categories:
 **`Sparkline`** — used everywhere. Stronger gradient since the polish pass (`0.5 → 0`), soft glow path under the main line, stroke width 2.2.
 
 **`MikrotikTab`** — calls `/api/mikrotik` server-side (NOT the router directly anymore — that hit CORS). Falls back to a static-info row if the route returns an error.
+
+**`ActivityFeed`** — horizontal scrolling ticker just above the services panel. Pulls from `/api/activity`. Hover pauses the scroll. Empty state renders nothing. Uses the `tickerScroll` keyframe in `globals.css` (translates `0` → `-50%` over a duration scaled to event count). Events are duplicated in the rendered list so the loop is seamless. Toggle via `CARD_KEYS["activity"]` in Settings.
 
 ### Services panel — services rendering
 

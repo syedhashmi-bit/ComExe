@@ -12,7 +12,7 @@
       "static/chunks/4bd1b696-7fb12dfea31143c4.js",
       "static/chunks/684-22dc3f08f4b2cc88.js",
       "static/chunks/main-app-c91dfe490f8d7d4f.js",
-      "static/css/4ad5d141e70fda9b.css",
+      "static/css/e6dda2939489e88b.css",
       "static/chunks/app/layout-9475f335e696758a.js"
     ],
     "/api/metrics/route": [
@@ -20,42 +20,49 @@
       "static/chunks/4bd1b696-7fb12dfea31143c4.js",
       "static/chunks/684-22dc3f08f4b2cc88.js",
       "static/chunks/main-app-c91dfe490f8d7d4f.js",
-      "static/chunks/app/api/metrics/route-672d6eabfbbb34e7.js"
-    ],
-    "/api/services/route": [
-      "static/chunks/webpack-06a82223b7106399.js",
-      "static/chunks/4bd1b696-7fb12dfea31143c4.js",
-      "static/chunks/684-22dc3f08f4b2cc88.js",
-      "static/chunks/main-app-c91dfe490f8d7d4f.js",
-      "static/chunks/app/api/services/route-350a2404fb20a153.js"
-    ],
-    "/api/weather/route": [
-      "static/chunks/webpack-06a82223b7106399.js",
-      "static/chunks/4bd1b696-7fb12dfea31143c4.js",
-      "static/chunks/684-22dc3f08f4b2cc88.js",
-      "static/chunks/main-app-c91dfe490f8d7d4f.js",
-      "static/chunks/app/api/weather/route-b108283a28e82f14.js"
-    ],
-    "/api/speedtest/route": [
-      "static/chunks/webpack-06a82223b7106399.js",
-      "static/chunks/4bd1b696-7fb12dfea31143c4.js",
-      "static/chunks/684-22dc3f08f4b2cc88.js",
-      "static/chunks/main-app-c91dfe490f8d7d4f.js",
-      "static/chunks/app/api/speedtest/route-1122fb087bbb698a.js"
+      "static/chunks/app/api/metrics/route-fa8414a352d24117.js"
     ],
     "/api/mikrotik/route": [
       "static/chunks/webpack-06a82223b7106399.js",
       "static/chunks/4bd1b696-7fb12dfea31143c4.js",
       "static/chunks/684-22dc3f08f4b2cc88.js",
       "static/chunks/main-app-c91dfe490f8d7d4f.js",
-      "static/chunks/app/api/mikrotik/route-30604f765835a80e.js"
+      "static/chunks/app/api/mikrotik/route-052095f291d39e2b.js"
+    ],
+    "/api/activity/route": [
+      "static/chunks/webpack-06a82223b7106399.js",
+      "static/chunks/4bd1b696-7fb12dfea31143c4.js",
+      "static/chunks/684-22dc3f08f4b2cc88.js",
+      "static/chunks/main-app-c91dfe490f8d7d4f.js",
+      "static/chunks/app/api/activity/route-93b4c4231debae2b.js"
+    ],
+    "/api/weather/route": [
+      "static/chunks/webpack-06a82223b7106399.js",
+      "static/chunks/4bd1b696-7fb12dfea31143c4.js",
+      "static/chunks/684-22dc3f08f4b2cc88.js",
+      "static/chunks/main-app-c91dfe490f8d7d4f.js",
+      "static/chunks/app/api/weather/route-08d5bbd54e506d15.js"
+    ],
+    "/api/speedtest/route": [
+      "static/chunks/webpack-06a82223b7106399.js",
+      "static/chunks/4bd1b696-7fb12dfea31143c4.js",
+      "static/chunks/684-22dc3f08f4b2cc88.js",
+      "static/chunks/main-app-c91dfe490f8d7d4f.js",
+      "static/chunks/app/api/speedtest/route-67da1bfc166b31ee.js"
+    ],
+    "/api/services/route": [
+      "static/chunks/webpack-06a82223b7106399.js",
+      "static/chunks/4bd1b696-7fb12dfea31143c4.js",
+      "static/chunks/684-22dc3f08f4b2cc88.js",
+      "static/chunks/main-app-c91dfe490f8d7d4f.js",
+      "static/chunks/app/api/services/route-87e8eec83cbe60bc.js"
     ],
     "/page": [
       "static/chunks/webpack-06a82223b7106399.js",
       "static/chunks/4bd1b696-7fb12dfea31143c4.js",
       "static/chunks/684-22dc3f08f4b2cc88.js",
       "static/chunks/main-app-c91dfe490f8d7d4f.js",
-      "static/chunks/app/page-1144c88dc6623654.js"
+      "static/chunks/app/page-a6243b59cf5a8d45.js"
     ]
   }
 }

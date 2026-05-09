@@ -68,3 +68,9 @@ body {
   0%, 100% { opacity: 1; box-shadow: 0 0 4px var(--dot-color, #10b981); }
   50%       { opacity: 0.65; box-shadow: 0 0 8px var(--dot-color, #10b981); }
 }
+
+/* Activity feed ticker — moves the doubled-events strip from 0% to -50% so the loop is seamless. */
+@keyframes tickerScroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
