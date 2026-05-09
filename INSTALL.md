@@ -1,4 +1,4 @@
-# Installation
+# Installing ComExe
 
 Three install paths, in order from "easiest" to "most flexible":
 

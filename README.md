@@ -1,6 +1,14 @@
-# Homelab Dashboard
+# ComExe
 
-Real-time single-page dashboard for a TrueNAS Scale homelab. Aggregates Prometheus metrics, service-health checks, speedtest history, weather, and an embedded Grafana panel into a dark, minimal UI. No database, no auth, no external state library.
+> Real-time single-page dashboard for a TrueNAS Scale homelab. Aggregates Prometheus metrics, service-health checks, speedtest history, weather, and an embedded Grafana panel into a dark, minimal UI.
+
+```
+┌─────┐
+│ >_  │   ComExe
+└─────┘
+```
+
+No database, no auth, no external state library. Configure everything via a built-in `/setup` wizard with live connection-testing — no env-var editing or compose-file fiddling required.
 
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?logo=typescript)

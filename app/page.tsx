@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
+import Link from "next/link";
 
 const MAX_HISTORY = 60;
 
@@ -1868,9 +1869,17 @@ export default function Dashboard() {
           <div className="flex items-center gap-3 min-w-0">
             <span className="block w-2 h-2 rounded-full shrink-0"
               style={{ background: "#10b981", boxShadow: "0 0 6px #10b98166", animation: "pulseDot 2s ease-in-out infinite", "--dot-color": "#10b981" } as React.CSSProperties} />
-            <h1 className="shrink-0 font-mono" style={{ fontSize: 18, fontWeight: 700, color: "#ffffff", letterSpacing: "-0.02em" }}>
-              home<span style={{ color: "#06b6d4" }}>lab</span>
-            </h1>
+            <Link href="/" className="flex items-center gap-2 shrink-0" style={{ textDecoration: "none" }}>
+              {/* Inline ComExe brand mark — a "> _" terminal prompt in a cyan rounded square. */}
+              <svg width="22" height="22" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
+                <rect x="2" y="5" width="28" height="22" rx="5" fill="#06b6d4" />
+                <path d="M10 12 L14 16 L10 20" stroke="#0a0c12" strokeWidth="2.6" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                <line x1="17" y1="20" x2="23" y2="20" stroke="#0a0c12" strokeWidth="2.6" strokeLinecap="round" />
+              </svg>
+              <h1 className="font-mono" style={{ fontSize: 18, fontWeight: 700, color: "#ffffff", letterSpacing: "-0.01em" }}>
+                Com<span style={{ color: "#06b6d4" }}>Exe</span>
+              </h1>
+            </Link>
             <span className="shrink-0" style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 6, padding: "3px 10px", fontSize: 11, color: "rgba(255,255,255,0.85)", letterSpacing: "0.04em" }}>
               truenas · :30104
             </span>
