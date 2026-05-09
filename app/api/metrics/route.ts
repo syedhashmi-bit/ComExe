@@ -4,7 +4,9 @@ const TRUENAS_IP = process.env.TRUENAS_IP || "192.168.88.196";
 const PROMETHEUS = `http://${TRUENAS_IP}:30104`;
 
 let metricsCache: { data: unknown; ts: number } | null = null;
-const CACHE_TTL = 10_000;
+// Slightly under the client poll interval (3s) so each poll gets fresh data
+// without forcing all ~30 PromQL queries through duplicate work on adjacent ticks.
+const CACHE_TTL = 2_500;
 
 const FS_EXCLUDE = `fstype!~"tmpfs|devtmpfs|overlay|squashfs|ramfs"`;
 

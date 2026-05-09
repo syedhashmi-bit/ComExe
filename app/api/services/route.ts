@@ -23,7 +23,9 @@ interface ServiceResult {
 }
 
 let servicesCache: { data: { services: ServiceResult[]; timestamp: number }; ts: number } | null = null;
-const CACHE_TTL = 10_000;
+// Slightly under the client poll interval (3s) so each poll gets fresh data
+// without forcing the upstream services through duplicate work on adjacent ticks.
+const CACHE_TTL = 2_500;
 
 let piholeSession: { sid: string; expiry: number } | null = null;
 

@@ -14,7 +14,8 @@ function formatMikrotikUptime(uptime: string): string {
 }
 
 let mikrotikCache: { data: unknown; ts: number } | null = null;
-const CACHE_TTL = 10_000;
+// Just under the client poll interval (5s) for the same reasons as the other routes.
+const CACHE_TTL = 4_000;
 
 export async function GET() {
   if (mikrotikCache && Date.now() - mikrotikCache.ts < CACHE_TTL) {

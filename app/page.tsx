@@ -1158,7 +1158,7 @@ function SettingsPanel({ settings, onUpdate, onClose }: {
         </div>
 
         {[
-          { title: "Refresh", options: [5, 10, 30, 60], key: "refreshInterval" as const, fmt: (v: number) => `${v}s` },
+          { title: "Refresh", options: [3, 5, 10, 30], key: "refreshInterval" as const, fmt: (v: number) => `${v}s` },
         ].map(({ title, options, key, fmt }) => (
           <div key={key} className="flex flex-col gap-2">
             <span className="text-[10px] uppercase tracking-widest" style={{ color: "#2e2e2e" }}>{title}</span>
@@ -1277,7 +1277,7 @@ function MikrotikTab() {
       }
     }
     load();
-    const id = setInterval(load, 30_000);
+    const id = setInterval(load, 5_000);
     return () => clearInterval(id);
   }, []);
 
@@ -1565,7 +1565,7 @@ function ActivityFeed({ events, loading }: { events: ActivityEvent[]; loading: b
 
 // ── dashboard ─────────────────────────────────────────────────────────────────
 
-const DEFAULT_SETTINGS: Settings = { refreshInterval: 10, tempUnit: "C", dataUnit: "decimal", visibleCards: {} };
+const DEFAULT_SETTINGS: Settings = { refreshInterval: 3, tempUnit: "C", dataUnit: "decimal", visibleCards: {} };
 
 export default function Dashboard() {
   const [metrics,      setMetrics]      = useState<Metrics | null>(null);
@@ -1713,7 +1713,7 @@ export default function Dashboard() {
   // Services — refresh every 10 seconds
   useEffect(() => {
     fetchServices();
-    const id = setInterval(fetchServices, 10_000);
+    const id = setInterval(fetchServices, 3_000);
     return () => clearInterval(id);
   }, [fetchServices]);
 

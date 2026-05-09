@@ -90,13 +90,15 @@ All UI components live in this one file. Categories:
 
 | Endpoint | Interval |
 |----------|----------|
-| `/api/metrics` | `settings.refreshInterval`s (default 10s) |
-| `/api/services` | 10s |
+| `/api/metrics` | `settings.refreshInterval`s (default 3s, options 3/5/10/30) |
+| `/api/services` | 3s |
+| `/api/mikrotik` | 5s |
+| `/api/activity` | 60s |
 | `/api/speedtest` | 300s |
 | `/api/weather` | 600s |
-| `/api/mikrotik` | 30s |
-| `/api/activity` | 60s |
 | Clock | 1s |
+
+Server-side cache TTLs are tuned just under the client poll interval (services/metrics: 2.5s, mikrotik: 4s) so each poll gets fresh data without forcing duplicate upstream calls on adjacent ticks. Activity/speedtest/weather TTLs match their slower polls.
 
 ### Components — what to know
 
