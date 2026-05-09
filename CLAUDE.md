@@ -55,7 +55,18 @@ Five routes — all proxy from the browser to internal services to avoid CORS an
 
 `metrics/route.ts` runs ~30 PromQL queries via `Promise.all`. **Destructuring order must stay in sync with the queries array** — positional. New queries get appended at the end to preserve order.
 
-`services/route.ts` does `Promise.allSettled` over 10 service functions (radarr, sonarr, bazarr, tautulli, qbittorrent, overseerr, pihole, prowlarr, nginx, uptimekuma). Each function falls back to `checkReachable()` on auth/data errors so a service still shows as "up" with `"—"` when the server responds but auth fails. 10s in-memory cache.
+`services/route.ts` does `Promise.allSettled` over 10 service functions (radarr, sonarr, bazarr, tautulli, qbittorrent, overseerr, pihole, prowlarr, nginx, uptimekuma). Each function has a single primary fetch that must succeed, plus optional enrichment fetches (`apiFetchOpt` returns `null` instead of throwing) that fail individually without sinking the card. On any primary fetch failure the card falls back to `["—"]` via `checkReachable()`. 10s in-memory cache.
+
+`ServiceResult` shape: `name, up, lines[], pct?, downCount?, queueItem?, queueItems?, streams?, health?, weekly?`. The new richer fields:
+- `queueItems?: QueueItem[]` — top-3 active downloads (Radarr/Sonarr/qBit). Each has `title`, `pct`, optional `etaSec`. The legacy single `queueItem` is still emitted for back-compat.
+- `health?: { warning, error }` — populated for Radarr/Sonarr/Prowlarr from their `/health` endpoints. Card renders an orange/red pill in the header when set.
+- `weekly?: { plays?, topShow?, topUser? }` — populated for Tautulli when no streams active, from `cmd=get_home_stats&time_range=7` + `cmd=get_history&after=<7d>`.
+
+Per-service enrichment:
+- **Radarr**: library size = `sum(movie.sizeOnDisk)`; cutoff-unmet count from `/wanted/cutoff?pageSize=1` `totalRecords`.
+- **Sonarr**: library size = `sum(series.statistics.sizeOnDisk)` (requires the default `includeStatistics=true` on `/series`).
+- **qBit**: aggregate ratio = `sum(uploaded) / sum(downloaded)`. Active speeds always shown. Top-3 downloads sorted by progress descending.
+- **PiHole**: top blocked domain from `/api/stats/top_domains?blocked=true&count=1`; active client count from `len(/api/stats/top_clients?count=99)`.
 
 `speedtest/route.ts` tries `/api/speedtest/latest` (Mbps) and `/api/v1/results?take=5` (the latter requires `Bearer ${SPEEDTEST_API_KEY}`). **Never trigger tests** — SpeedTracker schedules them. Note: the two endpoints return different units; see `memory.md` → "Speedtest unit mismatch".
 
@@ -119,8 +130,11 @@ Service cards render in two **categories** (`SVC_CATEGORIES` constant near top o
 Each category has a header with an accent dot, divider line, and live up-count (turns green at 100%). Each card has:
 - Brand-color gradient stripe at top (3px, with glow)
 - Subtle radial brand-color background
-- Status dot, label, hero stat (lines[0] with big number), other lines, then progress bars / streams as applicable
+- Status dot, optional health pill (`1 ERR` red / `1 WARN` amber), label, hero stat (lines[0] with big number), other lines
+- Progress bars: top-3 queue items for Radarr/Sonarr/qBit (each with title, ETA pill, thin bar), live stream progress bars for Tautulli
 - Click anywhere → opens that service's web UI in a new tab (URLs from `SVC_URLS` constant)
+
+Cards within a category are **sorted by health priority** before render: down → error → warning → active (has queue/stream) → idle. Same-tier services preserve route-array order.
 
 ### Page layout
 

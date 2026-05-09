@@ -77,14 +77,21 @@ interface SpeedtestResult {
   serverHost:     string | null;
 }
 
+interface ServiceQueueItem { title: string; pct: number; etaSec?: number | null }
+interface ServiceStream    { title: string; user: string; progress: number; posStr: string }
+interface ServiceHealth    { warning: number; error: number }
+interface ServiceWeekly    { plays?: number; topShow?: string; topUser?: string }
 interface ServiceResult {
   name: string;
   up: boolean;
   lines: string[];
-  pct?: number;
-  downCount?: number;
-  queueItem?: { title: string; pct: number } | null;
-  streams?: { title: string; user: string; progress: number; posStr: string }[];
+  pct?:        number;
+  downCount?:  number;
+  queueItem?:  ServiceQueueItem | null;
+  queueItems?: ServiceQueueItem[];
+  streams?:    ServiceStream[];
+  health?:     ServiceHealth;
+  weekly?:     ServiceWeekly;
 }
 
 interface ActivityEvent {
@@ -304,6 +311,16 @@ function fmtSince(s: number | null): string {
 
 function fmtPct(v: number | null): string {
   return v === null ? "—" : `${v.toFixed(1)}%`;
+}
+
+// Compact "time remaining" for queue items. qBit reports 8640000s (~100d)
+// to mean "unknown", so we suppress anything that big.
+function fmtEtaShort(sec: number | null | undefined): string | null {
+  if (sec == null || !isFinite(sec) || sec <= 0 || sec >= 8_640_000) return null;
+  if (sec < 60)    return `${Math.round(sec)}s`;
+  if (sec < 3600)  return `${Math.round(sec / 60)}m`;
+  if (sec < 86400) return `${Math.round(sec / 3600)}h`;
+  return `${Math.round(sec / 86400)}d`;
 }
 
 function cleanTitle(s: string): string {
@@ -1573,7 +1590,7 @@ export default function Dashboard() {
 
 
   const [weather,            setWeather]            = useState<{ temp: number | null; condition: string | null } | null>(null);
-  const [services,           setServices]           = useState<{ name: string; up: boolean; lines: string[]; pct?: number; downCount?: number; queueItem?: { title: string; pct: number } | null; streams?: { title: string; user: string; progress: number; posStr: string }[] }[] | null>(null);
+  const [services,           setServices]           = useState<ServiceResult[] | null>(null);
   const [servicesLoading,    setServicesLoading]    = useState(true);
   const [servicesUpdatedAt,  setServicesUpdatedAt]  = useState<number | null>(null);
   const [activityEvents,     setActivityEvents]     = useState<ActivityEvent[]>([]);
@@ -2472,7 +2489,22 @@ export default function Dashboard() {
                           </span>
                         </div>
                         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-                          {catCards.map(({ name, up, lines, pct: svcPct, downCount, queueItem, streams: svcStreams }) => {
+                          {[...catCards].sort((a, b) => {
+                            // Health-priority sort within each category. Stable: services
+                            // with the same priority preserve route-array order.
+                            // Tier:  0 = down  •  1 = error  •  2 = warning
+                            //        3 = active (queue/stream/<100%)  •  4 = idle
+                            const tier = (s: ServiceResult) => {
+                              if (!s.up)                         return 0;
+                              if ((s.health?.error   ?? 0) > 0)  return 1;
+                              if ((s.health?.warning ?? 0) > 0)  return 2;
+                              const hasQ = (s.queueItems?.length ?? 0) > 0 || s.queueItem;
+                              const hasS = (s.streams?.length    ?? 0) > 0;
+                              if (hasQ || hasS)                  return 3;
+                              return 4;
+                            };
+                            return tier(a) - tier(b);
+                          }).map(({ name, up, lines, pct: svcPct, downCount, queueItem, queueItems, streams: svcStreams, health }) => {
                             const color = SVC_COLORS[name] ?? "#666";
                             const icon  = SVC_ICONS[name]  ?? "";
                             const label = SVC_LABELS[name]  ?? name;
@@ -2513,14 +2545,36 @@ export default function Dashboard() {
 
                                 {/* Card body */}
                                 <div className="flex flex-col gap-2" style={{ padding: "13px 14px 14px" }}>
-                                  <div className="flex items-center justify-between">
+                                  <div className="flex items-center justify-between gap-2">
                                     <ServiceIcon src={icon} label={label} color={color} />
-                                    <span className="w-1.5 h-1.5 rounded-full shrink-0"
-                                      style={{
-                                        background: up ? "#10b981" : "#ef4444",
-                                        boxShadow: up ? "0 0 6px #10b981aa" : "0 0 4px #ef444455",
-                                        animation: up ? "pulseDot 2s ease-in-out infinite" : "none",
-                                      }} />
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                      {/* Health pill — only shown when /api/v3/health reported anything */}
+                                      {up && health && (health.error > 0 || health.warning > 0) && (() => {
+                                        const isError = health.error > 0;
+                                        const accent  = isError ? "#ef4444" : "#f59e0b";
+                                        const total   = health.error + health.warning;
+                                        const label   = isError
+                                          ? `${total} ${total === 1 ? "err" : "errs"}`
+                                          : `${total} ${total === 1 ? "warn" : "warns"}`;
+                                        return (
+                                          <span style={{
+                                            background: `${accent}1a`,
+                                            border: `1px solid ${accent}55`,
+                                            color: accent,
+                                            borderRadius: 4, padding: "1px 5px",
+                                            fontSize: 9, fontWeight: 700,
+                                            textTransform: "uppercase", letterSpacing: "0.05em",
+                                            fontVariantNumeric: "tabular-nums",
+                                          }}>{label}</span>
+                                        );
+                                      })()}
+                                      <span className="w-1.5 h-1.5 rounded-full shrink-0"
+                                        style={{
+                                          background: up ? "#10b981" : "#ef4444",
+                                          boxShadow: up ? "0 0 6px #10b981aa" : "0 0 4px #ef444455",
+                                          animation: up ? "pulseDot 2s ease-in-out infinite" : "none",
+                                        }} />
+                                    </div>
                                   </div>
                                   <span style={{
                                     fontSize: 14, fontWeight: 700,
@@ -2547,23 +2601,28 @@ export default function Dashboard() {
                                 {name === "radarr" && svcPct != null && up && (
                                   <GaugeBar percent={svcPct} color={svcPct > 90 ? "#10b981" : svcPct > 70 ? "#f59e0b" : "#ef4444"} thin />
                                 )}
-                                {name === "radarr" && queueItem && up && (
-                                  <div className="flex flex-col gap-1 mt-0.5">
-                                    <span style={{
-                                      fontSize: 10, fontWeight: 500, color: "#f59e0b",
-                                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "90%",
-                                    }}>↓ {cleanTitle(queueItem.title)}</span>
-                                    <GaugeBar percent={queueItem.pct} color="#f59e0b" thin />
-                                  </div>
-                                )}
-                                {/* Sonarr: active download */}
-                                {name === "sonarr" && queueItem && up && (
-                                  <div className="flex flex-col gap-1 mt-0.5">
-                                    <span style={{
-                                      fontSize: 10, fontWeight: 500, color: "#3b82f6",
-                                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "90%",
-                                    }}>↓ {cleanTitle(queueItem.title)}</span>
-                                    <GaugeBar percent={queueItem.pct} color="#3b82f6" thin />
+                                {(name === "radarr" || name === "sonarr" || name === "qbittorrent") && up && (queueItems?.length ?? 0) > 0 && (
+                                  <div className="flex flex-col gap-1.5 mt-0.5">
+                                    {queueItems!.slice(0, 3).map((q, qi) => {
+                                      const c = name === "radarr" ? "#f59e0b" : name === "sonarr" ? "#3b82f6" : "#06b6d4";
+                                      return (
+                                        <div key={qi} className="flex flex-col gap-1">
+                                          <div className="flex items-center gap-1.5">
+                                            <span style={{
+                                              fontSize: 10, fontWeight: 500, color: c,
+                                              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0,
+                                            }}>↓ {cleanTitle(q.title)}</span>
+                                            {fmtEtaShort(q.etaSec) && (
+                                              <span style={{
+                                                fontSize: 9, color: "rgba(255,255,255,0.45)",
+                                                fontVariantNumeric: "tabular-nums", flexShrink: 0,
+                                              }}>{fmtEtaShort(q.etaSec)}</span>
+                                            )}
+                                          </div>
+                                          <GaugeBar percent={q.pct} color={c} thin />
+                                        </div>
+                                      );
+                                    })}
                                   </div>
                                 )}
                                 {/* Tautulli: active streams inline */}
