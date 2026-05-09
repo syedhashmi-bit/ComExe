@@ -2,11 +2,11 @@
 
 Guidance for Claude Code working in this repo. **`memory.md`** has past decisions and bug fixes; **`skills.md`** has reusable patterns; **`context.md`** has env-var/infra inventory.
 
-> **Branding:** The visible product name is **ComExe**. Repo / image / container names (`homelab-dashboard`, `ghcr.io/syedhashmi-bit/homelab-dashboard`) intentionally stay as-is — renaming would break user deploys. Treat ComExe as a UI label only.
+> **Branding:** The product name is **ComExe** end-to-end. GitHub repo: `syedhashmi-bit/ComExe`. GHCR image: `ghcr.io/syedhashmi-bit/comexe:latest` (lowercase — GHCR requirement). Container/app name: `comexe`. The old `homelab-dashboard` repo URL still redirects via GitHub, but the GHCR image at the old path is frozen — every new build goes to the new path.
 
 ## Build & deploy workflow
 
-The production image is built by **GitHub Actions on push to `main`** and published to **`ghcr.io/syedhashmi-bit/homelab-dashboard:latest`**. TrueNAS deploys via `docker pull`, never builds locally — that historically SIGSEGV'd on this host (see `memory.md` → "Build moved off Docker"). CI builds on Ubuntu runners, which don't hit it.
+The production image is built by **GitHub Actions on push to `main`** and published to **`ghcr.io/syedhashmi-bit/comexe:latest`**. TrueNAS deploys via `docker pull`, never builds locally — that historically SIGSEGV'd on this host (see `memory.md` → "Build moved off Docker"). CI builds on Ubuntu runners, which don't hit it.
 
 ### Dev (PC)
 
@@ -91,7 +91,7 @@ The "Save & apply" button POSTs the form to `/api/config` (which writes to `/app
 
 If the writable volume isn't mounted, the wizard detects this from the GET `/api/config` `writable: false` field and falls back to "Or copy the generated config manually" — three tabs (`docker-compose.yml`, `docker run`, `.env`) with the same content the user would have edited by hand pre-wizard.
 
-Form state persists in `localStorage` (key `homelab-dashboard:setup-wizard`) so a refresh doesn't clobber inputs. There's a "Clear everything" red button to wipe localStorage on demand.
+Form state persists in `localStorage` (key `comexe:setup-wizard`) so a refresh doesn't clobber inputs. There's a "Clear everything" red button to wipe localStorage on demand.
 
 ### Config resolution — `app/lib/server-config.ts`
 

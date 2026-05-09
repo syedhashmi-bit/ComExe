@@ -237,7 +237,7 @@ git push
 
 Why CI not local Docker: `next build` SIGSEGV'd non-deterministically on the TrueNAS host but works reliably on Ubuntu runners. See `memory.md` → "Build moved off Docker" for the diagnostic trail.
 
-`.next/` is gitignored — built fresh inside the image during CI. Image lives at `ghcr.io/syedhashmi-bit/homelab-dashboard:latest` (plus `:sha-<short>` and `:v<x.y.z>` tags).
+`.next/` is gitignored — built fresh inside the image during CI. Image lives at `ghcr.io/syedhashmi-bit/comexe:latest` (plus `:sha-<short>` and `:v<x.y.z>` tags).
 
 ## Runtime client config pattern
 

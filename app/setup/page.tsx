@@ -58,7 +58,7 @@ interface WizardState {
   grafana:   { enabled: boolean; baseUrl: string; dashboardUid: string; datasourceUid: string; panelId: string };
 }
 
-const LS_KEY = "homelab-dashboard:setup-wizard";
+const LS_KEY = "comexe:setup-wizard";
 
 function defaultState(): WizardState {
   return {
@@ -513,7 +513,7 @@ export default function SetupWizard() {
             }}>
               <strong>Writable data volume not mounted.</strong> Save & apply needs a writable directory at <code style={{ color: "#fde68a" }}>/app/data</code>. Add this to your <code style={{ color: "#fde68a" }}>docker-compose.yml</code>:
               <pre style={{ marginTop: 8, padding: 8, background: "#1a1300", borderRadius: 4, fontSize: 10, color: "#fcd34d", whiteSpace: "pre-wrap" }}>{`services:
-  homelab-dashboard:
+  comexe:
     volumes:
       - ./dashboard-data:/app/data`}</pre>
               Or for plain <code style={{ color: "#fde68a" }}>docker run</code>: <code style={{ color: "#fde68a" }}>-v /root/dashboard-data:/app/data</code>. Restart the container, then come back here. Until then, use the manual config below.
@@ -660,9 +660,9 @@ function generateConfig(state: WizardState): GeneratedConfig {
   // ── docker-compose.yml ─────────────────────────────────────────────────────
   const composeLines = [
     "services:",
-    "  homelab-dashboard:",
-    "    image: ghcr.io/syedhashmi-bit/homelab-dashboard:latest",
-    "    container_name: homelab-dashboard",
+    "  comexe:",
+    "    image: ghcr.io/syedhashmi-bit/comexe:latest",
+    "    container_name: comexe",
     "    restart: unless-stopped",
     "    network_mode: host",
     "    # Mount your bookmarks file for the right-hand quick-links section:",
@@ -675,11 +675,11 @@ function generateConfig(state: WizardState): GeneratedConfig {
   // ── docker run command ─────────────────────────────────────────────────────
   const runLines = [
     "docker run -d \\",
-    "  --name homelab-dashboard \\",
+    "  --name comexe \\",
     "  --network host \\",
     "  --restart unless-stopped \\",
     ...envPairs.map(([k, v]) => `  -e ${k}=${shellQuote(v)} \\`),
-    "  ghcr.io/syedhashmi-bit/homelab-dashboard:latest",
+    "  ghcr.io/syedhashmi-bit/comexe:latest",
   ];
 
   // ── plain .env file ────────────────────────────────────────────────────────

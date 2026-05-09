@@ -9,9 +9,9 @@
 # Image is published from this repo's main branch by GitHub Actions.
 
 services:
-  homelab-dashboard:
-    image: ghcr.io/syedhashmi-bit/homelab-dashboard:latest
-    container_name: homelab-dashboard
+  comexe:
+    image: ghcr.io/syedhashmi-bit/comexe:latest
+    container_name: comexe
     restart: unless-stopped
     # Use host networking so the dashboard can reach internal services on
     # 192.168.88.x without extra port-mapping or DNS plumbing. If you'd

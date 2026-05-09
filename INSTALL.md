@@ -6,7 +6,7 @@ Three install paths, in order from "easiest" to "most flexible":
 2. **Docker Compose** — for any homelab Docker host
 3. **Plain `docker run`** — for the command-line type
 
-The image is published to **`ghcr.io/syedhashmi-bit/homelab-dashboard:latest`** by GitHub Actions on every push to `main`. Pull, configure with env vars, run.
+The image is published to **`ghcr.io/syedhashmi-bit/comexe:latest`** by GitHub Actions on every push to `main`. Pull, configure with env vars, run.
 
 ---
 
@@ -36,15 +36,15 @@ The fastest install. You don't pre-edit any compose file or env vars. Spin up th
 # any-host (bash)
 mkdir -p dashboard-data
 curl -fsSL -o bookmarks.json \
-  https://raw.githubusercontent.com/syedhashmi-bit/homelab-dashboard/main/bookmarks.example.json
+  https://raw.githubusercontent.com/syedhashmi-bit/ComExe/main/bookmarks.example.json
 
 docker run -d \
-  --name homelab-dashboard \
+  --name comexe \
   --network host \
   --restart unless-stopped \
   -v "$(pwd)/bookmarks.json:/app/bookmarks.json:ro" \
   -v "$(pwd)/dashboard-data:/app/data" \
-  ghcr.io/syedhashmi-bit/homelab-dashboard:latest
+  ghcr.io/syedhashmi-bit/comexe:latest
 ```
 
 Then:
@@ -64,8 +64,8 @@ The **`-v ./dashboard-data:/app/data`** mount is what makes Save & apply work. S
 Works on TrueNAS Scale 24.10 (Electric Eel) and later.
 
 1. **Apps** → **Discover Apps** → top-right click **Custom App**
-2. **Application Name**: `homelab-dashboard`
-3. **Image repository**: `ghcr.io/syedhashmi-bit/homelab-dashboard`
+2. **Application Name**: `comexe`
+3. **Image repository**: `ghcr.io/syedhashmi-bit/comexe`
 4. **Image tag**: `latest`
 5. **Container Environment Variables** — click **Add** for each one you need. Required minimum:
    - `TRUENAS_IP` = your TrueNAS LAN IP (e.g. `192.168.88.196`)
@@ -86,8 +86,8 @@ For Docker hosts that aren't TrueNAS, or for users who prefer compose.
 
 ```bash
 # 1. Get the example files
-curl -O https://raw.githubusercontent.com/syedhashmi-bit/homelab-dashboard/main/docker-compose.example.yml
-curl -O https://raw.githubusercontent.com/syedhashmi-bit/homelab-dashboard/main/bookmarks.example.json
+curl -O https://raw.githubusercontent.com/syedhashmi-bit/ComExe/main/docker-compose.example.yml
+curl -O https://raw.githubusercontent.com/syedhashmi-bit/ComExe/main/bookmarks.example.json
 
 # 2. Rename and edit
 mv docker-compose.example.yml docker-compose.yml
@@ -97,7 +97,7 @@ nano bookmarks.json           # customize your bookmarks
 
 # 3. Start
 docker compose up -d
-docker compose logs -f homelab-dashboard
+docker compose logs -f comexe
 ```
 
 ---
@@ -110,8 +110,8 @@ For the script-friendly. Save as `update-dashboard.sh`:
 #!/usr/bin/env bash
 set -euo pipefail
 
-NAME=homelab-dashboard
-IMAGE=ghcr.io/syedhashmi-bit/homelab-dashboard:latest
+NAME=comexe
+IMAGE=ghcr.io/syedhashmi-bit/comexe:latest
 
 log() { echo "[$(date +'%H:%M:%S')] $*"; }
 
@@ -229,7 +229,7 @@ environment:
 Pull the latest image and re-run:
 
 ```bash
-docker pull ghcr.io/syedhashmi-bit/homelab-dashboard:latest
+docker pull ghcr.io/syedhashmi-bit/comexe:latest
 docker compose up -d         # or run your update-dashboard.sh script
 ```
 
@@ -241,7 +241,7 @@ GitHub Actions builds a new `:latest` image on every push to the repo's `main` b
 
 ### Cards stuck on "—"
 
-The card renders that placeholder when the upstream service is reachable but the auth/data fetch failed. Run `docker logs homelab-dashboard` and look for the offending request. Most common causes:
+The card renders that placeholder when the upstream service is reachable but the auth/data fetch failed. Run `docker logs comexe` and look for the offending request. Most common causes:
 - Wrong API key / password env var
 - Wrong service URL (set `RADARR_URL=...` etc. if your service is on a non-default port)
 - Service is up but auth was rotated and the env var still has the old value
@@ -259,8 +259,8 @@ The ticker shows recent grabs/imports/streams from Sonarr, Radarr, and Tautulli.
 Volume isn't mounted. Confirm the file exists and the path inside the container:
 
 ```bash
-docker exec homelab-dashboard ls -la /app/bookmarks.json
-docker exec homelab-dashboard cat   /app/bookmarks.json | head
+docker exec comexe ls -la /app/bookmarks.json
+docker exec comexe cat   /app/bookmarks.json | head
 ```
 
 ### Container can't reach services

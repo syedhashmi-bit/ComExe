@@ -1983,7 +1983,7 @@ export default function Dashboard() {
                     setup wizard
                   </a>{" "}
                   to fill in URLs / API keys with live connection-testing, or check{" "}
-                  <a href="https://github.com/syedhashmi-bit/homelab-dashboard/blob/main/INSTALL.md" target="_blank" rel="noopener noreferrer"
+                  <a href="https://github.com/syedhashmi-bit/ComExe/blob/main/INSTALL.md" target="_blank" rel="noopener noreferrer"
                     style={{ color: "rgba(6,182,212,0.7)", textDecoration: "underline" }}>
                     INSTALL.md
                   </a>.

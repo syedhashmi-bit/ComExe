@@ -35,7 +35,7 @@ Crash point varies between runs (page-data-collection, post-static-page, post-tr
 Once we externalized config and started publishing a public image, the natural fix to the SIGSEGV was to move the build out of TrueNAS Docker entirely. CI (`.github/workflows/build.yml`) runs on Ubuntu x86_64 — different hardware than the user's TrueNAS — and `next build` works reliably there.
 
 - Dockerfile is back to a normal multi-stage build (`deps → builder → runner`).
-- Image is pushed to `ghcr.io/syedhashmi-bit/homelab-dashboard:latest` on every push to `main`. Also tagged with `:sha-<short>` and `:v<x.y.z>` for tagged releases.
+- Image is pushed to `ghcr.io/syedhashmi-bit/comexe:latest` on every push to `main`. Also tagged with `:sha-<short>` and `:v<x.y.z>` for tagged releases. (Pre-rename it lived at `ghcr.io/syedhashmi-bit/homelab-dashboard:latest` — that path is now frozen at the last build before the rename.)
 - TrueNAS `update-dashboard.sh` is now `docker pull` + `docker stop/rm/run`. No git pull, no docker build.
 - `.next/` removed from git — it's built fresh inside the image during CI.
 
@@ -82,7 +82,7 @@ Old commit SHAs are dead. Force-pushed to `main`. Anyone who pulled before the r
 
 Single-page React form. Per-service rows with auth-shape-aware fields (apikey / userpass / password / bearer). Each row has a **Test** button that POSTs to `/api/test-connection` — that endpoint actually authenticates against the upstream and returns concrete error messages.
 
-Form state mirrors to `localStorage` (`homelab-dashboard:setup-wizard`) so refresh doesn't lose progress. **Save & apply** button is the primary action; if the writable volume isn't mounted (`writable: false` from `/api/config` GET), the button is disabled with an amber warning showing the exact mount line to add. The legacy "copy this docker-compose.yml" three-tab output is hidden behind a "Show generated config" toggle as a fallback.
+Form state mirrors to `localStorage` (`comexe:setup-wizard`) so refresh doesn't lose progress. **Save & apply** button is the primary action; if the writable volume isn't mounted (`writable: false` from `/api/config` GET), the button is disabled with an amber warning showing the exact mount line to add. The legacy "copy this docker-compose.yml" three-tab output is hidden behind a "Show generated config" toggle as a fallback.
 
 ### First-run UX cleanup (current)
 
@@ -93,7 +93,14 @@ Form state mirrors to `localStorage` (`homelab-dashboard:setup-wizard`) so refre
 
 ### Brand: ComExe (current)
 
-Visible branding renamed from "homelab" to **ComExe**. Repo, Docker image (`ghcr.io/syedhashmi-bit/homelab-dashboard:latest`), container name in `update-dashboard.sh`, and similar infrastructure references kept as-is — renaming them would break user deploys.
+Renamed end-to-end:
+- GitHub repo: `syedhashmi-bit/homelab-dashboard` → `syedhashmi-bit/ComExe` (GitHub auto-redirects the old URL, including for `git clone` / `raw.githubusercontent.com`).
+- GHCR image: `ghcr.io/syedhashmi-bit/homelab-dashboard:latest` → `ghcr.io/syedhashmi-bit/comexe:latest` (lowercase — GHCR/Docker requirement; `docker/metadata-action` lowercases automatically).
+- Container / app name (compose service, `--name`): `homelab-dashboard` → `comexe`.
+- localStorage key: `homelab-dashboard:setup-wizard` → `comexe:setup-wizard` (one-time blip; existing wizard state is invalidated).
+- All in-repo references updated: `INSTALL.md`, `README.md`, `docker-compose.example.yml`, the wizard's generated config (`app/setup/page.tsx`), and the GitHub link in `app/page.tsx`.
+
+**Breaking-change note:** The GHCR image at the old path is frozen at the last pre-rename build. Anyone still running `docker pull ghcr.io/syedhashmi-bit/homelab-dashboard:latest` (e.g. an unmodified `update-dashboard.sh` on TrueNAS) won't get new builds. Update the script to pull from `ghcr.io/syedhashmi-bit/comexe:latest`.
 
 Icon at `app/icon.svg` (Next.js auto-serves as favicon). Minimalist letterform: open half-arc C on the left + bare 3-bar E on the right, both in cyan `#06b6d4`, single 2.6px stroke, rounded caps, no fills, no background plate. Same SVG embedded inline in the dashboard's header next to the wordmark "Com**Exe**".
 
@@ -152,7 +159,7 @@ Speedtest card was rendering `↓ 69,801,868` next to a 920 Mbps download. Cause
 ### Grafana app keeps stopping (May 8 2026)
 
 `docker logs ix-grafana-grafana-1` showed `fatal error: fault` (Go runtime SIGBUS on mmap'd file). Bleve search index was corrupted. User opted to delete + reinstall the app (lost dashboards). After reinstall:
-- Datasource UID changed from `bfkupt1hj588wa` to `cflfv1hjeg9vka` — homelab-dashboard's `GRAFANA_PANEL` URL had to be updated
+- Datasource UID changed from `bfkupt1hj588wa` to `cflfv1hjeg9vka` — ComExe's `GRAFANA_PANEL` URL had to be updated
 - Iframe wouldn't render until `GF_SECURITY_ALLOW_EMBEDDING=true`, `GF_AUTH_ANONYMOUS_ENABLED=true`, `GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer` were added to the Grafana app's env vars (defaults block all framing)
 
 ### qBittorrent IP ban during deploy iteration (May 8 2026)

@@ -108,7 +108,7 @@ The entire frontend is one file: **`app/page.tsx`** (~2 200 lines). All primitiv
 
 ## Install
 
-A prebuilt image is published to **`ghcr.io/syedhashmi-bit/homelab-dashboard:latest`** by GitHub Actions. You don't need to clone or build the repo to run it.
+A prebuilt image is published to **`ghcr.io/syedhashmi-bit/comexe:latest`** by GitHub Actions. You don't need to clone or build the repo to run it.
 
 > **Full install guide is in [INSTALL.md](./INSTALL.md)** — TrueNAS Custom App walkthrough, docker-compose, plain `docker run`, bookmarks customization, Grafana embed setup, and troubleshooting.
 
@@ -117,7 +117,7 @@ A prebuilt image is published to **`ghcr.io/syedhashmi-bit/homelab-dashboard:lat
 ```bash
 mkdir -p dashboard-data
 curl -fsSL -o bookmarks.json \
-  https://raw.githubusercontent.com/syedhashmi-bit/homelab-dashboard/main/bookmarks.example.json
+  https://raw.githubusercontent.com/syedhashmi-bit/ComExe/main/bookmarks.example.json
 
 docker run -d \
   --name comexe \
@@ -125,7 +125,7 @@ docker run -d \
   --restart unless-stopped \
   -v "$(pwd)/bookmarks.json:/app/bookmarks.json:ro" \
   -v "$(pwd)/dashboard-data:/app/data" \
-  ghcr.io/syedhashmi-bit/homelab-dashboard:latest
+  ghcr.io/syedhashmi-bit/comexe:latest
 ```
 
 Then visit **`http://<your-host>:3000/setup`** — fill in your TrueNAS IP, tick the services you use, paste each API key, click **Test** to confirm, then **Save & apply**. The cards go green within seconds.
