@@ -38,9 +38,10 @@ RUN mkdir -p /app/data && chown nextjs:nodejs /app/data
 COPY package.json package-lock.json* ./
 RUN npm ci --omit=dev && npm cache clean --force
 
-# Compiled output + the optional bookmarks.json baked in at build time.
-# Override at runtime via `-v /path/bookmarks.json:/app/bookmarks.json:ro`.
+# Compiled output + public assets (icons, etc.) + optional bookmarks.json.
+# Override bookmarks at runtime via `-v /path/bookmarks.json:/app/bookmarks.json:ro`.
 COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 COPY --chown=nextjs:nodejs bookmarks.example.json ./bookmarks.example.json
 
 # Optional bookmarks file — only present when the build-context happened to
