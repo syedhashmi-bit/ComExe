@@ -4,14 +4,98 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Theme tokens ─────────────────────────────────────────────────────── */
+/* Default: Midnight Cyan. Override via .theme-forge / .theme-forest etc. */
+
+:root {
+  /* surfaces */
+  --bg:             #0a0c12;
+  --bg-gradient:    rgba(30,40,80,0.35);
+  --header-bg:      rgba(10,12,20,0.9);
+  --card:           rgba(255,255,255,0.04);
+  --card-alt:       rgba(255,255,255,0.03);
+  --card-hover:     rgba(255,255,255,0.06);
+  --surface-dim:    rgba(255,255,255,0.02);
+  --surface:        rgba(255,255,255,0.08);
+  --surface-bright: rgba(255,255,255,0.05);
+
+  /* borders */
+  --border-dim:     rgba(255,255,255,0.04);
+  --border:         rgba(255,255,255,0.08);
+  --border-mid:     rgba(255,255,255,0.1);
+  --border-bright:  rgba(255,255,255,0.12);
+  --border-hover:   rgba(255,255,255,0.15);
+  --border-subtle:  rgba(255,255,255,0.07);
+
+  /* text */
+  --text:           #ffffff;
+  --text-bright:    rgba(255,255,255,0.9);
+  --text-secondary: rgba(255,255,255,0.85);
+  --text-mid:       rgba(255,255,255,0.75);
+  --text-muted:     rgba(255,255,255,0.6);
+  --text-dim:       rgba(255,255,255,0.5);
+  --text-label:     rgba(255,255,255,0.45);
+  --text-faint:     rgba(255,255,255,0.35);
+  --text-ghost:     rgba(255,255,255,0.25);
+  --text-hidden:    rgba(255,255,255,0.15);
+
+  /* brand */
+  --brand:          #06b6d4;
+  --brand-dim:      rgba(6,182,212,0.7);
+  --brand-glow:     rgba(6,182,212,0.5);
+
+  /* severity */
+  --ok:             #10b981;
+  --warn:           #f59e0b;
+  --critical:       #ef4444;
+
+  /* card accents */
+  --accent-cpu:      #06b6d4;
+  --accent-memory:   #10b981;
+  --accent-fs:       #f59e0b;
+  --accent-network:  #3b82f6;
+  --accent-gpu:      #ef4444;
+  --accent-speedtest: #8b5cf6;
+  --accent-system:   #d946ef;
+  --accent-grafana:  #f97316;
+
+  /* mikrotik tab */
+  --mt-bg:          rgba(15,18,30,0.9);
+  --mt-bg-hover:    rgba(20,24,40,0.95);
+
+  /* settings panel */
+  --settings-bg:         #0e0e0e;
+  --settings-border:     #1a1a1a;
+  --settings-input:      #161616;
+  --settings-input-border: #1e1e1e;
+  --settings-label:      #2e2e2e;
+  --settings-text:       #444;
+  --settings-text-dim:   #333;
+  --settings-text-light: #555;
+  --settings-active:     #00e5ff;
+  --settings-active-bg:  #00e5ff14;
+  --settings-active-bg-dim: #00e5ff22;
+  --settings-active-border: #00e5ff33;
+
+  /* misc */
+  --divider:        #181818;
+  --ring-dim:       rgba(255,255,255,0.06);
+  --skeleton-from:  rgba(255,255,255,0.04);
+  --skeleton-mid:   rgba(255,255,255,0.08);
+  --gauge-track:    rgba(255,255,255,0.08);
+  --donut-track:    rgba(255,255,255,0.1);
+  --donut-bg:       #161616;
+  --fade-to:        rgba(10,12,18,1);
+}
+
 * {
   box-sizing: border-box;
 }
 
 html,
 body {
-  background: #0a0c12;
-  color: #e4e4e4;
+  background: var(--bg);
+  color: var(--text-secondary);
   margin: 0;
   padding: 0;
   font-family: "Inter", "system-ui", sans-serif;
@@ -23,10 +107,10 @@ body {
   width: 4px;
 }
 ::-webkit-scrollbar-track {
-  background: rgba(255,255,255,0.02);
+  background: var(--surface-dim);
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255,255,255,0.1);
+  background: var(--border-mid);
   border-radius: 2px;
 }
 
@@ -36,7 +120,7 @@ body {
 }
 
 .skeleton {
-  background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 75%);
+  background: linear-gradient(90deg, var(--skeleton-from) 25%, var(--skeleton-mid) 50%, var(--skeleton-from) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
   border-radius: 4px;
@@ -65,8 +149,8 @@ body {
 }
 
 @keyframes pulseDot {
-  0%, 100% { opacity: 1; box-shadow: 0 0 4px var(--dot-color, #10b981); }
-  50%       { opacity: 0.65; box-shadow: 0 0 8px var(--dot-color, #10b981); }
+  0%, 100% { opacity: 1; box-shadow: 0 0 4px var(--dot-color, var(--ok)); }
+  50%       { opacity: 0.65; box-shadow: 0 0 8px var(--dot-color, var(--ok)); }
 }
 
 /* Activity feed ticker — moves the doubled-events strip from 0% to -50% so the loop is seamless. */

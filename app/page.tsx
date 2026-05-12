@@ -186,8 +186,8 @@ const SVC_LABELS: Record<string, string> = {
 
 // Service grouping for the services panel. Order within each list = render order.
 const SVC_CATEGORIES: { id: string; label: string; accent: string; services: string[] }[] = [
-  { id: "media", label: "media stack",   accent: "#f59e0b", services: ["radarr", "sonarr", "bazarr", "tautulli", "qbittorrent", "overseerr", "prowlarr"] },
-  { id: "infra", label: "infrastructure", accent: "#06b6d4", services: ["pihole", "nginx", "uptimekuma"] },
+  { id: "media", label: "media stack",   accent: "var(--warn)", services: ["radarr", "sonarr", "bazarr", "tautulli", "qbittorrent", "overseerr", "prowlarr"] },
+  { id: "infra", label: "infrastructure", accent: "var(--brand)", services: ["pihole", "nginx", "uptimekuma"] },
 ];
 
 // Fallback only — used briefly while /api/config is fetching, or if the fetch
@@ -337,20 +337,20 @@ function pct(used: number | null, total: number | null): number {
 // ── color helpers ─────────────────────────────────────────────────────────────
 
 function barColor(p: number): string {
-  if (p >= 90) return "#ef4444";
-  if (p >= 75) return "#f59e0b";
-  if (p >= 50) return "#06b6d4";
-  return "#10b981";
+  if (p >= 90) return "var(--critical)";
+  if (p >= 75) return "var(--warn)";
+  if (p >= 50) return "var(--brand)";
+  return "var(--ok)";
 }
 function gpuUtilColor(p: number): string {
-  if (p >= 90) return "#ef4444";
-  if (p >= 70) return "#f59e0b";
-  return "#10b981";
+  if (p >= 90) return "var(--critical)";
+  if (p >= 70) return "var(--warn)";
+  return "var(--ok)";
 }
 function tempColor(c: number): string {
-  if (c >= 85) return "#ef4444";
-  if (c >= 70) return "#f59e0b";
-  return "#10b981";
+  if (c >= 85) return "var(--critical)";
+  if (c >= 70) return "var(--warn)";
+  return "var(--ok)";
 }
 
 // ── alert helpers ─────────────────────────────────────────────────────────────
@@ -575,7 +575,7 @@ function ServiceIcon({ src, label, color }: { src: string; label: string; color:
   return (
     <img src={src} alt={label} width={32} height={32}
       className="w-8 h-8 rounded-lg object-contain shrink-0"
-      style={{ background: "#161616" }}
+      style={{ background: "var(--settings-input)" }}
       onError={() => setErr(true)}
     />
   );
@@ -592,7 +592,7 @@ function BookmarkItem({ name, url, icon }: { name: string; url: string; icon: st
         textDecoration: "none", height: 36, flexShrink: 0,
         transition: "background 0.15s ease, transform 0.15s ease",
       }}
-      onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.06)"; e.currentTarget.style.transform = "translateX(4px)"; }}
+      onMouseEnter={e => { e.currentTarget.style.background = "var(--card-hover)"; e.currentTarget.style.transform = "translateX(4px)"; }}
       onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.transform = "translateX(0)"; }}
     >
       {!imgErr ? (
@@ -608,11 +608,11 @@ function BookmarkItem({ name, url, icon }: { name: string; url: string; icon: st
         />
       ) : (
         <span className="rounded flex items-center justify-center font-bold shrink-0"
-          style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.4)", width: 18, height: 18, fontSize: 9 }}>
+          style={{ background: "var(--card-hover)", color: "var(--text-label)", width: 18, height: 18, fontSize: 9 }}>
           {name[0].toUpperCase()}
         </span>
       )}
-      <span className="truncate" style={{ color: "rgba(255,255,255,0.8)", fontSize: 13 }}>{name}</span>
+      <span className="truncate" style={{ color: "var(--text-secondary)", fontSize: 13 }}>{name}</span>
     </a>
   );
 }
@@ -692,7 +692,7 @@ function TrendDelta({
 function HeroStat({ line, keyPrefix }: { line: string; keyPrefix: string }) {
   const m = line.match(/^(.*?)(\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)(.*)$/);
   if (!m) {
-    return <span style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", lineHeight: 1.4 }}>{line}</span>;
+    return <span style={{ fontSize: 12, color: "var(--text-muted)", lineHeight: 1.4 }}>{line}</span>;
   }
   const [, prefix, numStr, rest] = m;
   const useCommas = numStr.includes(",");
@@ -700,15 +700,15 @@ function HeroStat({ line, keyPrefix }: { line: string; keyPrefix: string }) {
   const value     = parseFloat(numStr.replace(/,/g, ""));
   return (
     <div className="flex items-baseline gap-1.5 flex-wrap">
-      {prefix && <span style={{ fontSize: 11, color: "rgba(255,255,255,0.45)" }}>{prefix.trim()}</span>}
+      {prefix && <span style={{ fontSize: 11, color: "var(--text-label)" }}>{prefix.trim()}</span>}
       <span style={{
-        fontSize: 19, fontWeight: 700, color: "#ffffff",
+        fontSize: 19, fontWeight: 700, color: "var(--text)",
         fontVariantNumeric: "tabular-nums", letterSpacing: "-0.01em", lineHeight: 1.1,
       }}>
         <AnimatedNumber value={value} decimals={decimals} useCommas={useCommas} />
       </span>
       {rest && <span style={{
-        fontSize: 11, color: "rgba(255,255,255,0.55)",
+        fontSize: 11, color: "var(--text-dim)",
         overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
       }}>{animatedLine(rest, `${keyPrefix}-rest`)}</span>}
     </div>
@@ -739,7 +739,7 @@ function animatedLine(line: string, keyPrefix: string): React.ReactNode[] {
 
 function GaugeBar({ percent, color, thin = false, gradient }: { percent: number; color: string; thin?: boolean; gradient?: string }) {
   return (
-    <div className="relative w-full rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.08)", height: thin ? 3 : 5 }}>
+    <div className="relative w-full rounded-full overflow-hidden" style={{ background: "var(--surface)", height: thin ? 3 : 5 }}>
       <div
         className="h-full rounded-full transition-all duration-700 ease-out"
         style={{ width: `${percent}%`, background: gradient ?? color, boxShadow: `0 0 ${thin ? 3 : 6}px ${color}55` }}
@@ -812,14 +812,14 @@ function DonutChart({ used, total, color, size = 72 }: { used: number; total: nu
   return (
     <div className="relative flex items-center justify-center shrink-0" style={{ width: size, height: size }}>
       <svg width={size} height={size} viewBox="0 0 72 72" style={{ transform: "rotate(-90deg)" }}>
-        <circle cx="36" cy="36" r={r} fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="8" />
+        <circle cx="36" cy="36" r={r} fill="none" stroke="var(--donut-track)" strokeWidth="8" />
         <circle cx="36" cy="36" r={r} fill="none" stroke={color} strokeWidth="8"
           strokeDasharray={`${filled} ${circ - filled}`} strokeLinecap="round"
           style={{ filter: `drop-shadow(0 0 4px ${color}55)`, transition: "stroke-dasharray 0.7s ease" }}
         />
       </svg>
       <div className="absolute text-center">
-        <div className="text-[11px] font-medium tabular-nums" style={{ color: "#ffffff" }}>{pctVal.toFixed(0)}%</div>
+        <div className="text-[11px] font-medium tabular-nums" style={{ color: "var(--text)" }}>{pctVal.toFixed(0)}%</div>
       </div>
     </div>
   );
@@ -831,7 +831,7 @@ function RadialGauge({ percent, color, size = 88 }: { percent: number; color: st
   return (
     <div className="relative flex items-center justify-center shrink-0" style={{ width: size, height: size }}>
       <svg width={size} height={size} viewBox="0 0 88 88" style={{ transform: "rotate(-90deg)", position: "absolute", inset: 0 }}>
-        <circle cx="44" cy="44" r={r} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="6" />
+        <circle cx="44" cy="44" r={r} fill="none" stroke="var(--gauge-track)" strokeWidth="6" />
         <circle cx="44" cy="44" r={r} fill="none" stroke={color} strokeWidth="6"
           strokeDasharray={`${filled.toFixed(2)} ${(circ - filled).toFixed(2)}`} strokeLinecap="round"
           style={{ filter: `drop-shadow(0 0 5px ${color}66)`, transition: "stroke-dasharray 0.7s ease" }}
@@ -860,23 +860,23 @@ function ThreeSegmentDonut({ usedBytes, cacheBytes, freeBytes, totalBytes, du }:
     <div className="flex flex-col items-center gap-3">
       <div className="relative" style={{ width: size, height: size }}>
         <svg width={size} height={size} viewBox="0 0 88 88" style={{ transform: "rotate(-90deg)" }}>
-          <circle cx="44" cy="44" r={r} fill="none" stroke="#161616" strokeWidth="9" />
+          <circle cx="44" cy="44" r={r} fill="none" stroke="var(--donut-bg)" strokeWidth="9" />
           {usedLen > 0.1 && (
-            <circle cx="44" cy="44" r={r} fill="none" stroke="#ff1744" strokeWidth="9"
+            <circle cx="44" cy="44" r={r} fill="none" stroke="var(--critical)" strokeWidth="9"
               strokeDasharray={`${usedLen.toFixed(2)} ${circ.toFixed(2)}`}
               strokeDashoffset={0}
-              style={{ filter: "drop-shadow(0 0 3px #ff174444)", transition: "stroke-dasharray 0.7s ease" }}
+              style={{ filter: "drop-shadow(0 0 3px var(--critical)44)", transition: "stroke-dasharray 0.7s ease" }}
             />
           )}
           {cacheLen > 0.1 && (
-            <circle cx="44" cy="44" r={r} fill="none" stroke="#2a2a2a" strokeWidth="9"
+            <circle cx="44" cy="44" r={r} fill="none" stroke="var(--settings-label)" strokeWidth="9"
               strokeDasharray={`${cacheLen.toFixed(2)} ${circ.toFixed(2)}`}
               strokeDashoffset={(-usedLen).toFixed(2)}
               style={{ transition: "stroke-dasharray 0.7s ease" }}
             />
           )}
           {freeLen > 0.1 && (
-            <circle cx="44" cy="44" r={r} fill="none" stroke="#00c853" strokeWidth="9"
+            <circle cx="44" cy="44" r={r} fill="none" stroke="var(--ok)" strokeWidth="9"
               strokeDasharray={`${freeLen.toFixed(2)} ${circ.toFixed(2)}`}
               strokeDashoffset={(-(usedLen + cacheLen)).toFixed(2)}
               style={{ filter: "drop-shadow(0 0 3px #00c85333)", transition: "stroke-dasharray 0.7s ease" }}
@@ -884,24 +884,24 @@ function ThreeSegmentDonut({ usedBytes, cacheBytes, freeBytes, totalBytes, du }:
           )}
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-xs font-medium tabular-nums" style={{ color: "#e4e4e4" }}>
+          <span className="text-xs font-medium tabular-nums" style={{ color: "var(--text-secondary)" }}>
             {total > 0 ? `${usedPct.toFixed(0)}%` : "—"}
           </span>
-          <span className="text-[9px]" style={{ color: "#333" }}>used</span>
+          <span className="text-[9px]" style={{ color: "var(--settings-text-dim)" }}>used</span>
         </div>
       </div>
       <div className="flex flex-col gap-1.5 w-full">
         {[
-          { label: "used",      color: "#ff1744", bytes: used  },
-          { label: "zfs cache", color: "#2a2a2a", bytes: cache },
-          { label: "free",      color: "#00c853", bytes: free  },
+          { label: "used",      color: "var(--critical)", bytes: used  },
+          { label: "zfs cache", color: "var(--settings-label)", bytes: cache },
+          { label: "free",      color: "var(--ok)", bytes: free  },
         ].map(({ label, color, bytes }) => (
           <div key={label} className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-sm shrink-0" style={{ background: color }} />
-              <span className="text-[10px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.4)" }}>{label}</span>
+              <span className="text-[10px] uppercase tracking-widest" style={{ color: "var(--text-label)" }}>{label}</span>
             </div>
-            <span className="text-[10px] tabular-nums font-medium" style={{ color: "rgba(255,255,255,0.65)" }}>
+            <span className="text-[10px] tabular-nums font-medium" style={{ color: "var(--text-muted)" }}>
               {fmtBytes(bytes, 1, du)}
             </span>
           </div>
@@ -917,8 +917,8 @@ function LabeledBar({ label, right, percent, color, gradient }: {
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex justify-between items-center">
-        <span className="text-[10px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.4)" }}>{label}</span>
-        <span className="text-xs font-medium tabular-nums" style={{ color: "rgba(255,255,255,0.65)" }}>{right}</span>
+        <span className="text-[10px] uppercase tracking-widest" style={{ color: "var(--text-label)" }}>{label}</span>
+        <span className="text-xs font-medium tabular-nums" style={{ color: "var(--text-muted)" }}>{right}</span>
       </div>
       <GaugeBar percent={percent} color={color} gradient={gradient} />
     </div>
@@ -974,8 +974,8 @@ function Card({
       }} />
       <div className="flex items-center gap-2 overflow-hidden px-[18px] pt-[18px] pb-0">
         {icon && <span style={{ color: accent, opacity: 0.7 }}>{icon}</span>}
-        <span className="text-[10px] uppercase shrink-0" style={{ color: "rgba(255,255,255,0.45)", letterSpacing: "0.12em" }}>{label}</span>
-        {subtitle && <span className="text-[10px] truncate" style={{ color: "rgba(255,255,255,0.3)" }}>{subtitle}</span>}
+        <span className="text-[10px] uppercase shrink-0" style={{ color: "var(--text-label)", letterSpacing: "0.12em" }}>{label}</span>
+        {subtitle && <span className="text-[10px] truncate" style={{ color: "var(--text-faint)" }}>{subtitle}</span>}
         {/* live status dot, color reflects alertLevel */}
         <span className="ml-auto w-1.5 h-1.5 rounded-full shrink-0" style={{
           background: alertLevel === "critical" ? "#ef4444" : alertLevel === "warning" ? "#f59e0b" : "#10b981",
@@ -984,7 +984,7 @@ function Card({
                                                : "0 0 5px #10b98166",
           animation: "pulseDot 2s ease-in-out infinite",
         }} />
-        <span className="text-[9px]" style={{ color: "rgba(255,255,255,0.15)" }}>{externalLink ? "↗" : expanded ? "▲" : "▼"}</span>
+        <span className="text-[9px]" style={{ color: "var(--text-hidden)" }}>{externalLink ? "↗" : expanded ? "▲" : "▼"}</span>
       </div>
       <div className="px-[18px] pt-3 pb-[18px] flex flex-col gap-4">
         {children}
@@ -1004,8 +1004,8 @@ function StatusBanner({ result, visible }: { result: HealthResult; visible: bool
           height: 36, opacity: visible ? 1 : 0, transition: "opacity 0.4s ease",
         }}>
         <span className="block shrink-0 w-1.5 h-1.5 rounded-full"
-          style={{ background: "#f59e0b", boxShadow: "0 0 6px #f59e0b66", animation: "pulseDot 2s ease-in-out infinite" }} />
-        <span className="text-[10px] tracking-[0.2em] font-semibold uppercase" style={{ color: "#f59e0b" }}>WARNING</span>
+          style={{ background: "var(--warn)", boxShadow: "0 0 6px #f59e0b66", animation: "pulseDot 2s ease-in-out infinite" }} />
+        <span className="text-[10px] tracking-[0.2em] font-semibold uppercase" style={{ color: "var(--warn)" }}>WARNING</span>
         {reason && <span className="text-[10px]" style={{ color: "rgba(245,158,11,0.7)" }}>· {reason}</span>}
       </div>
     );
@@ -1018,10 +1018,10 @@ function StatusBanner({ result, visible }: { result: HealthResult; visible: bool
           background: "rgba(239,68,68,0.07)", border: "1px solid rgba(239,68,68,0.25)",
           height: 48, opacity: visible ? 1 : 0, transition: "opacity 0.4s ease",
         }}>
-        <span className="text-sm font-bold leading-none" style={{ color: "#ef4444" }}>✕</span>
+        <span className="text-sm font-bold leading-none" style={{ color: "var(--critical)" }}>✕</span>
         <span className="block shrink-0 w-1.5 h-1.5 rounded-full"
-          style={{ background: "#ef4444", boxShadow: "0 0 8px #ef444466", animation: "pulseDot 2s ease-in-out infinite" }} />
-        <span className="text-[10px] tracking-[0.2em] font-semibold uppercase" style={{ color: "#ef4444" }}>CRITICAL</span>
+          style={{ background: "var(--critical)", boxShadow: "0 0 8px #ef444466", animation: "pulseDot 2s ease-in-out infinite" }} />
+        <span className="text-[10px] tracking-[0.2em] font-semibold uppercase" style={{ color: "var(--critical)" }}>CRITICAL</span>
         {reason && <span className="text-[10px]" style={{ color: "rgba(239,68,68,0.7)" }}>· {reason}</span>}
       </div>
     );
@@ -1049,7 +1049,7 @@ function BigValue({ value, loading }: { value: string; loading?: boolean }) {
     <span
       key={renderKey}
       className="text-3xl font-medium tracking-tight"
-      style={{ color: "#ffffff", display: "inline-block", animation: renderKey > 0 ? "valueIn 0.35s ease-out forwards" : "none" }}
+      style={{ color: "var(--text)", display: "inline-block", animation: renderKey > 0 ? "valueIn 0.35s ease-out forwards" : "none" }}
     >
       {value}
     </span>
@@ -1059,7 +1059,7 @@ function BigValue({ value, loading }: { value: string; loading?: boolean }) {
 function SubRow({ label, value, valueColor }: { label: string; value: string; valueColor?: string }) {
   return (
     <div className="flex justify-between items-center">
-      <span className="text-xs" style={{ color: "rgba(255,255,255,0.4)" }}>{label}</span>
+      <span className="text-xs" style={{ color: "var(--text-label)" }}>{label}</span>
       <span className="text-xs font-medium tabular-nums" style={{ color: valueColor ?? "rgba(255,255,255,0.65)" }}>{value}</span>
     </div>
   );
@@ -1068,8 +1068,8 @@ function SubRow({ label, value, valueColor }: { label: string; value: string; va
 function StatRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between items-center py-0.5">
-      <span className="text-[10px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.4)" }}>{label}</span>
-      <span className="text-[10px] tabular-nums font-medium" style={{ color: "rgba(255,255,255,0.65)" }}>{value}</span>
+      <span className="text-[10px] uppercase tracking-widest" style={{ color: "var(--text-label)" }}>{label}</span>
+      <span className="text-[10px] tabular-nums font-medium" style={{ color: "var(--text-muted)" }}>{value}</span>
     </div>
   );
 }
@@ -1128,11 +1128,11 @@ function SearchBar({ inputRef, engine }: { inputRef: React.RefObject<HTMLInputEl
       <div
         style={{
           display: "flex", alignItems: "center", gap: 10,
-          background: "rgba(255,255,255,0.05)",
-          border: `1px solid ${focused ? "rgba(6,182,212,0.5)" : "rgba(255,255,255,0.12)"}`,
+          background: "var(--surface-bright)",
+          border: `1px solid ${focused ? "var(--brand-glow)" : "rgba(255,255,255,0.12)"}`,
           borderRadius: 999, padding: "10px 20px",
           backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)",
-          boxShadow: focused ? "0 0 0 3px rgba(6,182,212,0.15)" : "none",
+          boxShadow: focused ? "0 0 0 3px var(--brand-glow)" : "none",
           transform: focused ? "scale(1.01)" : "scale(1)",
           transition: "border-color 0.2s, box-shadow 0.2s, transform 0.2s",
         }}
@@ -1149,12 +1149,12 @@ function SearchBar({ inputRef, engine }: { inputRef: React.RefObject<HTMLInputEl
           onBlur={() => setFocused(false)}
           style={{
             flex: 1, background: "none", border: "none", outline: "none",
-            fontSize: 14, color: "#ffffff", fontFamily: "inherit",
-            caretColor: "#06b6d4",
+            fontSize: 14, color: "var(--text)", fontFamily: "inherit",
+            caretColor: "var(--brand)",
           }}
         />
         <button onClick={doSearch}
-          style={{ background: "none", border: "none", cursor: "pointer", padding: 2, color: "rgba(255,255,255,0.3)", display: "flex", transition: "color 0.15s" }}
+          style={{ background: "none", border: "none", cursor: "pointer", padding: 2, color: "var(--text-faint)", display: "flex", transition: "color 0.15s" }}
           onMouseEnter={e => (e.currentTarget.style.color = "rgba(255,255,255,0.7)")}
           onMouseLeave={e => (e.currentTarget.style.color = "rgba(255,255,255,0.3)")}
         >
@@ -1182,26 +1182,26 @@ function SettingsPanel({ settings, onUpdate, onClose, services }: {
       <div className="fixed inset-0 z-40" style={{ background: "rgba(0,0,0,0.5)" }} onClick={onClose} />
       <div
         className="fixed top-0 right-0 h-full z-50 flex flex-col gap-5 p-6 overflow-y-auto"
-        style={{ width: 272, background: "#0e0e0e", borderLeft: "1px solid #1a1a1a", boxShadow: "-12px 0 40px rgba(0,0,0,0.7)" }}
+        style={{ width: 272, background: "var(--settings-bg)", borderLeft: "1px solid var(--settings-border)", boxShadow: "-12px 0 40px rgba(0,0,0,0.7)" }}
       >
         <div className="flex items-center justify-between mb-1">
-          <span className="text-[10px] tracking-widest uppercase" style={{ color: "#444" }}>Settings</span>
-          <button onClick={onClose} style={{ color: "#333", background: "none", border: "none", cursor: "pointer", fontSize: 12 }}>✕</button>
+          <span className="text-[10px] tracking-widest uppercase" style={{ color: "var(--settings-text)" }}>Settings</span>
+          <button onClick={onClose} style={{ color: "var(--settings-text-dim)", background: "none", border: "none", cursor: "pointer", fontSize: 12 }}>✕</button>
         </div>
 
         {[
           { title: "Refresh", options: [3, 5, 10, 30], key: "refreshInterval" as const, fmt: (v: number) => `${v}s` },
         ].map(({ title, options, key, fmt }) => (
           <div key={key} className="flex flex-col gap-2">
-            <span className="text-[10px] uppercase tracking-widest" style={{ color: "#2e2e2e" }}>{title}</span>
+            <span className="text-[10px] uppercase tracking-widest" style={{ color: "var(--settings-label)" }}>{title}</span>
             <div className="flex gap-1.5">
               {options.map(o => (
                 <button key={o} onClick={() => onUpdate({ ...settings, [key]: o })}
                   className="flex-1 py-1.5 rounded text-[10px] font-medium transition-all duration-150"
                   style={{
-                    background: settings[key] === o ? "#00e5ff14" : "#161616",
-                    border: `1px solid ${settings[key] === o ? "#00e5ff33" : "#1e1e1e"}`,
-                    color: settings[key] === o ? "#00e5ff" : "#444", cursor: "pointer",
+                    background: settings[key] === o ? "var(--settings-active-bg)" : "#161616",
+                    border: `1px solid ${settings[key] === o ? "var(--settings-active-border)" : "#1e1e1e"}`,
+                    color: settings[key] === o ? "var(--settings-active)" : "#444", cursor: "pointer",
                   }}
                 >{fmt(o)}</button>
               ))}
@@ -1210,15 +1210,15 @@ function SettingsPanel({ settings, onUpdate, onClose, services }: {
         ))}
 
         <div className="flex flex-col gap-2">
-          <span className="text-[10px] uppercase tracking-widest" style={{ color: "#2e2e2e" }}>Temperature</span>
+          <span className="text-[10px] uppercase tracking-widest" style={{ color: "var(--settings-label)" }}>Temperature</span>
           <div className="flex gap-1.5">
             {(["C", "F"] as TempUnit[]).map(u => (
               <button key={u} onClick={() => onUpdate({ ...settings, tempUnit: u })}
                 className="flex-1 py-1.5 rounded text-[10px] font-medium transition-all duration-150"
                 style={{
-                  background: settings.tempUnit === u ? "#00e5ff14" : "#161616",
-                  border: `1px solid ${settings.tempUnit === u ? "#00e5ff33" : "#1e1e1e"}`,
-                  color: settings.tempUnit === u ? "#00e5ff" : "#444", cursor: "pointer",
+                  background: settings.tempUnit === u ? "var(--settings-active-bg)" : "#161616",
+                  border: `1px solid ${settings.tempUnit === u ? "var(--settings-active-border)" : "#1e1e1e"}`,
+                  color: settings.tempUnit === u ? "var(--settings-active)" : "#444", cursor: "pointer",
                 }}
               >°{u}</button>
             ))}
@@ -1226,15 +1226,15 @@ function SettingsPanel({ settings, onUpdate, onClose, services }: {
         </div>
 
         <div className="flex flex-col gap-2">
-          <span className="text-[10px] uppercase tracking-widest" style={{ color: "#2e2e2e" }}>Data Units</span>
+          <span className="text-[10px] uppercase tracking-widest" style={{ color: "var(--settings-label)" }}>Data Units</span>
           <div className="flex gap-1.5">
             {(["decimal", "binary"] as DataUnit[]).map(u => (
               <button key={u} onClick={() => onUpdate({ ...settings, dataUnit: u })}
                 className="flex-1 py-1.5 rounded text-[10px] font-medium transition-all duration-150"
                 style={{
-                  background: settings.dataUnit === u ? "#00e5ff14" : "#161616",
-                  border: `1px solid ${settings.dataUnit === u ? "#00e5ff33" : "#1e1e1e"}`,
-                  color: settings.dataUnit === u ? "#00e5ff" : "#444", cursor: "pointer",
+                  background: settings.dataUnit === u ? "var(--settings-active-bg)" : "#161616",
+                  border: `1px solid ${settings.dataUnit === u ? "var(--settings-active-border)" : "#1e1e1e"}`,
+                  color: settings.dataUnit === u ? "var(--settings-active)" : "#444", cursor: "pointer",
                 }}
               >{u === "decimal" ? "GB" : "GiB"}</button>
             ))}
@@ -1242,15 +1242,15 @@ function SettingsPanel({ settings, onUpdate, onClose, services }: {
         </div>
 
         <div className="flex flex-col gap-2">
-          <span className="text-[10px] uppercase tracking-widest" style={{ color: "#2e2e2e" }}>Search Engine</span>
+          <span className="text-[10px] uppercase tracking-widest" style={{ color: "var(--settings-label)" }}>Search Engine</span>
           <div className="flex gap-1.5 flex-wrap">
             {(["google", "bing", "duckduckgo", "kagi"] as SearchEngine[]).map(e => (
               <button key={e} onClick={() => onUpdate({ ...settings, searchEngine: e })}
                 className="flex-1 py-1.5 rounded text-[10px] font-medium transition-all duration-150 flex items-center justify-center gap-1"
                 style={{
-                  background: settings.searchEngine === e ? "#00e5ff14" : "#161616",
-                  border: `1px solid ${settings.searchEngine === e ? "#00e5ff33" : "#1e1e1e"}`,
-                  color: settings.searchEngine === e ? "#00e5ff" : "#444", cursor: "pointer",
+                  background: settings.searchEngine === e ? "var(--settings-active-bg)" : "#161616",
+                  border: `1px solid ${settings.searchEngine === e ? "var(--settings-active-border)" : "#1e1e1e"}`,
+                  color: settings.searchEngine === e ? "var(--settings-active)" : "#444", cursor: "pointer",
                   minWidth: 0, padding: "6px 4px",
                 }}
               >
@@ -1262,13 +1262,13 @@ function SettingsPanel({ settings, onUpdate, onClose, services }: {
         </div>
 
         <div className="flex flex-col gap-2">
-          <span className="text-[10px] uppercase tracking-widest" style={{ color: "#2e2e2e" }}>Timezone</span>
+          <span className="text-[10px] uppercase tracking-widest" style={{ color: "var(--settings-label)" }}>Timezone</span>
           <select
             value={settings.timezone}
             onChange={e => onUpdate({ ...settings, timezone: e.target.value })}
             style={{
-              background: "#161616", border: "1px solid #1e1e1e", borderRadius: 6,
-              padding: "6px 8px", fontSize: 10, color: settings.timezone ? "#00e5ff" : "#444",
+              background: "var(--settings-input)", border: "1px solid var(--settings-input-border)", borderRadius: 6,
+              padding: "6px 8px", fontSize: 10, color: settings.timezone ? "var(--settings-active)" : "#444",
               cursor: "pointer", outline: "none", width: "100%",
             }}
           >
@@ -1293,15 +1293,15 @@ function SettingsPanel({ settings, onUpdate, onClose, services }: {
         </div>
 
         <div className="flex flex-col gap-2">
-          <span className="text-[10px] uppercase tracking-widest" style={{ color: "#2e2e2e" }}>Visible Cards</span>
+          <span className="text-[10px] uppercase tracking-widest" style={{ color: "var(--settings-label)" }}>Visible Cards</span>
           {CARD_KEYS.map(c => {
             const on = settings.visibleCards[c] !== false;
             return (
               <label key={c} className="flex items-center gap-3 cursor-pointer" onClick={() => onUpdate({ ...settings, visibleCards: { ...settings.visibleCards, [c]: !on } })}>
                 <div className="relative w-7 h-4 rounded-full transition-all duration-200"
-                  style={{ background: on ? "#00e5ff22" : "#161616", border: `1px solid ${on ? "#00e5ff44" : "#1e1e1e"}` }}>
+                  style={{ background: on ? "var(--settings-active-bg-dim)" : "#161616", border: `1px solid ${on ? "var(--settings-active-border)" : "#1e1e1e"}` }}>
                   <div className="absolute top-0.5 w-3 h-3 rounded-full transition-all duration-200"
-                    style={{ left: on ? "calc(100% - 14px)" : "2px", background: on ? "#00e5ff" : "#2a2a2a" }} />
+                    style={{ left: on ? "calc(100% - 14px)" : "2px", background: on ? "var(--settings-active)" : "#2a2a2a" }} />
                 </div>
                 <span className="text-[10px] uppercase tracking-widest" style={{ color: on ? "#555" : "#2e2e2e" }}>{c}</span>
               </label>
@@ -1314,7 +1314,7 @@ function SettingsPanel({ settings, onUpdate, onClose, services }: {
             configured service shows "—". */}
         {services && services.length > 0 && (
           <div className="flex flex-col gap-2">
-            <span className="text-[10px] uppercase tracking-widest" style={{ color: "#2e2e2e" }}>Connections</span>
+            <span className="text-[10px] uppercase tracking-widest" style={{ color: "var(--settings-label)" }}>Connections</span>
             <div className="flex flex-col gap-1">
               {services.map(s => {
                 const configured = s.configured !== false;
@@ -1341,18 +1341,18 @@ function SettingsPanel({ settings, onUpdate, onClose, services }: {
               if (missing.length === 0) return null;
               const envVars = Array.from(new Set(missing.flatMap(s => s.envVar ?? [])));
               return (
-                <div style={{ marginTop: 6, padding: "8px 10px", background: "#0e1318", borderRadius: 6, border: "1px solid #1a1f26" }}>
-                  <div className="text-[9px] uppercase tracking-widest" style={{ color: "#3a4a5a", marginBottom: 4 }}>
+                <div style={{ marginTop: 6, padding: "8px 10px", background: "var(--settings-bg)", borderRadius: 6, border: "1px solid var(--settings-border)" }}>
+                  <div className="text-[9px] uppercase tracking-widest" style={{ color: "var(--settings-label)", marginBottom: 4 }}>
                     Missing env vars
                   </div>
                   <div className="flex flex-col gap-0.5">
                     {envVars.map(v => (
-                      <code key={v} className="text-[10px] font-mono" style={{ color: "#06b6d4" }}>{v}</code>
+                      <code key={v} className="text-[10px] font-mono" style={{ color: "var(--brand)" }}>{v}</code>
                     ))}
                   </div>
-                  <div className="text-[9px]" style={{ color: "#3a4a5a", marginTop: 6, lineHeight: 1.5 }}>
-                    Set these via <code style={{ color: "#5a6a7a" }}>docker run -e</code> or in your{" "}
-                    <code style={{ color: "#5a6a7a" }}>docker-compose.yml</code>.
+                  <div className="text-[9px]" style={{ color: "var(--settings-label)", marginTop: 6, lineHeight: 1.5 }}>
+                    Set these via <code style={{ color: "var(--settings-text)" }}>docker run -e</code> or in your{" "}
+                    <code style={{ color: "var(--settings-text)" }}>docker-compose.yml</code>.
                   </div>
                 </div>
               );
@@ -1360,8 +1360,8 @@ function SettingsPanel({ settings, onUpdate, onClose, services }: {
           </div>
         )}
 
-        <div style={{ height: 1, background: "#161616", marginTop: "auto" }} />
-        <span className="text-[9px] text-center" style={{ color: "#1e1e1e" }}>resets on page reload</span>
+        <div style={{ height: 1, background: "var(--settings-input)", marginTop: "auto" }} />
+        <span className="text-[9px] text-center" style={{ color: "var(--settings-input-border)" }}>resets on page reload</span>
       </div>
     </>
   );
@@ -1418,21 +1418,21 @@ function MikrotikTab({ mikrotikUrl }: { mikrotikUrl: string }) {
   }, []);
 
   const pill = (label: string, value: string, pctVal?: number, tempVal?: number | null) => {
-    const tempColor = tempVal == null ? null : tempVal > 80 ? "#ff1744" : tempVal > 60 ? "#ff9100" : "#00e676";
+    const tempColor = tempVal == null ? null : tempVal > 80 ? "var(--critical)" : tempVal > 60 ? "var(--warn)" : "var(--ok)";
     return (
       <div key={label} className="flex items-center gap-2 shrink-0">
-        <span style={{ color: "rgba(255,255,255,0.45)", fontSize: 10 }}>{label}</span>
+        <span style={{ color: "var(--text-label)", fontSize: 10 }}>{label}</span>
         <span style={{ color: tempColor ?? "rgba(255,255,255,0.9)", fontSize: 11, fontVariantNumeric: "tabular-nums" }}>{value}</span>
         {pctVal != null && (
-          <div style={{ width: 36, height: 3, background: "rgba(255,255,255,0.1)", borderRadius: 2, overflow: "hidden" }}>
-            <div style={{ width: `${pctVal}%`, height: "100%", background: pctVal > 85 ? "#ff1744" : pctVal > 65 ? "#ff9100" : "#00e5ff", borderRadius: 2 }} />
+          <div style={{ width: 36, height: 3, background: "var(--border-mid)", borderRadius: 2, overflow: "hidden" }}>
+            <div style={{ width: `${pctVal}%`, height: "100%", background: pctVal > 85 ? "var(--critical)" : pctVal > 65 ? "var(--warn)" : "var(--settings-active)", borderRadius: 2 }} />
           </div>
         )}
       </div>
     );
   };
 
-  const sep = () => <span style={{ color: "rgba(255,255,255,0.1)", fontSize: 14, userSelect: "none" }}>|</span>;
+  const sep = () => <span style={{ color: "var(--text-hidden)", fontSize: 14, userSelect: "none" }}>|</span>;
 
   const fmtMtBytes = (b: number | null) => {
     if (b == null) return "—";
@@ -1441,11 +1441,11 @@ function MikrotikTab({ mikrotikUrl }: { mikrotikUrl: string }) {
     return `${(b / 1e9).toFixed(1)} GB`;
   };
 
-  const staticSep = () => <span style={{ color: "rgba(255,255,255,0.12)", fontSize: 14, userSelect: "none", flexShrink: 0 }}>|</span>;
+  const staticSep = () => <span style={{ color: "var(--text-hidden)", fontSize: 14, userSelect: "none", flexShrink: 0 }}>|</span>;
   const staticPill = (label: string, value: string) => (
     <div className="flex items-center gap-1.5 shrink-0">
-      <span style={{ color: "rgba(255,255,255,0.4)", fontSize: 10 }}>{label}</span>
-      <span style={{ color: "rgba(255,255,255,0.85)", fontSize: 11, fontVariantNumeric: "tabular-nums" }}>{value}</span>
+      <span style={{ color: "var(--text-label)", fontSize: 10 }}>{label}</span>
+      <span style={{ color: "var(--text-secondary)", fontSize: 11, fontVariantNumeric: "tabular-nums" }}>{value}</span>
     </div>
   );
 
@@ -1454,24 +1454,24 @@ function MikrotikTab({ mikrotikUrl }: { mikrotikUrl: string }) {
       <a href={mikrotikUrl} target="_blank" rel="noopener noreferrer"
         className="flex items-center gap-4 w-full overflow-x-auto"
         style={{
-          background: "rgba(15,18,30,0.9)", border: "1px solid rgba(255,255,255,0.08)",
+          background: "var(--mt-bg)", border: "1px solid var(--border)",
           borderRadius: 10, padding: "12px 20px",
           textDecoration: "none", cursor: "pointer",
           transition: "border-color 0.2s, background 0.2s",
         }}
-        onMouseEnter={e => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.15)"; e.currentTarget.style.background = "rgba(20,24,40,0.95)"; }}
-        onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)"; e.currentTarget.style.background = "rgba(15,18,30,0.9)"; }}
+        onMouseEnter={e => { e.currentTarget.style.borderColor = "var(--border-hover)"; e.currentTarget.style.background = "var(--mt-bg-hover)"; }}
+        onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.background = "var(--mt-bg)"; }}
       >
         <div className="flex items-center gap-2 shrink-0">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#06b6d4" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ stroke: "var(--brand)" }} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
             <rect x="1" y="9" width="22" height="7" rx="2"/>
             <line x1="5" y1="9" x2="5" y2="16"/><line x1="9" y1="9" x2="9" y2="16"/>
-            <circle cx="16.5" cy="12.5" r="1" fill="#06b6d4" stroke="none"/>
-            <circle cx="19.5" cy="12.5" r="1" fill="#06b6d4" stroke="none"/>
+            <circle cx="16.5" cy="12.5" r="1" style={{ fill: "var(--brand)" }} stroke="none"/>
+            <circle cx="19.5" cy="12.5" r="1" style={{ fill: "var(--brand)" }} stroke="none"/>
             <line x1="7" y1="5" x2="7" y2="9"/><line x1="12" y1="3" x2="12" y2="9"/><line x1="17" y1="5" x2="17" y2="9"/>
           </svg>
-          <span style={{ color: "#ffffff", fontWeight: 700, fontSize: 14 }}>MikroTik</span>
-          <span style={{ color: "rgba(255,255,255,0.45)", fontSize: 11 }}>hAP ax³</span>
+          <span style={{ color: "var(--text)", fontWeight: 700, fontSize: 14 }}>MikroTik</span>
+          <span style={{ color: "var(--text-label)", fontSize: 11 }}>hAP ax³</span>
         </div>
         {staticSep()}
         {staticPill("RouterOS", "7.22.1")}
@@ -1483,7 +1483,7 @@ function MikrotikTab({ mikrotikUrl }: { mikrotikUrl: string }) {
         {staticPill("RAM", "—")}
         {staticSep()}
         {staticPill("Uptime", "13d 4h")}
-        <span style={{ color: "rgba(255,255,255,0.2)", fontSize: 10, marginLeft: "auto", flexShrink: 0 }}>tap to open ↗</span>
+        <span style={{ color: "var(--text-ghost)", fontSize: 10, marginLeft: "auto", flexShrink: 0 }}>tap to open ↗</span>
       </a>
     );
   }
@@ -1496,22 +1496,22 @@ function MikrotikTab({ mikrotikUrl }: { mikrotikUrl: string }) {
     <a href={mikrotikUrl} target="_blank" rel="noopener noreferrer"
       className="flex items-center gap-4 w-full overflow-x-auto"
       style={{
-        background: "rgba(15,18,30,0.9)", border: "1px solid rgba(255,255,255,0.08)",
+        background: "var(--mt-bg)", border: "1px solid var(--border)",
         borderRadius: 10, padding: "12px 20px", textDecoration: "none", cursor: "pointer",
         transition: "border-color 0.2s, background 0.2s",
       }}
-      onMouseEnter={e => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.15)"; e.currentTarget.style.background = "rgba(20,24,40,0.95)"; }}
-      onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)"; e.currentTarget.style.background = "rgba(15,18,30,0.9)"; }}
+      onMouseEnter={e => { e.currentTarget.style.borderColor = "var(--border-hover)"; e.currentTarget.style.background = "var(--mt-bg-hover)"; }}
+      onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.background = "var(--mt-bg)"; }}
     >
       <div className="flex items-center gap-2 shrink-0">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#06b6d4" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ stroke: "var(--brand)" }} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
           <rect x="1" y="9" width="22" height="7" rx="2"/>
           <line x1="5" y1="9" x2="5" y2="16"/><line x1="9" y1="9" x2="9" y2="16"/>
-          <circle cx="16.5" cy="12.5" r="1" fill="#06b6d4" stroke="none"/>
-          <circle cx="19.5" cy="12.5" r="1" fill="#06b6d4" stroke="none"/>
+          <circle cx="16.5" cy="12.5" r="1" style={{ fill: "var(--brand)" }} stroke="none"/>
+          <circle cx="19.5" cy="12.5" r="1" style={{ fill: "var(--brand)" }} stroke="none"/>
           <line x1="7" y1="5" x2="7" y2="9"/><line x1="12" y1="3" x2="12" y2="9"/><line x1="17" y1="5" x2="17" y2="9"/>
         </svg>
-        <span style={{ color: "#ffffff", fontWeight: 700, fontSize: 14 }}>MikroTik</span>
+        <span style={{ color: "var(--text)", fontWeight: 700, fontSize: 14 }}>MikroTik</span>
       </div>
       {sep()}
       {data.board && pill("Model", data.board)}
@@ -1521,7 +1521,7 @@ function MikrotikTab({ mikrotikUrl }: { mikrotikUrl: string }) {
       {data.hddTotal != null && <>{sep()}{pill("Storage", `${fmtMtBytes(data.hddUsed)} / ${fmtMtBytes(data.hddTotal)}`, hddPct)}</>}
       {data.uptime && <>{sep()}{pill("Uptime", data.uptime)}</>}
       {data.temp != null && <>{sep()}{pill("Temp", `${data.temp}°C`, undefined, data.temp)}</>}
-      <span style={{ color: "rgba(255,255,255,0.2)", fontSize: 10, marginLeft: "auto", flexShrink: 0 }}>tap to open ↗</span>
+      <span style={{ color: "var(--text-ghost)", fontSize: 10, marginLeft: "auto", flexShrink: 0 }}>tap to open ↗</span>
     </a>
   );
 }
@@ -1533,23 +1533,23 @@ function GrafanaCard({ baseUrl, panelUrl }: { baseUrl: string; panelUrl: string 
 
   return (
     <div style={{
-      background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
+      background: "var(--card)", border: "1px solid var(--border)",
       borderRadius: 14, padding: 18, backdropFilter: "blur(6px)",
       display: "flex", flexDirection: "column", gap: 12,
     }}>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span style={{ color: "#f97316" }}><IconGrafana /></span>
-          <span className="text-[10px] uppercase tracking-widest font-semibold" style={{ color: "rgba(255,255,255,0.45)", letterSpacing: "0.15em" }}>grafana</span>
+          <span style={{ color: "var(--accent-grafana)" }}><IconGrafana /></span>
+          <span className="text-[10px] uppercase tracking-widest font-semibold" style={{ color: "var(--text-label)", letterSpacing: "0.15em" }}>grafana</span>
           {panelUrl && !loaded && (
-            <span className="text-[9px]" style={{ color: "rgba(255,255,255,0.2)" }}>loading…</span>
+            <span className="text-[9px]" style={{ color: "var(--text-ghost)" }}>loading…</span>
           )}
         </div>
         <a href={baseUrl} target="_blank" rel="noopener noreferrer"
           className="text-[10px]"
-          style={{ color: "rgba(255,255,255,0.3)", textDecoration: "none", transition: "color 0.15s" }}
-          onMouseEnter={e => (e.currentTarget.style.color = "#f97316")}
+          style={{ color: "var(--text-faint)", textDecoration: "none", transition: "color 0.15s" }}
+          onMouseEnter={e => (e.currentTarget.style.color = "var(--accent-grafana)")}
           onMouseLeave={e => (e.currentTarget.style.color = "rgba(255,255,255,0.3)")}>
           open grafana ↗
         </a>
@@ -1559,16 +1559,16 @@ function GrafanaCard({ baseUrl, panelUrl }: { baseUrl: string; panelUrl: string 
       {!panelUrl ? (
         <div style={{
           position: "relative", height: 220, borderRadius: 8,
-          background: "rgba(255,255,255,0.02)",
-          border: "1px dashed rgba(255,255,255,0.08)",
+          background: "var(--surface-dim)",
+          border: "1px dashed var(--border)",
           display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6,
           padding: 18, textAlign: "center",
         }}>
-          <span className="text-[11px]" style={{ color: "rgba(255,255,255,0.4)" }}>
+          <span className="text-[11px]" style={{ color: "var(--text-label)" }}>
             Grafana embed not configured.
           </span>
-          <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.25)", maxWidth: 360, lineHeight: 1.5 }}>
-            Set <code style={{ color: "rgba(249,115,22,0.85)" }}>GRAFANA_DASHBOARD_UID</code> and <code style={{ color: "rgba(249,115,22,0.85)" }}>GRAFANA_DATASOURCE_UID</code> env vars to render a panel here.
+          <span className="text-[10px]" style={{ color: "var(--text-ghost)", maxWidth: 360, lineHeight: 1.5 }}>
+            Set <code style={{ color: "var(--accent-grafana)" }}>GRAFANA_DASHBOARD_UID</code> and <code style={{ color: "var(--accent-grafana)" }}>GRAFANA_DATASOURCE_UID</code> env vars to render a panel here.
           </span>
         </div>
       ) : (
@@ -1576,10 +1576,10 @@ function GrafanaCard({ baseUrl, panelUrl }: { baseUrl: string; panelUrl: string 
         {!loaded && (
           <div style={{
             position: "absolute", inset: 0, borderRadius: 8,
-            background: "rgba(255,255,255,0.03)",
+            background: "var(--card-alt)",
             display: "flex", alignItems: "center", justifyContent: "center",
           }}>
-            <span className="text-[11px]" style={{ color: "rgba(255,255,255,0.2)" }}>loading panel…</span>
+            <span className="text-[11px]" style={{ color: "var(--text-ghost)" }}>loading panel…</span>
           </div>
         )}
         <iframe
@@ -1625,19 +1625,19 @@ function ActivityEventPill({ ev }: { ev: ActivityEvent }) {
         color, fontSize: 9, fontWeight: 700,
         textTransform: "uppercase", letterSpacing: "0.1em",
       }}>{ev.source}</span>
-      <span style={{ color: "rgba(255,255,255,0.35)", fontSize: 10 }}>{verb}</span>
+      <span style={{ color: "var(--text-faint)", fontSize: 10 }}>{verb}</span>
       <span style={{
-        color: "rgba(255,255,255,0.85)", fontSize: 11, fontWeight: 500,
+        color: "var(--text-secondary)", fontSize: 11, fontWeight: 500,
         maxWidth: 280, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
       }}>{ev.title}</span>
       {ev.subtitle && (
         <span style={{
-          color: "rgba(255,255,255,0.32)", fontSize: 10,
+          color: "var(--text-faint)", fontSize: 10,
           maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
         }}>· {ev.subtitle}</span>
       )}
       <span style={{
-        color: "rgba(255,255,255,0.25)", fontSize: 9,
+        color: "var(--text-ghost)", fontSize: 9,
         fontVariantNumeric: "tabular-nums",
       }}>· {relativeAgo(ev.timestamp)}</span>
     </span>
@@ -1656,11 +1656,11 @@ function ActivityFeed({ events, loading }: { events: ActivityEvent[]; loading: b
   if (loading && events.length === 0) {
     return (
       <div style={{
-        height: 36, background: "rgba(255,255,255,0.02)",
-        border: "1px solid rgba(255,255,255,0.06)", borderRadius: 10,
+        height: 36, background: "var(--surface-dim)",
+        border: "1px solid var(--border-dim)", borderRadius: 10,
         display: "flex", alignItems: "center", padding: "0 14px",
       }}>
-        <span className="text-[10px] uppercase" style={{ color: "rgba(255,255,255,0.25)", letterSpacing: "0.18em" }}>
+        <span className="text-[10px] uppercase" style={{ color: "var(--text-ghost)", letterSpacing: "0.18em" }}>
           loading activity…
         </span>
       </div>
@@ -1679,18 +1679,18 @@ function ActivityFeed({ events, loading }: { events: ActivityEvent[]; loading: b
       onMouseLeave={() => setHov(false)}
       style={{
         height: 36,
-        background: "rgba(255,255,255,0.02)",
-        border: "1px solid rgba(255,255,255,0.06)",
+        background: "var(--surface-dim)",
+        border: "1px solid var(--border-dim)",
         borderRadius: 10,
       }}>
       {/* Section label, pinned left, sits above the scrolling content */}
       <div className="absolute inset-y-0 left-0 z-10 flex items-center pointer-events-none"
         style={{
           paddingLeft: 12, paddingRight: 18,
-          background: "linear-gradient(to right, rgba(10,12,18,1) 60%, transparent)",
+          background: "linear-gradient(to right, var(--fade-to) 60%, transparent)",
         }}>
         <span className="text-[9px] uppercase" style={{
-          color: "rgba(255,255,255,0.4)", letterSpacing: "0.22em", fontWeight: 700,
+          color: "var(--text-label)", letterSpacing: "0.22em", fontWeight: 700,
         }}>
           activity
         </span>
@@ -1708,7 +1708,7 @@ function ActivityFeed({ events, loading }: { events: ActivityEvent[]; loading: b
       </div>
       {/* Right-edge fade so titles don't hard-cut */}
       <div className="absolute inset-y-0 right-0 pointer-events-none"
-        style={{ width: 40, background: "linear-gradient(to left, rgba(10,12,18,1), transparent)" }} />
+        style={{ width: 40, background: "linear-gradient(to left, var(--fade-to), transparent)" }} />
     </div>
   );
 }
@@ -1987,8 +1987,8 @@ export default function Dashboard() {
       <div className="fixed top-0 left-0 right-0 z-50" style={{ height: 2 }}>
         <div style={{
           height: "100%",
-          background: "linear-gradient(90deg, #00e5ff, #00e676)",
-          boxShadow: "0 0 8px #00e5ff66",
+          background: "linear-gradient(90deg, var(--settings-active), var(--ok))",
+          boxShadow: "0 0 8px var(--settings-active)66",
           transition: refreshing ? "width 0.5s ease" : "width 0.8s ease, opacity 0.5s ease 0.3s",
           width: refreshing ? "80%" : loading ? "35%" : "100%",
           opacity: (refreshing || loading) ? 1 : 0,
@@ -1997,44 +1997,44 @@ export default function Dashboard() {
       {/* healthy state line — 2px cyan at very top */}
       {!loading && showHealth && health.status === "healthy" && mounted && (
         <div className="fixed top-0 left-0 right-0 z-40" style={{
-          height: 2, background: "#06b6d4", boxShadow: "0 0 8px rgba(6,182,212,0.5)",
+          height: 2, background: "var(--brand)", boxShadow: "0 0 8px rgba(6,182,212,0.5)",
         }} />
       )}
 
       {/* ── sticky frosted header ── */}
       <header className="fixed top-0 left-0 right-0 z-30" style={{
-        background: "rgba(10,12,20,0.9)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
-        borderBottom: "1px solid rgba(255,255,255,0.07)",
+        background: "var(--header-bg)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
+        borderBottom: "1px solid var(--border-subtle)",
       }}>
         <div className="max-w-5xl mx-auto px-6 py-2.5 flex items-center justify-between gap-4">
           {/* Left */}
           <div className="flex items-center gap-3 min-w-0">
             <span className="block w-2 h-2 rounded-full shrink-0"
-              style={{ background: "#10b981", boxShadow: "0 0 6px #10b98166", animation: "pulseDot 2s ease-in-out infinite", "--dot-color": "#10b981" } as React.CSSProperties} />
+              style={{ background: "var(--ok)", boxShadow: "0 0 6px #10b98166", animation: "pulseDot 2s ease-in-out infinite", "--dot-color": "#10b981" } as React.CSSProperties} />
             <Link href="/" className="flex items-center gap-2 shrink-0" style={{ textDecoration: "none" }}>
               {/* Minimalist ComExe brand mark — bare "CE" monogram, single-weight strokes, no fills. */}
               <svg width="22" height="22" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
-                <path d="M14 8 A 8 8 0 1 0 14 24" stroke="#06b6d4" strokeWidth="2.6" fill="none" strokeLinecap="round" />
-                <path d="M19 8 L25 8"   stroke="#06b6d4" strokeWidth="2.6" fill="none" strokeLinecap="round" />
-                <path d="M19 8 L19 24"  stroke="#06b6d4" strokeWidth="2.6" fill="none" strokeLinecap="round" />
-                <path d="M19 16 L24 16" stroke="#06b6d4" strokeWidth="2.6" fill="none" strokeLinecap="round" />
-                <path d="M19 24 L25 24" stroke="#06b6d4" strokeWidth="2.6" fill="none" strokeLinecap="round" />
+                <path d="M14 8 A 8 8 0 1 0 14 24" style={{ stroke: "var(--brand)" }} strokeWidth="2.6" fill="none" strokeLinecap="round" />
+                <path d="M19 8 L25 8"   style={{ stroke: "var(--brand)" }} strokeWidth="2.6" fill="none" strokeLinecap="round" />
+                <path d="M19 8 L19 24"  style={{ stroke: "var(--brand)" }} strokeWidth="2.6" fill="none" strokeLinecap="round" />
+                <path d="M19 16 L24 16" style={{ stroke: "var(--brand)" }} strokeWidth="2.6" fill="none" strokeLinecap="round" />
+                <path d="M19 24 L25 24" style={{ stroke: "var(--brand)" }} strokeWidth="2.6" fill="none" strokeLinecap="round" />
               </svg>
-              <h1 className="font-mono" style={{ fontSize: 18, fontWeight: 700, color: "#ffffff", letterSpacing: "-0.01em" }}>
-                Com<span style={{ color: "#06b6d4" }}>Exe</span>
+              <h1 className="font-mono" style={{ fontSize: 18, fontWeight: 700, color: "var(--text)", letterSpacing: "-0.01em" }}>
+                Com<span style={{ color: "var(--brand)" }}>Exe</span>
               </h1>
             </Link>
-            <span className="shrink-0" style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 6, padding: "3px 10px", fontSize: 11, color: "rgba(255,255,255,0.85)", letterSpacing: "0.04em" }}>
+            <span className="shrink-0" style={{ background: "var(--surface)", border: "1px solid var(--border-bright)", borderRadius: 6, padding: "3px 10px", fontSize: 11, color: "var(--text-secondary)", letterSpacing: "0.04em" }}>
               truenas · :30104
             </span>
             {metrics?.uptime != null && (
-              <span className="flex items-center gap-1.5 shrink-0" style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 6, padding: "3px 10px", fontSize: 11, color: "rgba(255,255,255,0.85)" }}>
+              <span className="flex items-center gap-1.5 shrink-0" style={{ background: "var(--surface)", border: "1px solid var(--border-bright)", borderRadius: 6, padding: "3px 10px", fontSize: 11, color: "var(--text-secondary)" }}>
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
                 </svg>
                 {fmtUptime(metrics.uptime)}
-                <span style={{ color: "rgba(255,255,255,0.3)" }}>·</span>
-                <span style={{ color: "rgba(255,255,255,0.45)", fontSize: 10 }}>{fmtSince(metrics.uptime)}</span>
+                <span style={{ color: "var(--text-faint)" }}>·</span>
+                <span style={{ color: "var(--text-label)", fontSize: 10 }}>{fmtSince(metrics.uptime)}</span>
               </span>
             )}
             {weather && (
@@ -2043,8 +2043,8 @@ export default function Dashboard() {
                   className="peer"
                   style={{
                     display: "inline-flex", alignItems: "center", gap: 4,
-                    background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)",
-                    borderRadius: 6, padding: "3px 10px", fontSize: 11, color: "rgba(255,255,255,0.85)",
+                    background: "var(--surface)", border: "1px solid var(--border-bright)",
+                    borderRadius: 6, padding: "3px 10px", fontSize: 11, color: "var(--text-secondary)",
                     cursor: weather.forecast?.length ? "default" : undefined,
                   }}
                 >
@@ -2060,24 +2060,24 @@ export default function Dashboard() {
                     className="absolute left-0 opacity-0 pointer-events-none peer-hover:opacity-100 peer-hover:pointer-events-auto hover:opacity-100 hover:pointer-events-auto"
                     style={{
                       top: "calc(100% + 6px)", zIndex: 50, minWidth: 200,
-                      background: "rgba(14,14,14,0.97)", border: "1px solid rgba(255,255,255,0.1)",
+                      background: "var(--settings-bg)", border: "1px solid var(--border-mid)",
                       borderRadius: 10, padding: "10px 12px",
                       backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
                       boxShadow: "0 8px 32px rgba(0,0,0,0.6)",
                       transition: "opacity 0.15s ease",
                     }}
                   >
-                    <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginBottom: 8, fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase" }}>3-Day Forecast</div>
+                    <div style={{ fontSize: 10, color: "var(--text-label)", marginBottom: 8, fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase" }}>3-Day Forecast</div>
                     <div className="flex flex-col gap-1.5">
                       {weather.forecast.map((d, i) => (
                         <div key={i} className="flex items-center justify-between gap-4" style={{ fontSize: 12 }}>
-                          <span style={{ color: "rgba(255,255,255,0.6)", minWidth: 28 }}>{d.date}</span>
+                          <span style={{ color: "var(--text-muted)", minWidth: 28 }}>{d.date}</span>
                           <span style={{ fontSize: 14 }}>{d.emoji}</span>
-                          <span className="flex-1" style={{ color: "rgba(255,255,255,0.4)", fontSize: 10 }}>{d.condition}</span>
-                          <span className="font-mono tabular-nums" style={{ color: "rgba(255,255,255,0.85)" }}>
+                          <span className="flex-1" style={{ color: "var(--text-label)", fontSize: 10 }}>{d.condition}</span>
+                          <span className="font-mono tabular-nums" style={{ color: "var(--text-secondary)" }}>
                             {tu === "F" ? `${Math.round(d.high * 9/5 + 32)}°` : `${d.high}°`}
                           </span>
-                          <span className="font-mono tabular-nums" style={{ color: "rgba(255,255,255,0.35)" }}>
+                          <span className="font-mono tabular-nums" style={{ color: "var(--text-faint)" }}>
                             {tu === "F" ? `${Math.round(d.low * 9/5 + 32)}°` : `${d.low}°`}
                           </span>
                         </div>
@@ -2092,12 +2092,12 @@ export default function Dashboard() {
           <div className="flex items-center gap-3 shrink-0">
             {clockDate && (
               <div className="flex flex-col items-end leading-tight">
-                <span style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", fontFamily: "inherit" }}>{clockDate}</span>
-                <span className="font-mono tabular-nums" style={{ fontSize: 13, color: "#ffffff", fontWeight: 600 }}>{clockTime}</span>
+                <span style={{ fontSize: 10, color: "var(--text-faint)", fontFamily: "inherit" }}>{clockDate}</span>
+                <span className="font-mono tabular-nums" style={{ fontSize: 13, color: "var(--text)", fontWeight: 600 }}>{clockTime}</span>
               </div>
             )}
             {error && (
-              <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 4, background: "rgba(239,68,68,0.1)", color: "#ef4444", border: "1px solid rgba(239,68,68,0.2)" }}>
+              <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 4, background: "rgba(239,68,68,0.1)", color: "var(--critical)", border: "1px solid rgba(239,68,68,0.2)" }}>
                 {error}
               </span>
             )}
@@ -2110,7 +2110,7 @@ export default function Dashboard() {
             <button
               title="Open TrueNAS"
               onClick={() => window.open("http://192.168.88.196", "_blank")}
-              style={{ color: "rgba(255,255,255,0.2)", background: "none", border: "none", cursor: "pointer", padding: 2, transition: "color 0.2s" }}
+              style={{ color: "var(--text-ghost)", background: "none", border: "none", cursor: "pointer", padding: 2, transition: "color 0.2s" }}
               onMouseEnter={e => (e.currentTarget.style.color = "#06b6d4")}
               onMouseLeave={e => (e.currentTarget.style.color = "rgba(255,255,255,0.2)")}
             ><IconTrueNAS /></button>
@@ -2125,8 +2125,8 @@ export default function Dashboard() {
       <main
         className="w-full min-h-screen"
         style={{
-          background: "#0a0c12",
-          backgroundImage: "radial-gradient(ellipse at 50% 0%, rgba(30,40,80,0.35) 0%, transparent 65%)",
+          background: "var(--bg)",
+          backgroundImage: "radial-gradient(ellipse at 50% 0%, var(--bg-gradient) 0%, transparent 65%)",
           fontFamily: "'Inter', system-ui, sans-serif",
           opacity: mounted ? 1 : 0,
           transition: "opacity 0.5s ease-out",
@@ -2159,13 +2159,13 @@ export default function Dashboard() {
                 borderRadius: 10,
                 padding: "10px 14px",
               }}>
-                <span style={{ color: "#06b6d4", fontSize: 14 }}>👋</span>
-                <span style={{ fontSize: 12, color: "rgba(255,255,255,0.85)", fontWeight: 500 }}>
+                <span style={{ color: "var(--brand)", fontSize: 14 }}>👋</span>
+                <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500 }}>
                   Welcome — {configuredCount === 0 ? "no services configured yet" : `only ${configuredCount} of ${totalCount} services configured`}.
                 </span>
-                <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
+                <span style={{ fontSize: 11, color: "var(--text-dim)" }}>
                   {missingCount === 1 ? "1 service is" : `${missingCount} services are`} missing config. Try the{" "}
-                  <a href="/setup" style={{ color: "#06b6d4", textDecoration: "underline", fontWeight: 600 }}>
+                  <a href="/setup" style={{ color: "var(--brand)", textDecoration: "underline", fontWeight: 600 }}>
                     setup wizard
                   </a>{" "}
                   to fill in URLs / API keys with live connection-testing, or check{" "}
@@ -2183,7 +2183,7 @@ export default function Dashboard() {
 
             {/* CPU */}
             {isVisible("cpu") && (
-              <Card label="cpu" accent="#06b6d4"
+              <Card label="cpu" accent="var(--accent-cpu)"
                 subtitle={!loading ? (metrics?.sysInfo?.cpuModel ?? undefined) : undefined}
                 alertLevel={cpuAlert} icon={<IconCPU />}
                 animDelay={0} expanded={expandedCard === "cpu"} onToggle={() => toggleCard("cpu")}>
@@ -2199,7 +2199,7 @@ export default function Dashboard() {
                       {metrics?.sysInfo?.cpuCores != null && (
                         <span className="tabular-nums" style={{
                           background: "rgba(6,182,212,0.1)", border: "1px solid rgba(6,182,212,0.25)",
-                          borderRadius: 5, padding: "2px 7px", fontSize: 10, color: "#06b6d4",
+                          borderRadius: 5, padding: "2px 7px", fontSize: 10, color: "var(--brand)",
                         }}>{metrics.sysInfo.cpuCores} cores</span>
                       )}
                       {metrics?.sysInfo?.cpuFreqGhz != null && (
@@ -2215,14 +2215,14 @@ export default function Dashboard() {
                 <GaugeBar percent={cpuPct} color={barColor(cpuPct)}
                   gradient={`linear-gradient(90deg, #0891b2, #06b6d4 60%, ${barColor(cpuPct)})`} />
                 {!loading && (metrics?.sysInfo?.load1 != null) && (
-                  <span className="text-[10px] tabular-nums font-mono" style={{ color: "rgba(255,255,255,0.35)" }}>
+                  <span className="text-[10px] tabular-nums font-mono" style={{ color: "var(--text-faint)" }}>
                     Load: {metrics.sysInfo.load1?.toFixed(2)} · {metrics.sysInfo.load5?.toFixed(2)} · {metrics.sysInfo.load15?.toFixed(2)}
                   </span>
                 )}
                 {expandedCard === "cpu" && (() => {
                   const s = histStats(cpuHistory);
                   return (
-                    <div className="flex flex-col gap-0.5 pt-2" style={{ borderTop: "1px solid #181818" }}>
+                    <div className="flex flex-col gap-0.5 pt-2" style={{ borderTop: "1px solid var(--divider)" }}>
                       <StatRow label="min" value={s.min != null ? fmtPct(s.min) : "—"} />
                       <StatRow label="max" value={s.max != null ? fmtPct(s.max) : "—"} />
                       <StatRow label="avg" value={s.avg != null ? fmtPct(s.avg) : "—"} />
@@ -2234,7 +2234,7 @@ export default function Dashboard() {
 
             {/* Memory */}
             {isVisible("memory") && (
-              <Card label="memory" accent="#10b981" alertLevel={memAlert} icon={<IconMemory />}
+              <Card label="memory" accent="var(--accent-memory)" alertLevel={memAlert} icon={<IconMemory />}
                 animDelay={50} expanded={expandedCard === "memory"} onToggle={() => toggleCard("memory")}>
                 {loading ? <Skeleton /> : (
                   <>
@@ -2247,7 +2247,7 @@ export default function Dashboard() {
                     />
                     {realMemPct > 0 && (
                       <div className="flex items-center justify-center gap-2">
-                        <span className="text-[10px] tabular-nums" style={{ color: "rgba(255,255,255,0.3)" }}>
+                        <span className="text-[10px] tabular-nums" style={{ color: "var(--text-faint)" }}>
                           actual pressure: {realMemPct.toFixed(1)}%
                         </span>
                         <TrendDelta history={memHistory} current={realMemPct} goodDirection="down" suffix="%" />
@@ -2256,7 +2256,7 @@ export default function Dashboard() {
                     {expandedCard === "memory" && (() => {
                       const s = histStats(memHistory);
                       return (
-                        <div className="flex flex-col gap-0.5 pt-2" style={{ borderTop: "1px solid #181818" }}>
+                        <div className="flex flex-col gap-0.5 pt-2" style={{ borderTop: "1px solid var(--divider)" }}>
                           <StatRow label="total"    value={fmtBytes(memTotal, 1, du)} />
                           <StatRow label="min used" value={s.min != null ? fmtPct(s.min) : "—"} />
                           <StatRow label="max used" value={s.max != null ? fmtPct(s.max) : "—"} />
@@ -2271,10 +2271,10 @@ export default function Dashboard() {
 
             {/* Filesystems */}
             {isVisible("filesystems") && (
-              <Card label="filesystems" accent="#f59e0b" alertLevel={maxDiskAlert} icon={<IconDisk />}
+              <Card label="filesystems" accent="var(--accent-fs)" alertLevel={maxDiskAlert} icon={<IconDisk />}
                 animDelay={100} expanded={expandedCard === "filesystems"} onToggle={() => toggleCard("filesystems")}>
                 {loading ? <Skeleton /> : !metrics?.disks.length ? (
-                  <span className="text-xs" style={{ color: "#444" }}>no filesystems found</span>
+                  <span className="text-xs" style={{ color: "var(--settings-text)" }}>no filesystems found</span>
                 ) : (() => {
                   const PREFIX = "/mnt/Pool/Media/";
                   const folderName = (mp: string) => mp.startsWith(PREFIX) ? mp.slice(PREFIX.length) : (mp.split("/").pop() ?? mp);
@@ -2292,10 +2292,10 @@ export default function Dashboard() {
                         <div className="flex flex-col gap-2">
                           <div className="flex items-baseline justify-between gap-2">
                             <div className="flex items-baseline gap-2">
-                              <span className="font-mono tabular-nums" style={{ fontSize: 26, fontWeight: 600, color: "#ffffff", lineHeight: 1.1, letterSpacing: "-0.01em" }}>
+                              <span className="font-mono tabular-nums" style={{ fontSize: 26, fontWeight: 600, color: "var(--text)", lineHeight: 1.1, letterSpacing: "-0.01em" }}>
                                 {fmtBytes(poolUsed, 1, du)}
                               </span>
-                              <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.4)" }}>
+                              <span className="text-[10px]" style={{ color: "var(--text-label)" }}>
                                 of {fmtBytes(poolTotal, 1, du)}
                               </span>
                             </div>
@@ -2305,7 +2305,7 @@ export default function Dashboard() {
                               </span>
                             )}
                           </div>
-                          <div className="rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)", height: 6 }}>
+                          <div className="rounded-full overflow-hidden" style={{ background: "var(--card-hover)", height: 6 }}>
                             <div className="h-full rounded-full transition-all duration-700" style={{
                               width: `${poolPct ?? 0}%`,
                               background: `linear-gradient(90deg, ${poolColor}99, ${poolColor})`,
@@ -2325,14 +2325,14 @@ export default function Dashboard() {
                           const barC = fsBarColor(disk.usedPct);
                           return (
                             <div key={disk.mountpoint} className="flex flex-col gap-1"
-                              style={{ padding: "5px 0", borderTop: idx > 0 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
+                              style={{ padding: "5px 0", borderTop: idx > 0 ? "1px solid var(--border-dim)" : "none" }}>
                               <div className="flex items-center justify-between gap-2">
                                 <div className="flex items-center gap-1.5 min-w-0">
-                                  <span style={{ color: "#f59e0b", opacity: 0.55, flexShrink: 0 }}><IconFolder /></span>
-                                  <span className="text-[11px] font-medium truncate" style={{ color: "rgba(255,255,255,0.78)" }}>{name}</span>
+                                  <span style={{ color: "var(--warn)", opacity: 0.55, flexShrink: 0 }}><IconFolder /></span>
+                                  <span className="text-[11px] font-medium truncate" style={{ color: "var(--text-mid)" }}>{name}</span>
                                 </div>
                                 <div className="flex items-center gap-2 shrink-0">
-                                  <span className="text-[9px] tabular-nums font-mono" style={{ color: "rgba(255,255,255,0.32)" }}>
+                                  <span className="text-[9px] tabular-nums font-mono" style={{ color: "var(--text-faint)" }}>
                                     {fmtBytes(disk.used, 1, du)}
                                   </span>
                                   <span className="tabular-nums font-mono font-semibold" style={{ fontSize: 10, color: barC, minWidth: "2.5ch", textAlign: "right" }}>
@@ -2340,7 +2340,7 @@ export default function Dashboard() {
                                   </span>
                                 </div>
                               </div>
-                              <div className="rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)", height: 4 }}>
+                              <div className="rounded-full overflow-hidden" style={{ background: "var(--card-hover)", height: 4 }}>
                                 <div className="h-full rounded-full transition-all duration-700"
                                   style={{ width: `${disk.usedPct}%`, background: barC, boxShadow: `0 0 4px ${barC}55` }} />
                               </div>
@@ -2356,51 +2356,51 @@ export default function Dashboard() {
 
             {/* Network */}
             {isVisible("network") && (
-              <Card label="network" accent="#3b82f6" icon={<IconNetwork />}
+              <Card label="network" accent="var(--accent-network)" icon={<IconNetwork />}
                 animDelay={150} expanded={expandedCard === "network"} onToggle={() => toggleCard("network")}>
                 {!loading && metrics?.network?.interfaceName && (
                   <span className="self-start font-mono" style={{
                     background: "rgba(59,130,246,0.12)", border: "1px solid rgba(59,130,246,0.25)",
-                    borderRadius: 4, padding: "2px 7px", fontSize: 9, color: "#3b82f6",
+                    borderRadius: 4, padding: "2px 7px", fontSize: 9, color: "var(--accent-network)",
                   }}>{metrics.network.interfaceName}</span>
                 )}
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center gap-2">
-                    <span className="text-[11px] font-bold" style={{ color: "#3b82f6" }}>↓</span>
-                    <span className="text-[10px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.3)" }}>rx</span>
-                    <span className="text-xs font-medium tabular-nums ml-auto font-mono" style={{ color: "rgba(255,255,255,0.8)" }}>
+                    <span className="text-[11px] font-bold" style={{ color: "var(--accent-network)" }}>↓</span>
+                    <span className="text-[10px] uppercase tracking-widest" style={{ color: "var(--text-faint)" }}>rx</span>
+                    <span className="text-xs font-medium tabular-nums ml-auto font-mono" style={{ color: "var(--text-secondary)" }}>
                       {loading ? "—" : `${fmtBytes(metrics?.network.rxBytesPerSec ?? null, 1, du)}/s`}
                     </span>
                   </div>
                   <Sparkline data={rxHistory} color="#3b82f6" autoMax height={50} />
-                  <span className="text-[10px] tabular-nums font-medium" style={{ color: "rgba(255,255,255,0.35)" }}>
+                  <span className="text-[10px] tabular-nums font-medium" style={{ color: "var(--text-faint)" }}>
                     ↓ {fmtBytes(metrics?.network.rxBytesTotal ?? null, 1, du)} total
                   </span>
                 </div>
-                <div style={{ height: 1, background: "rgba(255,255,255,0.05)" }} />
+                <div style={{ height: 1, background: "var(--surface-bright)" }} />
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center gap-2">
-                    <span className="text-[11px] font-bold" style={{ color: "#f59e0b" }}>↑</span>
-                    <span className="text-[10px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.3)" }}>tx</span>
-                    <span className="text-xs font-medium tabular-nums ml-auto font-mono" style={{ color: "rgba(255,255,255,0.8)" }}>
+                    <span className="text-[11px] font-bold" style={{ color: "var(--warn)" }}>↑</span>
+                    <span className="text-[10px] uppercase tracking-widest" style={{ color: "var(--text-faint)" }}>tx</span>
+                    <span className="text-xs font-medium tabular-nums ml-auto font-mono" style={{ color: "var(--text-secondary)" }}>
                       {loading ? "—" : `${fmtBytes(metrics?.network.txBytesPerSec ?? null, 1, du)}/s`}
                     </span>
                   </div>
                   <Sparkline data={txHistory} color="#f59e0b" autoMax height={50} />
-                  <span className="text-[10px] tabular-nums font-medium" style={{ color: "rgba(255,255,255,0.35)" }}>
+                  <span className="text-[10px] tabular-nums font-medium" style={{ color: "var(--text-faint)" }}>
                     ↑ {fmtBytes(metrics?.network.txBytesTotal ?? null, 1, du)} total
                   </span>
                 </div>
                 {!loading && metrics?.sysInfo?.tcpEstab != null && (
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.3)" }}>tcp</span>
-                    <span className="text-[11px] tabular-nums font-mono font-medium" style={{ color: "rgba(255,255,255,0.65)" }}>
+                    <span className="text-[10px] uppercase tracking-widest" style={{ color: "var(--text-faint)" }}>tcp</span>
+                    <span className="text-[11px] tabular-nums font-mono font-medium" style={{ color: "var(--text-muted)" }}>
                       {metrics.sysInfo.tcpEstab} established
                     </span>
                   </div>
                 )}
                 {expandedCard === "network" && rxHistory.length > 0 && (
-                  <div className="flex flex-col gap-0.5 pt-2" style={{ borderTop: "1px solid #181818" }}>
+                  <div className="flex flex-col gap-0.5 pt-2" style={{ borderTop: "1px solid var(--divider)" }}>
                     <StatRow label="peak rx" value={`${fmtBytes(Math.max(...rxHistory), 1, du)}/s`} />
                     <StatRow label="peak tx" value={`${fmtBytes(Math.max(...txHistory), 1, du)}/s`} />
                   </div>
@@ -2418,15 +2418,15 @@ export default function Dashboard() {
                       <div className="relative flex items-center justify-center shrink-0" style={{ width: 88, height: 88 }}>
                         <RadialGauge percent={gpuUtil ?? 0} color={gpuColor} size={88} />
                         <div className="absolute inset-0 flex flex-col items-center justify-center">
-                          <span className="font-medium tabular-nums font-mono" style={{ fontSize: 22, lineHeight: 1, color: "#ffffff" }}>
+                          <span className="font-medium tabular-nums font-mono" style={{ fontSize: 22, lineHeight: 1, color: "var(--text)" }}>
                             {gpuUtil != null ? gpuUtil.toFixed(0) : "—"}
                           </span>
-                          <span className="text-[9px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.35)" }}>%</span>
+                          <span className="text-[9px] uppercase tracking-widest" style={{ color: "var(--text-faint)" }}>%</span>
                         </div>
                       </div>
                       <div className="flex flex-col gap-1 min-w-0">
                         {metrics?.gpu?.name && (
-                          <span className="text-[10px] font-medium truncate" style={{ color: "#06b6d4" }}>{metrics.gpu.name}</span>
+                          <span className="text-[10px] font-medium truncate" style={{ color: "var(--brand)" }}>{metrics.gpu.name}</span>
                         )}
                         {metrics?.gpu?.temperature != null && (
                           <div className="flex items-baseline gap-2">
@@ -2438,7 +2438,7 @@ export default function Dashboard() {
                           </div>
                         )}
                         {metrics?.gpu?.powerDraw != null && (
-                          <span className="text-[10px] tabular-nums" style={{ color: "rgba(255,255,255,0.4)" }}>
+                          <span className="text-[10px] tabular-nums" style={{ color: "var(--text-label)" }}>
                             {metrics.gpu.powerDraw.toFixed(1)} W
                           </span>
                         )}
@@ -2449,7 +2449,7 @@ export default function Dashboard() {
                       right={`${fmtBytes(metrics?.gpu?.memUsed ?? null, 1, du)} / ${fmtBytes(metrics?.gpu?.memTotal ?? null, 1, du)}`}
                       percent={gpuMemPct}
                       color="#a855f7"
-                      gradient="linear-gradient(90deg, #7c3aed, #a855f7)"
+                      gradient="linear-gradient(90deg, var(--accent-speedtest), #a855f7)"
                     />
                     {metrics?.gpu?.powerDraw != null && metrics?.gpu?.powerLimit != null && (
                       <LabeledBar
@@ -2457,7 +2457,7 @@ export default function Dashboard() {
                         right={`${metrics.gpu.powerDraw.toFixed(1)} / ${metrics.gpu.powerLimit.toFixed(0)} W`}
                         percent={gpuPwrPct}
                         color="#f59e0b"
-                        gradient="linear-gradient(90deg, #ea580c, #f59e0b)"
+                        gradient="linear-gradient(90deg, #ea580c, var(--warn))"
                       />
                     )}
                     {/* Tertiary tier: clocks + fan + ENC/DEC, all in one dim row.
@@ -2477,16 +2477,16 @@ export default function Dashboard() {
                       }
                       if (tertiaryItems.length === 0) return null;
                       return (
-                        <div className="flex flex-wrap gap-1.5 pt-1" style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}>
+                        <div className="flex flex-wrap gap-1.5 pt-1" style={{ borderTop: "1px solid var(--border-dim)" }}>
                           {tertiaryItems.map(item => (
                             <span key={item.label} className="tabular-nums font-mono" style={{
-                              background: "rgba(255,255,255,0.04)",
-                              border: "1px solid rgba(255,255,255,0.08)",
+                              background: "var(--card)",
+                              border: "1px solid var(--border)",
                               borderRadius: 4, padding: "2px 7px", fontSize: 9,
-                              color: "rgba(255,255,255,0.5)",
+                              color: "var(--text-dim)",
                               letterSpacing: "0.01em",
                             }}>
-                              <span style={{ color: "rgba(255,255,255,0.32)", marginRight: 4 }}>{item.label}</span>
+                              <span style={{ color: "var(--text-faint)", marginRight: 4 }}>{item.label}</span>
                               {item.value}
                             </span>
                           ))}
@@ -2496,7 +2496,7 @@ export default function Dashboard() {
                     {gpuTempHistory.length >= 2 && (
                       <div className="flex flex-col gap-1.5">
                         <div className="flex justify-between items-center">
-                          <span className="text-[10px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.25)" }}>temp history</span>
+                          <span className="text-[10px] uppercase tracking-widest" style={{ color: "var(--text-ghost)" }}>temp history</span>
                         </div>
                         <Sparkline data={gpuTempHistory}
                           color={metrics?.gpu?.temperature != null ? tempColor(metrics.gpu.temperature) : "#555"}
@@ -2507,7 +2507,7 @@ export default function Dashboard() {
                       const s  = histStats(gpuHistory);
                       const ts = histStats(gpuTempHistory);
                       return (
-                        <div className="flex flex-col gap-0.5 pt-2" style={{ borderTop: "1px solid #181818" }}>
+                        <div className="flex flex-col gap-0.5 pt-2" style={{ borderTop: "1px solid var(--divider)" }}>
                           <StatRow label="util min" value={s.min != null ? fmtPct(s.min) : "—"} />
                           <StatRow label="util max" value={s.max != null ? fmtPct(s.max) : "—"} />
                           <StatRow label="util avg" value={s.avg != null ? fmtPct(s.avg) : "—"} />
@@ -2523,10 +2523,10 @@ export default function Dashboard() {
 
             {/* Speedtest — compact card, row 2 col 3 */}
             {isVisible("speedtest") && (
-              <Card label="speedtest" accent="#8b5cf6" icon={<IconSpeedtest />}
+              <Card label="speedtest" accent="var(--accent-speedtest)" icon={<IconSpeedtest />}
                 animDelay={250} externalLink="http://192.168.88.196:30220">
                 {speedtestLoading ? <Skeleton /> : !speedtestResults.length ? (
-                  <span className="text-xs" style={{ color: "rgba(255,255,255,0.4)" }}>no data</span>
+                  <span className="text-xs" style={{ color: "var(--text-label)" }}>no data</span>
                 ) : (() => {
                   const latest = speedtestResults[0];
                   const ts   = latest.timestamp ?? latest.created_at;
@@ -2538,10 +2538,10 @@ export default function Dashboard() {
                     : `${Math.round(diff / 86400)}d ago`;
                   const dl = latest.download;
                   const quality = dl == null ? null
-                    : dl >= 500 ? { label: "Excellent", color: "#10b981", bg: "rgba(16,185,129,0.12)", border: "rgba(16,185,129,0.3)" }
-                    : dl >= 200 ? { label: "Good",      color: "#06b6d4", bg: "rgba(6,182,212,0.12)",  border: "rgba(6,182,212,0.3)"  }
-                    : dl >= 50  ? { label: "Fair",      color: "#f59e0b", bg: "rgba(245,158,11,0.12)", border: "rgba(245,158,11,0.3)" }
-                    :             { label: "Poor",      color: "#ef4444", bg: "rgba(239,68,68,0.12)",  border: "rgba(239,68,68,0.3)"  };
+                    : dl >= 500 ? { label: "Excellent", color: "var(--ok)", bg: "rgba(16,185,129,0.12)", border: "rgba(16,185,129,0.3)" }
+                    : dl >= 200 ? { label: "Good",      color: "var(--brand)", bg: "rgba(6,182,212,0.12)",  border: "rgba(6,182,212,0.3)"  }
+                    : dl >= 50  ? { label: "Fair",      color: "var(--warn)", bg: "rgba(245,158,11,0.12)", border: "rgba(245,158,11,0.3)" }
+                    :             { label: "Poor",      color: "var(--critical)", bg: "rgba(239,68,68,0.12)",  border: "rgba(239,68,68,0.3)"  };
                   return (
                     <div className="flex flex-col gap-2.5">
 
@@ -2549,13 +2549,13 @@ export default function Dashboard() {
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex flex-col gap-0.5">
                           {latest.isp && (
-                            <span className="text-[12px] font-semibold" style={{ color: "rgba(255,255,255,0.75)" }}>{latest.isp}</span>
+                            <span className="text-[12px] font-semibold" style={{ color: "var(--text-mid)" }}>{latest.isp}</span>
                           )}
                           {latest.serverLocation && (
-                            <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.4)" }}>{latest.serverLocation}</span>
+                            <span className="text-[10px]" style={{ color: "var(--text-label)" }}>{latest.serverLocation}</span>
                           )}
                           {latest.serverHost && (
-                            <span className="text-[9px] font-mono truncate" style={{ color: "rgba(255,255,255,0.22)", maxWidth: 160 }}>{latest.serverHost}</span>
+                            <span className="text-[9px] font-mono truncate" style={{ color: "var(--text-ghost)", maxWidth: 160 }}>{latest.serverHost}</span>
                           )}
                         </div>
                         {quality && (
@@ -2569,16 +2569,16 @@ export default function Dashboard() {
                       {/* Big numbers: download + upload */}
                       <div className="flex items-end gap-4">
                         <div className="flex flex-col">
-                          <span className="font-medium tabular-nums font-mono" style={{ fontSize: 44, lineHeight: 1, color: "#06b6d4" }}>
+                          <span className="font-medium tabular-nums font-mono" style={{ fontSize: 44, lineHeight: 1, color: "var(--brand)" }}>
                             {dl != null ? dl.toFixed(0) : "—"}
                           </span>
-                          <span className="text-[9px] uppercase tracking-widest mt-0.5" style={{ color: "rgba(255,255,255,0.35)" }}>Mbps ↓</span>
+                          <span className="text-[9px] uppercase tracking-widest mt-0.5" style={{ color: "var(--text-faint)" }}>Mbps ↓</span>
                         </div>
                         <div className="flex flex-col mb-[4px]">
-                          <span className="font-medium tabular-nums font-mono" style={{ fontSize: 28, lineHeight: 1, color: "#f59e0b" }}>
+                          <span className="font-medium tabular-nums font-mono" style={{ fontSize: 28, lineHeight: 1, color: "var(--warn)" }}>
                             {latest.upload != null ? latest.upload.toFixed(0) : "—"}
                           </span>
-                          <span className="text-[9px] uppercase tracking-widest mt-0.5" style={{ color: "rgba(255,255,255,0.35)" }}>Mbps ↑</span>
+                          <span className="text-[9px] uppercase tracking-widest mt-0.5" style={{ color: "var(--text-faint)" }}>Mbps ↑</span>
                         </div>
                       </div>
 
@@ -2586,22 +2586,22 @@ export default function Dashboard() {
                       {(latest.ping != null || latest.jitter != null) && (
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="w-1.5 h-1.5 rounded-full shrink-0"
-                            style={{ background: "#10b981", boxShadow: "0 0 4px #10b98166" }} />
+                            style={{ background: "var(--ok)", boxShadow: "0 0 4px #10b98166" }} />
                           {latest.ping != null && (
                             <>
-                              <span className="text-[11px] tabular-nums font-medium font-mono" style={{ color: "#10b981" }}>
+                              <span className="text-[11px] tabular-nums font-medium font-mono" style={{ color: "var(--ok)" }}>
                                 {latest.ping < 10 ? latest.ping.toFixed(1) : latest.ping.toFixed(0)} ms
                               </span>
-                              <span className="text-[9px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.28)" }}>ping</span>
+                              <span className="text-[9px] uppercase tracking-widest" style={{ color: "var(--text-ghost)" }}>ping</span>
                             </>
                           )}
                           {latest.jitter != null && (
                             <>
-                              <span style={{ color: "rgba(255,255,255,0.2)", fontSize: 9 }}>·</span>
-                              <span className="text-[11px] tabular-nums font-medium font-mono" style={{ color: "rgba(255,255,255,0.45)" }}>
+                              <span style={{ color: "var(--text-ghost)", fontSize: 9 }}>·</span>
+                              <span className="text-[11px] tabular-nums font-medium font-mono" style={{ color: "var(--text-label)" }}>
                                 {latest.jitter < 10 ? latest.jitter.toFixed(1) : latest.jitter.toFixed(0)} ms
                               </span>
-                              <span className="text-[9px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.28)" }}>jitter</span>
+                              <span className="text-[9px] uppercase tracking-widest" style={{ color: "var(--text-ghost)" }}>jitter</span>
                             </>
                           )}
                         </div>
@@ -2610,7 +2610,7 @@ export default function Dashboard() {
                       {/* Download history sparkline */}
                       {speedtestHistory.length >= 2 && (
                         <div className="flex flex-col gap-1">
-                          <span className="text-[9px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.25)" }}>download history</span>
+                          <span className="text-[9px] uppercase tracking-widest" style={{ color: "var(--text-ghost)" }}>download history</span>
                           <Sparkline data={speedtestHistory} color="#8b5cf6" height={40} />
                         </div>
                       )}
@@ -2618,12 +2618,12 @@ export default function Dashboard() {
                       {/* Footer: last tested + total count */}
                       <div className="flex items-center justify-between flex-wrap gap-1">
                         {rel && (
-                          <span className="text-[9px] tabular-nums" style={{ color: "rgba(255,255,255,0.3)" }}>
+                          <span className="text-[9px] tabular-nums" style={{ color: "var(--text-faint)" }}>
                             auto-tested · {rel}
                           </span>
                         )}
                         {speedtestTotalTests != null && (
-                          <span className="text-[9px] tabular-nums" style={{ color: "rgba(255,255,255,0.22)" }}>
+                          <span className="text-[9px] tabular-nums" style={{ color: "var(--text-ghost)" }}>
                             {speedtestTotalTests.toLocaleString()} tests recorded
                           </span>
                         )}
@@ -2639,7 +2639,7 @@ export default function Dashboard() {
             {(isVisible("system") || isVisible("grafana")) && (
               <div className="lg:col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
                 {isVisible("system") && (
-                  <Card label="system" accent="#d946ef" icon={<IconTerminal />}
+                  <Card label="system" accent="var(--accent-system)" icon={<IconTerminal />}
                     expanded={expandedCard === "system"} onToggle={() => toggleCard("system")}>
                     {loading ? <Skeleton /> : (
                       <div className="flex flex-col gap-0">
@@ -2654,11 +2654,11 @@ export default function Dashboard() {
                           <div key={label}>
                             <div className="flex items-center gap-2 py-2">
                               <span style={{ fontSize: 13, width: 18, textAlign: "center", flexShrink: 0 }}>{emoji}</span>
-                              <span className="text-[10px] uppercase tracking-widest shrink-0" style={{ color: "rgba(255,255,255,0.3)", minWidth: 46 }}>{label}</span>
+                              <span className="text-[10px] uppercase tracking-widest shrink-0" style={{ color: "var(--text-faint)", minWidth: 46 }}>{label}</span>
                               <span className={`text-[11px] font-medium ml-auto truncate${mono ? " font-mono" : ""}`}
-                                style={{ color: "rgba(255,255,255,0.75)" }}>{value}</span>
+                                style={{ color: "var(--text-mid)" }}>{value}</span>
                             </div>
-                            {i < arr.length - 1 && <div style={{ height: 1, background: "rgba(255,255,255,0.05)" }} />}
+                            {i < arr.length - 1 && <div style={{ height: 1, background: "var(--surface-bright)" }} />}
                           </div>
                         ))}
                       </div>
@@ -2689,11 +2689,11 @@ export default function Dashboard() {
               }}>
                 <div className="flex items-center gap-3 mb-3">
                   <span style={{
-                    width: 8, height: 8, borderRadius: "50%", background: "#ef4444", flexShrink: 0,
+                    width: 8, height: 8, borderRadius: "50%", background: "var(--critical)", flexShrink: 0,
                     boxShadow: "0 0 6px #ef4444",
                     animation: "pulseDot 1.5s ease-in-out infinite",
                   }} />
-                  <span className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: "#c4b5fd" }}>
+                  <span className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: "var(--accent-speedtest)" }}>
                     Now Playing · {streams.length} stream{streams.length !== 1 ? "s" : ""}
                   </span>
                 </div>
@@ -2702,24 +2702,24 @@ export default function Dashboard() {
                     <div key={i} className="flex flex-col gap-1.5">
                       {/* Title row */}
                       <div className="flex items-baseline justify-between gap-2">
-                        <span className="text-[12px] font-medium truncate" style={{ color: "rgba(255,255,255,0.85)" }}>{st.title}</span>
+                        <span className="text-[12px] font-medium truncate" style={{ color: "var(--text-secondary)" }}>{st.title}</span>
                         {st.posStr && (
-                          <span className="text-[10px] tabular-nums font-mono shrink-0" style={{ color: "rgba(255,255,255,0.35)" }}>{st.posStr}</span>
+                          <span className="text-[10px] tabular-nums font-mono shrink-0" style={{ color: "var(--text-faint)" }}>{st.posStr}</span>
                         )}
                       </div>
                       {/* User row */}
                       <div className="flex items-center gap-1">
-                        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "rgba(255,255,255,0.3)", flexShrink: 0 }}>
+                        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--text-faint)", flexShrink: 0 }}>
                           <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
                         </svg>
-                        <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>{st.user}</span>
+                        <span style={{ fontSize: 11, color: "var(--text-label)" }}>{st.user}</span>
                       </div>
                       {/* Progress bar */}
-                      <div style={{ height: 3, background: "rgba(255,255,255,0.07)", borderRadius: 2 }}>
+                      <div style={{ height: 3, background: "var(--border-subtle)", borderRadius: 2 }}>
                         <div style={{
                           height: "100%", borderRadius: 2,
                           width: `${Math.min(100, st.progress)}%`,
-                          background: "linear-gradient(90deg, #7c3aed, #a78bfa)",
+                          background: "linear-gradient(90deg, var(--accent-speedtest), #a78bfa)",
                         }} />
                       </div>
                     </div>
@@ -2736,17 +2736,17 @@ export default function Dashboard() {
 
           {/* ── services (full width) ── */}
           {isVisible("services") && (
-            <div className="flex flex-col gap-4" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 14, padding: 20 }}>
+            <div className="flex flex-col gap-4" style={{ background: "var(--surface-dim)", border: "1px solid var(--border-subtle)", borderRadius: 14, padding: 20 }}>
               <div className="flex items-center gap-3 flex-wrap">
-                <span style={{ color: "#8b5cf6", opacity: 0.8 }}><IconServices /></span>
-                <span className="text-[10px] uppercase" style={{ color: "rgba(255,255,255,0.45)", letterSpacing: "0.15em" }}>services</span>
+                <span style={{ color: "var(--accent-speedtest)", opacity: 0.8 }}><IconServices /></span>
+                <span className="text-[10px] uppercase" style={{ color: "var(--text-label)", letterSpacing: "0.15em" }}>services</span>
                 {services && (() => {
                   // Only count services the user has actually configured. Unconfigured ones
                   // are listed in Settings → Connections, not in the visible card grid.
                   const configured = services.filter(s => s.configured !== false);
                   if (configured.length === 0) return null;
                   return (
-                    <span style={{ background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.25)", borderRadius: 6, padding: "2px 8px", fontSize: 10, color: "#10b981", fontWeight: 600 }}>
+                    <span style={{ background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.25)", borderRadius: 6, padding: "2px 8px", fontSize: 10, color: "var(--ok)", fontWeight: 600 }}>
                       {configured.filter(s => s.up).length} / {configured.length} online
                     </span>
                   );
@@ -2754,11 +2754,11 @@ export default function Dashboard() {
                 {servicesUpdatedAt != null && (() => {
                   const sec = Math.round((Date.now() - servicesUpdatedAt) / 1000);
                   const rel = sec < 60 ? `${sec}s ago` : `${Math.round(sec / 60)}m ago`;
-                  return <span className="text-[9px] ml-auto" style={{ color: "rgba(255,255,255,0.2)" }}>updated {rel}</span>;
+                  return <span className="text-[9px] ml-auto" style={{ color: "var(--text-ghost)" }}>updated {rel}</span>;
                 })()}
               </div>
               {servicesLoading ? <Skeleton /> : !services ? (
-                <span style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>unavailable</span>
+                <span style={{ fontSize: 12, color: "var(--text-label)" }}>unavailable</span>
               ) : (
                 <div className="flex flex-col gap-5">
                   {SVC_CATEGORIES.map(cat => {
@@ -2777,7 +2777,7 @@ export default function Dashboard() {
                         {/* Category header with accent dot + brighter divider */}
                         <div className="flex items-center gap-3">
                           <span className="w-1.5 h-1.5 rounded-full" style={{ background: cat.accent, boxShadow: `0 0 6px ${cat.accent}88` }} />
-                          <span className="text-[10px] uppercase" style={{ color: "rgba(255,255,255,0.55)", letterSpacing: "0.22em", fontWeight: 700 }}>
+                          <span className="text-[10px] uppercase" style={{ color: "var(--text-dim)", letterSpacing: "0.22em", fontWeight: 700 }}>
                             {cat.label}
                           </span>
                           <span style={{ flex: 1, height: 1, background: `linear-gradient(to right, ${cat.accent}33, transparent 70%)` }} />
@@ -2821,7 +2821,7 @@ export default function Dashboard() {
                                   background: up
                                     ? `radial-gradient(ellipse at top, ${color}1a 0%, transparent 55%), rgba(255,255,255,0.03)`
                                     : "rgba(255,255,255,0.03)",
-                                  border: "1px solid rgba(255,255,255,0.07)",
+                                  border: "1px solid var(--border-subtle)",
                                   borderRadius: 12, padding: 0,
                                   minHeight: 140,
                                   transition: "transform 0.15s, border-color 0.15s, box-shadow 0.2s",
@@ -2833,7 +2833,7 @@ export default function Dashboard() {
                                 }}
                                 onMouseLeave={e => {
                                   e.currentTarget.style.transform = "translateY(0)";
-                                  e.currentTarget.style.borderColor = "rgba(255,255,255,0.07)";
+                                  e.currentTarget.style.borderColor = "var(--border-subtle)";
                                   e.currentTarget.style.boxShadow = "none";
                                 }}
                               >
@@ -2897,7 +2897,7 @@ export default function Dashboard() {
                                       fontSize: 11, lineHeight: 1.5, fontVariantNumeric: "tabular-nums",
                                     }}>{animatedLine(line, `${name}-${i + 1}`)}</span>
                                   ))}
-                                  {!up && <span style={{ fontSize: 10, color: "rgba(255,255,255,0.3)" }}>offline</span>}
+                                  {!up && <span style={{ fontSize: 10, color: "var(--text-faint)" }}>offline</span>}
                                 {/* Radarr: library completion + active download */}
                                 {name === "radarr" && svcPct != null && up && (
                                   <GaugeBar percent={svcPct} color={svcPct > 90 ? "#10b981" : svcPct > 70 ? "#f59e0b" : "#ef4444"} thin />
@@ -2915,7 +2915,7 @@ export default function Dashboard() {
                                             }}>↓ {cleanTitle(q.title)}</span>
                                             {fmtEtaShort(q.etaSec) && (
                                               <span style={{
-                                                fontSize: 9, color: "rgba(255,255,255,0.45)",
+                                                fontSize: 9, color: "var(--text-label)",
                                                 fontVariantNumeric: "tabular-nums", flexShrink: 0,
                                               }}>{fmtEtaShort(q.etaSec)}</span>
                                             )}
@@ -2932,11 +2932,11 @@ export default function Dashboard() {
                                     {svcStreams.slice(0, 3).map((st, si) => (
                                       <div key={si} className="flex flex-col gap-1">
                                         <span style={{
-                                          fontSize: 12, color: "rgba(255,255,255,0.6)",
+                                          fontSize: 12, color: "var(--text-muted)",
                                           fontStyle: "italic",
                                           overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                                         }}>{st.title}</span>
-                                        <div style={{ height: 3, background: "rgba(255,255,255,0.07)", borderRadius: 2 }}>
+                                        <div style={{ height: 3, background: "var(--border-subtle)", borderRadius: 2 }}>
                                           <div style={{
                                             height: "100%", borderRadius: 2,
                                             width: `${Math.min(100, st.progress)}%`,
@@ -2963,15 +2963,15 @@ export default function Dashboard() {
 
           {/* ── bookmarks ── */}
           {showBookmarks && (
-            <div className="flex flex-col gap-4" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 14, padding: "20px 24px" }}>
+            <div className="flex flex-col gap-4" style={{ background: "var(--surface-dim)", border: "1px solid var(--border-subtle)", borderRadius: 14, padding: "20px 24px" }}>
               <div className="flex items-center gap-2">
-                <span className="text-[10px] uppercase" style={{ color: "rgba(255,255,255,0.35)", letterSpacing: "0.15em" }}>bookmarks</span>
-                <span style={{ fontSize: 9, color: "rgba(255,255,255,0.18)", marginLeft: "auto" }}>H to toggle</span>
+                <span className="text-[10px] uppercase" style={{ color: "var(--text-faint)", letterSpacing: "0.15em" }}>bookmarks</span>
+                <span style={{ fontSize: 9, color: "var(--text-ghost)", marginLeft: "auto" }}>H to toggle</span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 {(clientConfig?.bookmarks ?? BOOKMARKS_FALLBACK).map(col => (
                   <div key={col.title} className="flex flex-col gap-0.5">
-                    <div className="flex items-center gap-2 mb-2 pb-2" style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+                    <div className="flex items-center gap-2 mb-2 pb-2" style={{ borderBottom: "1px solid var(--border)" }}>
                       <span className="w-2 h-2 rounded-full shrink-0" style={{ background: col.accentColor }} />
                       <span className="text-[9px] uppercase tracking-[0.18em]" style={{ color: col.accentColor, opacity: 0.8 }}>{col.title}</span>
                     </div>
@@ -2985,16 +2985,16 @@ export default function Dashboard() {
           )}
 
           {/* ── footer ── */}
-          <div className="flex items-center justify-between flex-wrap gap-3" style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 12 }}>
+          <div className="flex items-center justify-between flex-wrap gap-3" style={{ borderTop: "1px solid var(--border-dim)", paddingTop: 12 }}>
             <div className="flex items-center gap-2">
               <span className="flex items-center justify-center rounded" style={{ width: 16, height: 16, background: "rgba(251,146,60,0.2)", border: "1px solid rgba(251,146,60,0.3)", fontSize: 9, fontWeight: 700, color: "#fb923c" }}>C</span>
-              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.25)" }}>built with claude code</span>
+              <span style={{ fontSize: 11, color: "var(--text-ghost)" }}>built with claude code</span>
             </div>
-            <span style={{ fontSize: 11, color: "rgba(255,255,255,0.18)" }}>
+            <span style={{ fontSize: 11, color: "var(--text-ghost)" }}>
               tracking {services?.length ?? 0} services · G search · R refresh · H bookmarks
             </span>
             <a href="http://192.168.88.196:30104" target="_blank" rel="noopener noreferrer"
-              style={{ fontSize: 11, color: "rgba(255,255,255,0.25)", textDecoration: "none", transition: "color 0.15s" }}
+              style={{ fontSize: 11, color: "var(--text-ghost)", textDecoration: "none", transition: "color 0.15s" }}
               onMouseEnter={e => (e.currentTarget.style.color = "rgba(255,255,255,0.55)")}
               onMouseLeave={e => (e.currentTarget.style.color = "rgba(255,255,255,0.25)")}>
               prometheus ↗
