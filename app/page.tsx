@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
+import { THEMES, TIMEZONES, SVC_PORTS, type ThemeKey } from "@/app/lib/constants";
 
 const MAX_HISTORY = 60;
 
@@ -59,15 +60,6 @@ interface Metrics {
 }
 
 type SearchEngine = "google" | "bing" | "duckduckgo" | "kagi";
-type ThemeKey = "midnight" | "forge" | "forest" | "plum" | "paper";
-
-const THEMES: { key: ThemeKey; label: string; bg: string; brand: string }[] = [
-  { key: "midnight", label: "Midnight",  bg: "#0a0c12", brand: "#06b6d4" },
-  { key: "forge",    label: "Forge",     bg: "#12100a", brand: "#f59e0b" },
-  { key: "forest",   label: "Forest",    bg: "#080f0a", brand: "#10b981" },
-  { key: "plum",     label: "Plum",      bg: "#10081a", brand: "#d946ef" },
-  { key: "paper",    label: "Paper",     bg: "#f8fafc", brand: "#0284c7" },
-];
 
 interface Settings {
   refreshInterval: number;
@@ -166,30 +158,25 @@ const SVC_COLORS: Record<string, string> = {
   pihole: "#f60d1a", prowlarr: "#ff8c00", nginx: "#2ecc71",
   uptimekuma: "#5cdd8b",
 };
+// Self-hosted favicons — no external Google Fonts request on every load.
 const SVC_ICONS: Record<string, string> = {
-  radarr:      "https://www.google.com/s2/favicons?domain=radarr.video&sz=32",
-  sonarr:      "https://www.google.com/s2/favicons?domain=sonarr.tv&sz=32",
-  bazarr:      "https://www.google.com/s2/favicons?domain=bazarr.media&sz=32",
-  tautulli:    "https://www.google.com/s2/favicons?domain=tautulli.com&sz=32",
-  qbittorrent: "https://www.google.com/s2/favicons?domain=qbittorrent.org&sz=32",
-  overseerr:   "https://www.google.com/s2/favicons?domain=overseerr.dev&sz=32",
-  nginx:       "https://www.google.com/s2/favicons?domain=nginxproxymanager.com&sz=32",
-  pihole:      "https://www.google.com/s2/favicons?domain=pi-hole.net&sz=32",
-  prowlarr:    "https://www.google.com/s2/favicons?domain=prowlarr.com&sz=32",
-  uptimekuma:  "https://www.google.com/s2/favicons?domain=uptime.kuma.pet&sz=32",
+  radarr:      "/icons/radarr.png",
+  sonarr:      "/icons/sonarr.png",
+  bazarr:      "/icons/bazarr.png",
+  tautulli:    "/icons/tautulli.png",
+  qbittorrent: "/icons/qbittorrent.png",
+  overseerr:   "/icons/overseerr.png",
+  nginx:       "/icons/nginx.png",
+  pihole:      "/icons/pihole.png",
+  prowlarr:    "/icons/prowlarr.png",
+  uptimekuma:  "/icons/uptimekuma.png",
 };
-const SVC_URLS: Record<string, string> = {
-  radarr:      "http://192.168.88.196:30025",
-  sonarr:      "http://192.168.88.196:33027",
-  bazarr:      "http://192.168.88.196:30046",
-  tautulli:    "http://192.168.88.196:30047",
-  qbittorrent: "http://192.168.88.196:30024",
-  overseerr:   "http://192.168.88.196:30002",
-  nginx:       "http://192.168.88.196:30020",
-  pihole:      "http://192.168.88.196:20720",
-  prowlarr:    "http://192.168.88.196:30050",
-  uptimekuma:  "http://192.168.88.196:31050",
-};
+// Built dynamically from clientConfig.truenasIp — no hardcoded IPs.
+function buildSvcUrls(ip: string): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(SVC_PORTS).map(([name, port]) => [name, `http://${ip}:${port}`])
+  );
+}
 const SVC_LABELS: Record<string, string> = {
   qbittorrent: "qBittorrent",
   nginx:       "Nginx Proxy",
@@ -210,11 +197,6 @@ const BOOKMARKS_FALLBACK: BookmarkColumn[] = [];
 
 // ── client-side data fetching ─────────────────────────────────────────────────
 
-const PROMETHEUS    = "http://192.168.88.196:30104";
-const SPEEDTEST_BASE = "http://192.168.88.196:30220";
-const WEATHER_URL   = "https://api.open-meteo.com/v1/forecast?latitude=-41.4419&longitude=147.1450&current=temperature_2m,weather_code";
-const FS_EXCLUDE    = `fstype!~"tmpfs|devtmpfs|overlay|squashfs|ramfs"`;
-
 const WEATHER_CODES: Record<number, string> = {
   0: "sunny", 1: "mostly clear", 2: "partly cloudy", 3: "overcast",
   45: "foggy", 48: "foggy",
@@ -225,36 +207,6 @@ const WEATHER_CODES: Record<number, string> = {
   85: "snow showers", 86: "heavy snow showers",
   95: "thunderstorm", 96: "thunderstorm", 99: "heavy thunderstorm",
 };
-
-async function queryProm(q: string): Promise<number | null> {
-  try {
-    const res = await fetch(`${PROMETHEUS}/api/v1/query?query=${encodeURIComponent(q)}`, {
-      signal: AbortSignal.timeout(5000),
-    });
-    if (!res.ok) return null;
-    const json = await res.json();
-    const result = json?.data?.result?.[0]?.value?.[1];
-    return result != null ? parseFloat(result) : null;
-  } catch {
-    return null;
-  }
-}
-
-async function queryPromAll(q: string): Promise<{ metric: Record<string, string>; value: number }[]> {
-  try {
-    const res = await fetch(`${PROMETHEUS}/api/v1/query?query=${encodeURIComponent(q)}`, {
-      signal: AbortSignal.timeout(5000),
-    });
-    if (!res.ok) return [];
-    const json = await res.json();
-    return (json?.data?.result ?? []).map((r: { metric: Record<string, string>; value: [number, string] }) => ({
-      metric: r.metric,
-      value:  parseFloat(r.value[1]),
-    }));
-  } catch {
-    return [];
-  }
-}
 
 interface SpeedtestRaw {
   ping?:           number | null;
@@ -792,51 +744,6 @@ function Sparkline({ data, color, autoMax = false, height = 32 }: {
   );
 }
 
-function MiniBarChart({ data, color, height = 32 }: { data: number[]; color: string; height?: number }) {
-  const last20 = data.slice(-20);
-  const maxVal = Math.max(...last20, 0.001);
-  return (
-    <div className="flex items-end gap-px w-full" style={{ height }}>
-      {Array.from({ length: 20 }, (_, i) => {
-        const val = last20[i] ?? 0;
-        const h = Math.max(2, (val / maxVal) * height);
-        return (
-          <div
-            key={i}
-            className="flex-1 rounded-sm transition-all duration-500"
-            style={{
-              height: h,
-              background: color,
-              opacity: i < last20.length ? 0.75 : 0.1,
-              boxShadow: val > maxVal * 0.7 ? `0 0 4px ${color}55` : "none",
-            }}
-          />
-        );
-      })}
-    </div>
-  );
-}
-
-function DonutChart({ used, total, color, size = 72 }: { used: number; total: number; color: string; size?: number }) {
-  const pctVal = total > 0 ? Math.min(100, (used / total) * 100) : 0;
-  const r = 28, circ = 2 * Math.PI * r;
-  const filled = (pctVal / 100) * circ;
-  return (
-    <div className="relative flex items-center justify-center shrink-0" style={{ width: size, height: size }}>
-      <svg width={size} height={size} viewBox="0 0 72 72" style={{ transform: "rotate(-90deg)" }}>
-        <circle cx="36" cy="36" r={r} fill="none" stroke="var(--donut-track)" strokeWidth="8" />
-        <circle cx="36" cy="36" r={r} fill="none" stroke={color} strokeWidth="8"
-          strokeDasharray={`${filled} ${circ - filled}`} strokeLinecap="round"
-          style={{ filter: `drop-shadow(0 0 4px ${color}55)`, transition: "stroke-dasharray 0.7s ease" }}
-        />
-      </svg>
-      <div className="absolute text-center">
-        <div className="text-[11px] font-medium tabular-nums" style={{ color: "var(--text)" }}>{pctVal.toFixed(0)}%</div>
-      </div>
-    </div>
-  );
-}
-
 function RadialGauge({ percent, color, size = 88 }: { percent: number; color: string; size?: number }) {
   const r = 32, circ = 2 * Math.PI * r;
   const filled = (Math.min(100, Math.max(0, percent)) / 100) * circ;
@@ -1250,9 +1157,9 @@ function SettingsPanel({ settings, onUpdate, onClose, services }: {
                 <button key={o} onClick={() => onUpdate({ ...settings, [key]: o })}
                   className="flex-1 py-1.5 rounded text-[10px] font-medium transition-all duration-150"
                   style={{
-                    background: settings[key] === o ? "var(--settings-active-bg)" : "#161616",
-                    border: `1px solid ${settings[key] === o ? "var(--settings-active-border)" : "#1e1e1e"}`,
-                    color: settings[key] === o ? "var(--settings-active)" : "#444", cursor: "pointer",
+                    background: settings[key] === o ? "var(--settings-active-bg)" : "var(--settings-input)",
+                    border: `1px solid ${settings[key] === o ? "var(--settings-active-border)" : "var(--settings-input-border)"}`,
+                    color: settings[key] === o ? "var(--settings-active)" : "var(--settings-text)", cursor: "pointer",
                   }}
                 >{fmt(o)}</button>
               ))}
@@ -1267,9 +1174,9 @@ function SettingsPanel({ settings, onUpdate, onClose, services }: {
               <button key={u} onClick={() => onUpdate({ ...settings, tempUnit: u })}
                 className="flex-1 py-1.5 rounded text-[10px] font-medium transition-all duration-150"
                 style={{
-                  background: settings.tempUnit === u ? "var(--settings-active-bg)" : "#161616",
-                  border: `1px solid ${settings.tempUnit === u ? "var(--settings-active-border)" : "#1e1e1e"}`,
-                  color: settings.tempUnit === u ? "var(--settings-active)" : "#444", cursor: "pointer",
+                  background: settings.tempUnit === u ? "var(--settings-active-bg)" : "var(--settings-input)",
+                  border: `1px solid ${settings.tempUnit === u ? "var(--settings-active-border)" : "var(--settings-input-border)"}`,
+                  color: settings.tempUnit === u ? "var(--settings-active)" : "var(--settings-text)", cursor: "pointer",
                 }}
               >°{u}</button>
             ))}
@@ -1283,9 +1190,9 @@ function SettingsPanel({ settings, onUpdate, onClose, services }: {
               <button key={u} onClick={() => onUpdate({ ...settings, dataUnit: u })}
                 className="flex-1 py-1.5 rounded text-[10px] font-medium transition-all duration-150"
                 style={{
-                  background: settings.dataUnit === u ? "var(--settings-active-bg)" : "#161616",
-                  border: `1px solid ${settings.dataUnit === u ? "var(--settings-active-border)" : "#1e1e1e"}`,
-                  color: settings.dataUnit === u ? "var(--settings-active)" : "#444", cursor: "pointer",
+                  background: settings.dataUnit === u ? "var(--settings-active-bg)" : "var(--settings-input)",
+                  border: `1px solid ${settings.dataUnit === u ? "var(--settings-active-border)" : "var(--settings-input-border)"}`,
+                  color: settings.dataUnit === u ? "var(--settings-active)" : "var(--settings-text)", cursor: "pointer",
                 }}
               >{u === "decimal" ? "GB" : "GiB"}</button>
             ))}
@@ -1299,9 +1206,9 @@ function SettingsPanel({ settings, onUpdate, onClose, services }: {
               <button key={e} onClick={() => onUpdate({ ...settings, searchEngine: e })}
                 className="flex-1 py-1.5 rounded text-[10px] font-medium transition-all duration-150 flex items-center justify-center gap-1"
                 style={{
-                  background: settings.searchEngine === e ? "var(--settings-active-bg)" : "#161616",
-                  border: `1px solid ${settings.searchEngine === e ? "var(--settings-active-border)" : "#1e1e1e"}`,
-                  color: settings.searchEngine === e ? "var(--settings-active)" : "#444", cursor: "pointer",
+                  background: settings.searchEngine === e ? "var(--settings-active-bg)" : "var(--settings-input)",
+                  border: `1px solid ${settings.searchEngine === e ? "var(--settings-active-border)" : "var(--settings-input-border)"}`,
+                  color: settings.searchEngine === e ? "var(--settings-active)" : "var(--settings-text)", cursor: "pointer",
                   minWidth: 0, padding: "6px 4px",
                 }}
               >
@@ -1324,20 +1231,7 @@ function SettingsPanel({ settings, onUpdate, onClose, services }: {
             }}
           >
             <option value="">Browser local</option>
-            {[
-              "Pacific/Auckland", "Pacific/Fiji",
-              "Australia/Sydney", "Australia/Adelaide", "Australia/Perth", "Australia/Hobart", "Australia/Brisbane",
-              "Asia/Tokyo", "Asia/Seoul", "Asia/Shanghai", "Asia/Hong_Kong", "Asia/Singapore",
-              "Asia/Kolkata", "Asia/Dubai", "Asia/Karachi",
-              "Europe/Moscow", "Europe/Istanbul", "Europe/Athens", "Europe/Helsinki",
-              "Europe/Berlin", "Europe/Paris", "Europe/Amsterdam", "Europe/Zurich",
-              "Europe/London",
-              "Atlantic/Reykjavik",
-              "America/Sao_Paulo", "America/Argentina/Buenos_Aires",
-              "America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles",
-              "America/Anchorage", "Pacific/Honolulu",
-              "America/Toronto", "America/Vancouver",
-            ].map(tz => (
+            {TIMEZONES.map(tz => (
               <option key={tz} value={tz}>{tz.replace(/_/g, " ")}</option>
             ))}
           </select>
@@ -1352,8 +1246,8 @@ function SettingsPanel({ settings, onUpdate, onClose, services }: {
                 <button key={t.key} onClick={() => onUpdate({ ...settings, theme: t.key })}
                   className="flex-1 flex flex-col items-center gap-1 py-2 rounded transition-all duration-150"
                   style={{
-                    background: active ? "var(--settings-active-bg)" : "#161616",
-                    border: `1px solid ${active ? "var(--settings-active-border)" : "#1e1e1e"}`,
+                    background: active ? "var(--settings-active-bg)" : "var(--settings-input)",
+                    border: `1px solid ${active ? "var(--settings-active-border)" : "var(--settings-input-border)"}`,
                     cursor: "pointer", minWidth: 0,
                   }}
                 >
@@ -1374,9 +1268,9 @@ function SettingsPanel({ settings, onUpdate, onClose, services }: {
             return (
               <label key={c} className="flex items-center gap-3 cursor-pointer" onClick={() => onUpdate({ ...settings, visibleCards: { ...settings.visibleCards, [c]: !on } })}>
                 <div className="relative w-7 h-4 rounded-full transition-all duration-200"
-                  style={{ background: on ? "var(--settings-active-bg-dim)" : "#161616", border: `1px solid ${on ? "var(--settings-active-border)" : "#1e1e1e"}` }}>
+                  style={{ background: on ? "var(--settings-active-bg-dim)" : "var(--settings-input)", border: `1px solid ${on ? "var(--settings-active-border)" : "var(--settings-input-border)"}` }}>
                   <div className="absolute top-0.5 w-3 h-3 rounded-full transition-all duration-200"
-                    style={{ left: on ? "calc(100% - 14px)" : "2px", background: on ? "var(--settings-active)" : "#2a2a2a" }} />
+                    style={{ left: on ? "calc(100% - 14px)" : "2px", background: on ? "var(--settings-active)" : "var(--settings-label)" }} />
                 </div>
                 <span className="text-[10px] uppercase tracking-widest" style={{ color: on ? "#555" : "#2e2e2e" }}>{c}</span>
               </label>
@@ -2335,7 +2229,7 @@ export default function Dashboard() {
               }} />
             <button
               title="Open TrueNAS"
-              onClick={() => window.open("http://192.168.88.196", "_blank")}
+              onClick={() => window.open(`http://${clientConfig?.truenasIp ?? "192.168.88.196"}`, "_blank")}
               style={{ color: "var(--text-ghost)", background: "none", border: "none", cursor: "pointer", padding: 2, transition: "color 0.2s" }}
               onMouseEnter={e => (e.currentTarget.style.color = "#06b6d4")}
               onMouseLeave={e => (e.currentTarget.style.color = "rgba(255,255,255,0.2)")}
@@ -2750,7 +2644,7 @@ export default function Dashboard() {
             {/* Speedtest — compact card, row 2 col 3 */}
             {isVisible("speedtest") && (
               <Card label="speedtest" accent="var(--accent-speedtest)" icon={<IconSpeedtest />}
-                animDelay={250} externalLink="http://192.168.88.196:30220">
+                animDelay={250} externalLink={`http://${clientConfig?.truenasIp ?? "192.168.88.196"}:${SVC_PORTS.speedtest}`}>
                 {speedtestLoading ? <Skeleton /> : !speedtestResults.length ? (
                   <span className="text-xs" style={{ color: "var(--text-label)" }}>no data</span>
                 ) : (() => {
@@ -3036,7 +2930,8 @@ export default function Dashboard() {
                             const color = SVC_COLORS[name] ?? "#666";
                             const icon  = SVC_ICONS[name]  ?? "";
                             const label = SVC_LABELS[name]  ?? name;
-                            const url   = clientConfig?.serviceUrls?.[name] ?? SVC_URLS[name];
+                            const svcUrls = buildSvcUrls(clientConfig?.truenasIp ?? "192.168.88.196");
+                            const url   = clientConfig?.serviceUrls?.[name] ?? svcUrls[name];
                             const stripeColor = up ? color : "rgba(255,255,255,0.12)";
                             return (
                               <div key={name}
@@ -3326,7 +3221,7 @@ export default function Dashboard() {
             <span style={{ fontSize: 11, color: "var(--text-ghost)" }}>
               tracking {services?.length ?? 0} services · G search · R refresh · H bookmarks
             </span>
-            <a href="http://192.168.88.196:30104" target="_blank" rel="noopener noreferrer"
+            <a href={`http://${clientConfig?.truenasIp ?? "192.168.88.196"}:${SVC_PORTS.prometheus}`} target="_blank" rel="noopener noreferrer"
               style={{ fontSize: 11, color: "var(--text-ghost)", textDecoration: "none", transition: "color 0.15s" }}
               onMouseEnter={e => (e.currentTarget.style.color = "rgba(255,255,255,0.55)")}
               onMouseLeave={e => (e.currentTarget.style.color = "rgba(255,255,255,0.25)")}>

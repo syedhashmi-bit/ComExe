@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { THEMES, type ThemeKey } from "@/app/lib/constants";
 
 // ── Welcome flow ────────────────────────────────────────────────────────────
 // Four-step first-run wizard shown when the user has no config.json on disk.
@@ -9,16 +10,6 @@ import Link from "next/link";
 //
 // The main dashboard (page.tsx) auto-redirects here when zero services are
 // configured and localStorage hasn't seen the welcome flag yet.
-
-type ThemeKey = "midnight" | "forge" | "forest" | "plum" | "paper";
-
-const THEMES: { key: ThemeKey; label: string; desc: string; bg: string; brand: string; card: string; text: string }[] = [
-  { key: "midnight", label: "Midnight Cyan", desc: "Dark blue-black with cyan accents",    bg: "#0a0c12", brand: "#06b6d4", card: "#0e1117", text: "#e2e8f0" },
-  { key: "forge",    label: "Forge",         desc: "Warm dark with amber accents",         bg: "#12100a", brand: "#f59e0b", card: "#1a1610", text: "#e2d9c5" },
-  { key: "forest",   label: "Forest",        desc: "Deep green-black with emerald accents", bg: "#080f0a", brand: "#10b981", card: "#0e1610", text: "#c5e2d0" },
-  { key: "plum",     label: "Plum",          desc: "Purple-black with magenta accents",    bg: "#10081a", brand: "#d946ef", card: "#160e1e", text: "#d9c5e2" },
-  { key: "paper",    label: "Paper",         desc: "Light theme with slate accents",       bg: "#f8fafc", brand: "#0284c7", card: "#ffffff", text: "#1e293b" },
-];
 
 const SETTINGS_KEY = "comexe:settings";
 const WELCOME_KEY = "comexe:welcome-done";

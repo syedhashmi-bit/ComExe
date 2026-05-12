@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { THEMES, TIMEZONES } from "@/app/lib/constants";
 
 // ── Setup wizard ──────────────────────────────────────────────────────────────
 // Single-page form. The user picks which services they have, fills in URLs and
@@ -109,12 +110,12 @@ function deriveDefaultUrl(ip: string, port: number): string {
 function StatusPill({ status }: { status: TestStatus }) {
   if (status.state === "idle") return null;
   if (status.state === "testing") {
-    return <span className="text-[11px]" style={{ color: "#06b6d4" }}>testing…</span>;
+    return <span className="text-[11px]" style={{ color: "var(--brand)" }}>testing…</span>;
   }
   if (status.state === "ok") {
-    return <span className="text-[11px]" style={{ color: "#10b981" }}>✓ {status.msg}</span>;
+    return <span className="text-[11px]" style={{ color: "var(--ok)" }}>✓ {status.msg}</span>;
   }
-  return <span className="text-[11px]" style={{ color: "#ef4444" }}>✗ {status.msg}</span>;
+  return <span className="text-[11px]" style={{ color: "var(--critical)" }}>✗ {status.msg}</span>;
 }
 
 function Field({ label, value, onChange, type = "text", placeholder, mono = false }: {
@@ -123,7 +124,7 @@ function Field({ label, value, onChange, type = "text", placeholder, mono = fals
 }) {
   return (
     <label className="flex flex-col gap-1">
-      <span className="text-[9px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.4)" }}>{label}</span>
+      <span className="text-[9px] uppercase tracking-widest" style={{ color: "var(--text-label)" }}>{label}</span>
       <input
         type={type}
         value={value}
@@ -132,12 +133,12 @@ function Field({ label, value, onChange, type = "text", placeholder, mono = fals
         autoComplete="off"
         spellCheck={false}
         style={{
-          background: "rgba(255,255,255,0.04)",
-          border: "1px solid rgba(255,255,255,0.1)",
+          background: "var(--card)",
+          border: "1px solid var(--border-mid)",
           borderRadius: 6,
           padding: "8px 10px",
           fontSize: 12,
-          color: "#fff",
+          color: "var(--text)",
           fontFamily: mono ? "monospace" : undefined,
           fontVariantNumeric: mono ? "tabular-nums" : undefined,
           outline: "none",
@@ -151,9 +152,9 @@ function Btn({ children, onClick, variant = "secondary", disabled }: {
   children: React.ReactNode; onClick: () => void;
   variant?: "primary" | "secondary" | "danger"; disabled?: boolean;
 }) {
-  const palette = variant === "primary" ? { bg: "#06b6d4", fg: "#0a0c12" }
-                : variant === "danger"  ? { bg: "rgba(239,68,68,0.15)", fg: "#ef4444" }
-                                        : { bg: "rgba(255,255,255,0.06)", fg: "rgba(255,255,255,0.7)" };
+  const palette = variant === "primary" ? { bg: "var(--brand)", fg: "var(--bg)" }
+                : variant === "danger"  ? { bg: "rgba(239,68,68,0.15)", fg: "var(--critical)" }
+                                        : { bg: "var(--surface)", fg: "var(--text-mid)" };
   return (
     <button
       onClick={onClick}
@@ -161,7 +162,7 @@ function Btn({ children, onClick, variant = "secondary", disabled }: {
       style={{
         background: palette.bg,
         color: palette.fg,
-        border: variant === "primary" ? "none" : `1px solid ${variant === "danger" ? "rgba(239,68,68,0.35)" : "rgba(255,255,255,0.12)"}`,
+        border: variant === "primary" ? "none" : `1px solid ${variant === "danger" ? "rgba(239,68,68,0.35)" : "var(--border-mid)"}`,
         borderRadius: 6,
         padding: "6px 12px",
         fontSize: 11,
@@ -360,14 +361,14 @@ export default function SetupWizard() {
   return (
     <div style={{ maxWidth: 1100, margin: "0 auto", padding: "32px 24px 80px" }}>
       <header style={{ marginBottom: 32 }}>
-        <h1 style={{ fontSize: 28, fontWeight: 700, color: "#fff", marginBottom: 8 }}>Setup</h1>
-        <p style={{ fontSize: 13, color: "rgba(255,255,255,0.55)", lineHeight: 1.6, maxWidth: 720 }}>
-          Fill in the URL + credentials for each service you want to monitor, click <b style={{ color: "#06b6d4" }}>Test</b> to confirm
-          the dashboard can reach it, then copy the generated config at the bottom into your <code style={{ color: "rgba(6,182,212,0.85)" }}>docker-compose.yml</code> or <code style={{ color: "rgba(6,182,212,0.85)" }}>docker run</code> command and redeploy.
+        <h1 style={{ fontSize: 28, fontWeight: 700, color: "var(--text)", marginBottom: 8 }}>Setup</h1>
+        <p style={{ fontSize: 13, color: "var(--text-muted)", lineHeight: 1.6, maxWidth: 720 }}>
+          Fill in the URL + credentials for each service you want to monitor, click <b style={{ color: "var(--brand)" }}>Test</b> to confirm
+          the dashboard can reach it, then copy the generated config at the bottom into your <code style={{ color: "var(--brand-dim)" }}>docker-compose.yml</code> or <code style={{ color: "var(--brand-dim)" }}>docker run</code> command and redeploy.
         </p>
-        <p style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", marginTop: 8 }}>
+        <p style={{ fontSize: 11, color: "var(--text-faint)", marginTop: 8 }}>
           Form state (including credentials) is stored in your browser&apos;s localStorage so a refresh doesn&apos;t lose progress. Click{" "}
-          <span style={{ color: "#ef4444", cursor: "pointer", textDecoration: "underline" }} onClick={clearEverything}>Clear everything</span>{" "}
+          <span style={{ color: "var(--critical)", cursor: "pointer", textDecoration: "underline" }} onClick={clearEverything}>Clear everything</span>{" "}
           when you&apos;re done.
         </p>
       </header>
@@ -393,8 +394,8 @@ export default function SetupWizard() {
             return (
               <div key={svc.id}
                 style={{
-                  background: row.enabled ? "rgba(6,182,212,0.05)" : "rgba(255,255,255,0.02)",
-                  border: `1px solid ${row.enabled ? "rgba(6,182,212,0.2)" : "rgba(255,255,255,0.06)"}`,
+                  background: row.enabled ? "var(--settings-active-bg)" : "var(--surface-dim)",
+                  border: `1px solid ${row.enabled ? "var(--settings-active-border)" : "var(--border-dim)"}`,
                   borderRadius: 8,
                   padding: 14,
                   transition: "all 0.15s",
@@ -404,10 +405,10 @@ export default function SetupWizard() {
                     type="checkbox"
                     checked={row.enabled}
                     onChange={e => updateRow(svc.id, { enabled: e.target.checked, url: row.url || deriveDefaultUrl(state.truenasIp, svc.defaultPort) })}
-                    style={{ width: 14, height: 14, accentColor: "#06b6d4", cursor: "pointer" }}
+                    style={{ width: 14, height: 14, accentColor: "var(--brand)", cursor: "pointer" }}
                   />
-                  <span style={{ fontSize: 13, fontWeight: 600, color: row.enabled ? "#fff" : "rgba(255,255,255,0.5)" }}>{svc.label}</span>
-                  <span style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>{svc.description}</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: row.enabled ? "var(--text)" : "var(--text-dim)" }}>{svc.label}</span>
+                  <span style={{ fontSize: 11, color: "var(--text-faint)" }}>{svc.description}</span>
                   <div style={{ marginLeft: "auto" }}><StatusPill status={row.testStatus} /></div>
                 </div>
                 {row.enabled && (
@@ -435,8 +436,8 @@ export default function SetupWizard() {
                       </Btn>
                     </div>
                     {svc.helpText && (
-                      <div style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", display: "flex", alignItems: "center", gap: 4 }}>
-                        <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 14, height: 14, borderRadius: 7, border: "1px solid rgba(255,255,255,0.15)", fontSize: 9, color: "rgba(255,255,255,0.4)", flexShrink: 0 }}>?</span>
+                      <div style={{ fontSize: 10, color: "var(--text-faint)", display: "flex", alignItems: "center", gap: 4 }}>
+                        <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 14, height: 14, borderRadius: 7, border: "1px solid var(--border-bright)", fontSize: 9, color: "var(--text-label)", flexShrink: 0 }}>?</span>
                         <span>Where to find it: <em>{svc.helpText}</em></span>
                       </div>
                     )}
@@ -451,8 +452,8 @@ export default function SetupWizard() {
       {/* ── 3. MikroTik ── */}
       <Section title="3 · MikroTik router (optional)" subtitle="If you've got a MikroTik router, set up a read-only RouterOS user and put its credentials here. The dashboard never writes anything to the router.">
         <div style={{
-          background: state.mikrotik.enabled ? "rgba(6,182,212,0.05)" : "rgba(255,255,255,0.02)",
-          border: `1px solid ${state.mikrotik.enabled ? "rgba(6,182,212,0.2)" : "rgba(255,255,255,0.06)"}`,
+          background: state.mikrotik.enabled ? "var(--settings-active-bg)" : "var(--surface-dim)",
+          border: `1px solid ${state.mikrotik.enabled ? "var(--settings-active-border)" : "var(--border-dim)"}`,
           borderRadius: 8, padding: 14,
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -460,9 +461,9 @@ export default function SetupWizard() {
               type="checkbox"
               checked={state.mikrotik.enabled}
               onChange={e => setState(s => ({ ...s, mikrotik: { ...s.mikrotik, enabled: e.target.checked } }))}
-              style={{ width: 14, height: 14, accentColor: "#06b6d4", cursor: "pointer" }}
+              style={{ width: 14, height: 14, accentColor: "var(--brand)", cursor: "pointer" }}
             />
-            <span style={{ fontSize: 13, fontWeight: 600, color: state.mikrotik.enabled ? "#fff" : "rgba(255,255,255,0.5)" }}>MikroTik router</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: state.mikrotik.enabled ? "var(--text)" : "var(--text-dim)" }}>MikroTik router</span>
             <div style={{ marginLeft: "auto" }}><StatusPill status={state.mikrotik.testStatus} /></div>
           </div>
           {state.mikrotik.enabled && (
@@ -481,8 +482,8 @@ export default function SetupWizard() {
       {/* ── 4. Grafana embed ── */}
       <Section title="4 · Grafana embed (optional)" subtitle="If you want a Grafana panel embedded in the dashboard, paste the dashboard's UID and your Prometheus datasource UID. Both are visible in Grafana's URLs.">
         <div style={{
-          background: state.grafana.enabled ? "rgba(249,115,22,0.05)" : "rgba(255,255,255,0.02)",
-          border: `1px solid ${state.grafana.enabled ? "rgba(249,115,22,0.2)" : "rgba(255,255,255,0.06)"}`,
+          background: state.grafana.enabled ? "rgba(249,115,22,0.05)" : "var(--surface-dim)",
+          border: `1px solid ${state.grafana.enabled ? "rgba(249,115,22,0.2)" : "var(--border-dim)"}`,
           borderRadius: 8, padding: 14,
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -492,7 +493,7 @@ export default function SetupWizard() {
               onChange={e => setState(s => ({ ...s, grafana: { ...s.grafana, enabled: e.target.checked, baseUrl: s.grafana.baseUrl || `http://${s.truenasIp}:30037` } }))}
               style={{ width: 14, height: 14, accentColor: "#f97316", cursor: "pointer" }}
             />
-            <span style={{ fontSize: 13, fontWeight: 600, color: state.grafana.enabled ? "#fff" : "rgba(255,255,255,0.5)" }}>Grafana panel</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: state.grafana.enabled ? "var(--text)" : "var(--text-dim)" }}>Grafana panel</span>
           </div>
           {state.grafana.enabled && (
             <div style={{ marginTop: 12, marginLeft: 26, display: "flex", flexDirection: "column", gap: 14 }}>
@@ -504,9 +505,9 @@ export default function SetupWizard() {
               </div>
 
               {/* Multi-panel support */}
-              <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 12 }}>
+              <div style={{ borderTop: "1px solid var(--border-dim)", paddingTop: 12 }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                  <span style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Additional panels</span>
+                  <span style={{ fontSize: 10, color: "var(--text-label)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Additional panels</span>
                   <button onClick={() => {
                     const s = { ...state, grafana: { ...state.grafana, panels: [...state.grafana.panels, { panelId: "", label: "", size: "md" as const }] } };
                     setState(s); saveState(s);
@@ -527,9 +528,9 @@ export default function SetupWizard() {
                         <button key={sz} onClick={() => { const s = { ...state, grafana: { ...state.grafana, panels: state.grafana.panels.map((p, i) => i === pi ? { ...p, size: sz } : p) } }; setState(s); saveState(s); }}
                           style={{
                             fontSize: 9, padding: "4px 8px", borderRadius: 4, cursor: "pointer",
-                            background: panel.size === sz ? "rgba(249,115,22,0.2)" : "rgba(255,255,255,0.03)",
-                            border: `1px solid ${panel.size === sz ? "rgba(249,115,22,0.4)" : "rgba(255,255,255,0.08)"}`,
-                            color: panel.size === sz ? "#f97316" : "rgba(255,255,255,0.35)",
+                            background: panel.size === sz ? "rgba(249,115,22,0.2)" : "var(--surface-dim)",
+                            border: `1px solid ${panel.size === sz ? "rgba(249,115,22,0.4)" : "var(--border)"}`,
+                            color: panel.size === sz ? "#f97316" : "var(--text-faint)",
                             fontWeight: panel.size === sz ? 600 : 400,
                           }}>{sz.toUpperCase()}</button>
                       ))}
@@ -539,7 +540,7 @@ export default function SetupWizard() {
                   </div>
                 ))}
                 {state.grafana.panels.length === 0 && (
-                  <span style={{ fontSize: 10, color: "rgba(255,255,255,0.25)", fontStyle: "italic" }}>
+                  <span style={{ fontSize: 10, color: "var(--text-ghost)", fontStyle: "italic" }}>
                     No extra panels. The default panel above will be shown. Click &quot;+ Add panel&quot; to embed more.
                   </span>
                 )}
@@ -552,7 +553,7 @@ export default function SetupWizard() {
       {/* ── Action bar ── */}
       <div style={{ display: "flex", gap: 10, alignItems: "center", margin: "32px 0 16px", flexWrap: "wrap" }}>
         <Btn variant="primary" onClick={testAll}>Test every enabled service</Btn>
-        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "rgba(255,255,255,0.4)", cursor: "pointer" }}>
+        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--text-label)", cursor: "pointer" }}>
           <input type="checkbox" checked={showPasswords} onChange={e => setShowPasswords(e.target.checked)} />
           show passwords
         </label>
@@ -565,16 +566,16 @@ export default function SetupWizard() {
       <Section title="5 · Preferences" subtitle="Search engine, timezone, theme, and display defaults. These are optional — the dashboard works with sensible defaults.">
         <div style={{
           display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12,
-          background: "rgba(255,255,255,0.02)",
-          border: "1px solid rgba(255,255,255,0.08)",
+          background: "var(--surface-dim)",
+          border: "1px solid var(--border)",
           borderRadius: 10, padding: 16,
         }}>
           <div>
-            <label style={{ display: "block", fontSize: 10, color: "rgba(255,255,255,0.35)", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>Search Engine</label>
+            <label style={{ display: "block", fontSize: 10, color: "var(--text-faint)", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>Search Engine</label>
             <select
               value={state.preferences.searchEngine}
               onChange={e => { const s = { ...state, preferences: { ...state.preferences, searchEngine: e.target.value } }; setState(s); saveState(s); }}
-              style={{ width: "100%", background: "#111", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 6, padding: "8px 10px", fontSize: 12, color: "#fff", outline: "none" }}
+              style={{ width: "100%", background: "var(--settings-input)", border: "1px solid var(--border-mid)", borderRadius: 6, padding: "8px 10px", fontSize: 12, color: "var(--text)", outline: "none" }}
             >
               <option value="google">Google</option>
               <option value="bing">Bing</option>
@@ -583,41 +584,22 @@ export default function SetupWizard() {
             </select>
           </div>
           <div>
-            <label style={{ display: "block", fontSize: 10, color: "rgba(255,255,255,0.35)", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>Timezone</label>
+            <label style={{ display: "block", fontSize: 10, color: "var(--text-faint)", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>Timezone</label>
             <select
               value={state.preferences.timezone}
               onChange={e => { const s = { ...state, preferences: { ...state.preferences, timezone: e.target.value } }; setState(s); saveState(s); }}
-              style={{ width: "100%", background: "#111", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 6, padding: "8px 10px", fontSize: 12, color: "#fff", outline: "none" }}
+              style={{ width: "100%", background: "var(--settings-input)", border: "1px solid var(--border-mid)", borderRadius: 6, padding: "8px 10px", fontSize: 12, color: "var(--text)", outline: "none" }}
             >
               <option value="">Browser local (auto)</option>
-              {[
-                "Pacific/Auckland", "Pacific/Fiji",
-                "Australia/Sydney", "Australia/Adelaide", "Australia/Perth", "Australia/Hobart", "Australia/Brisbane",
-                "Asia/Tokyo", "Asia/Seoul", "Asia/Shanghai", "Asia/Hong_Kong", "Asia/Singapore",
-                "Asia/Kolkata", "Asia/Dubai", "Asia/Karachi",
-                "Europe/Moscow", "Europe/Istanbul", "Europe/Athens", "Europe/Helsinki",
-                "Europe/Berlin", "Europe/Paris", "Europe/Amsterdam", "Europe/Zurich",
-                "Europe/London",
-                "Atlantic/Reykjavik",
-                "America/Sao_Paulo", "America/Argentina/Buenos_Aires",
-                "America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles",
-                "America/Anchorage", "Pacific/Honolulu",
-                "America/Toronto", "America/Vancouver",
-              ].map(tz => (
+              {TIMEZONES.map(tz => (
                 <option key={tz} value={tz}>{tz.replace(/_/g, " ")}</option>
               ))}
             </select>
           </div>
           <div style={{ gridColumn: "1 / -1" }}>
-            <label style={{ display: "block", fontSize: 10, color: "rgba(255,255,255,0.35)", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>Theme</label>
+            <label style={{ display: "block", fontSize: 10, color: "var(--text-faint)", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>Theme</label>
             <div style={{ display: "flex", gap: 8 }}>
-              {([
-                { key: "midnight", label: "Midnight",  bg: "#0a0c12", brand: "#06b6d4" },
-                { key: "forge",    label: "Forge",     bg: "#12100a", brand: "#f59e0b" },
-                { key: "forest",   label: "Forest",    bg: "#080f0a", brand: "#10b981" },
-                { key: "plum",     label: "Plum",      bg: "#10081a", brand: "#d946ef" },
-                { key: "paper",    label: "Paper",     bg: "#f8fafc", brand: "#0284c7" },
-              ] as const).map(t => {
+              {THEMES.map(t => {
                 const active = state.preferences.theme === t.key;
                 return (
                   <button key={t.key}
@@ -625,8 +607,8 @@ export default function SetupWizard() {
                     style={{
                       flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
                       padding: "10px 4px", borderRadius: 8, cursor: "pointer",
-                      background: active ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.02)",
-                      border: `1.5px solid ${active ? t.brand : "rgba(255,255,255,0.08)"}`,
+                      background: active ? "var(--surface)" : "var(--surface-dim)",
+                      border: `1.5px solid ${active ? t.brand : "var(--border)"}`,
                       transition: "all 0.15s",
                     }}
                   >
@@ -637,7 +619,7 @@ export default function SetupWizard() {
                     }}>
                       <div style={{ width: 12, height: 12, borderRadius: 6, background: t.brand }} />
                     </div>
-                    <span style={{ fontSize: 10, color: active ? "#fff" : "rgba(255,255,255,0.5)" }}>{t.label}</span>
+                    <span style={{ fontSize: 10, color: active ? "var(--text)" : "var(--text-dim)" }}>{t.label}</span>
                   </button>
                 );
               })}
@@ -649,8 +631,8 @@ export default function SetupWizard() {
       {/* ── 6. Save & apply ── */}
       <Section title="6 · Save & apply" subtitle="Writes your config to the container's data volume. The dashboard picks up the change within ~3 seconds — no redeploy needed.">
         <div style={{
-          background: "rgba(255,255,255,0.02)",
-          border: "1px solid rgba(255,255,255,0.08)",
+          background: "var(--surface-dim)",
+          border: "1px solid var(--border)",
           borderRadius: 10, padding: 16,
           display: "flex", flexDirection: "column", gap: 12,
         }}>
@@ -675,22 +657,22 @@ export default function SetupWizard() {
               {saveStatus.state === "saving" ? "Saving…" : "Save & apply"}
             </Btn>
             {saveStatus.state === "ok" && (
-              <span style={{ fontSize: 12, color: "#10b981", fontWeight: 600 }}>
-                ✓ {saveStatus.msg} · <Link href="/" style={{ color: "#06b6d4", textDecoration: "underline" }}>Back to dashboard</Link>
+              <span style={{ fontSize: 12, color: "var(--ok)", fontWeight: 600 }}>
+                ✓ {saveStatus.msg} · <Link href="/" style={{ color: "var(--brand)", textDecoration: "underline" }}>Back to dashboard</Link>
               </span>
             )}
             {saveStatus.state === "err" && (
-              <span style={{ fontSize: 12, color: "#ef4444", maxWidth: 600 }}>
+              <span style={{ fontSize: 12, color: "var(--critical)", maxWidth: 600 }}>
                 ✗ {saveStatus.msg}
               </span>
             )}
           </div>
 
-          <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 12 }}>
+          <div style={{ borderTop: "1px solid var(--border-dim)", paddingTop: 12 }}>
             <button
               onClick={() => setShowAdvanced(s => !s)}
               style={{
-                background: "none", border: "none", color: "rgba(255,255,255,0.5)",
+                background: "none", border: "none", color: "var(--text-dim)",
                 fontSize: 11, cursor: "pointer", padding: 0, fontWeight: 500,
               }}>
               {showAdvanced ? "▾" : "▸"} Or copy the generated config manually (for env-var-based deployments)
@@ -703,9 +685,9 @@ export default function SetupWizard() {
                 {(["compose", "run", "env"] as const).map(t => (
                   <button key={t} onClick={() => setOutputTab(t)}
                     style={{
-                      background: outputTab === t ? "rgba(6,182,212,0.15)" : "rgba(255,255,255,0.04)",
-                      border: `1px solid ${outputTab === t ? "rgba(6,182,212,0.4)" : "rgba(255,255,255,0.08)"}`,
-                      color: outputTab === t ? "#06b6d4" : "rgba(255,255,255,0.6)",
+                      background: outputTab === t ? "var(--settings-active-bg)" : "var(--surface-dim)",
+                      border: `1px solid ${outputTab === t ? "var(--settings-active-border)" : "var(--border)"}`,
+                      color: outputTab === t ? "var(--brand)" : "var(--text-muted)",
                       padding: "6px 14px", borderRadius: 6, fontSize: 11, cursor: "pointer", fontWeight: 600,
                     }}>
                     {t === "compose" ? "docker-compose.yml" : t === "run" ? "docker run" : ".env"}
@@ -716,11 +698,11 @@ export default function SetupWizard() {
                 </div>
               </div>
               <pre style={{
-                background: "#0a0d12",
-                border: "1px solid rgba(255,255,255,0.08)",
+                background: "var(--bg)",
+                border: "1px solid var(--border)",
                 borderRadius: 8, padding: 16,
                 fontSize: 11, fontFamily: "monospace",
-                color: "rgba(255,255,255,0.85)",
+                color: "var(--text-secondary)",
                 overflow: "auto",
                 maxHeight: 480,
                 lineHeight: 1.6,
@@ -734,10 +716,10 @@ export default function SetupWizard() {
         </div>
       </Section>
 
-      <footer style={{ marginTop: 40, paddingTop: 20, borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-        <p style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", lineHeight: 1.6 }}>
+      <footer style={{ marginTop: 40, paddingTop: 20, borderTop: "1px solid var(--border-dim)" }}>
+        <p style={{ fontSize: 11, color: "var(--text-faint)", lineHeight: 1.6 }}>
           After applying the config and restarting the container, head back to{" "}
-          <Link href="/" style={{ color: "#06b6d4" }}>the dashboard</Link> and check Settings → Connections to confirm everything&apos;s green.
+          <Link href="/" style={{ color: "var(--brand)" }}>the dashboard</Link> and check Settings → Connections to confirm everything&apos;s green.
         </p>
       </footer>
     </div>
@@ -747,8 +729,8 @@ export default function SetupWizard() {
 function Section({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
   return (
     <section style={{ marginBottom: 28 }}>
-      <h2 style={{ fontSize: 14, fontWeight: 700, color: "#fff", marginBottom: 4, letterSpacing: "0.02em" }}>{title}</h2>
-      {subtitle && <p style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginBottom: 14, lineHeight: 1.6 }}>{subtitle}</p>}
+      <h2 style={{ fontSize: 14, fontWeight: 700, color: "var(--text)", marginBottom: 4, letterSpacing: "0.02em" }}>{title}</h2>
+      {subtitle && <p style={{ fontSize: 11, color: "var(--text-label)", marginBottom: 14, lineHeight: 1.6 }}>{subtitle}</p>}
       {children}
     </section>
   );
