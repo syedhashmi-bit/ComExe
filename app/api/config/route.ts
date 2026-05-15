@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { promises as fs } from "node:fs";
-import path from "node:path";
 import { loadConfig, writeConfigFile, isConfigWritable, invalidateConfigCache, type PartialFileConfig } from "@/app/lib/server-config";
+import { loadBookmarks } from "@/app/lib/bookmarks";
+import type { BookmarkColumn } from "@/app/lib/types";
 
 // ── /api/config ───────────────────────────────────────────────────────────────
 // GET  → runtime client-side config (URLs, bookmarks, Grafana embed, etc.).
@@ -37,51 +37,6 @@ export interface ClientConfig {
   // True when the data/ volume is writable, i.e. POST will succeed. The wizard
   // shows different copy if false.
   writable: boolean;
-}
-
-export interface BookmarkColumn {
-  title:       string;
-  accentColor: string;
-  items:       { name: string; url: string; icon: string }[];
-}
-
-const DEFAULT_BOOKMARKS: BookmarkColumn[] = [
-  {
-    title: "Social",
-    accentColor: "#06b6d4",
-    items: [
-      { name: "YouTube",   url: "https://www.youtube.com",   icon: "https://www.google.com/s2/favicons?domain=youtube.com&sz=32"  },
-      { name: "Reddit",    url: "https://www.reddit.com",    icon: "https://www.google.com/s2/favicons?domain=reddit.com&sz=32"   },
-    ],
-  },
-  {
-    title: "Productivity",
-    accentColor: "#10b981",
-    items: [
-      { name: "ChatGPT",   url: "https://chat.openai.com",   icon: "https://www.google.com/s2/favicons?domain=openai.com&sz=32"   },
-      { name: "Gmail",     url: "https://mail.google.com",   icon: "https://www.google.com/s2/favicons?domain=gmail.com&sz=32"    },
-    ],
-  },
-];
-
-let bookmarksCache: { data: BookmarkColumn[]; ts: number } | null = null;
-const BOOKMARKS_TTL = 60_000;
-
-async function loadBookmarks(): Promise<BookmarkColumn[]> {
-  if (bookmarksCache && Date.now() - bookmarksCache.ts < BOOKMARKS_TTL) {
-    return bookmarksCache.data;
-  }
-  const filePath = process.env.BOOKMARKS_PATH ?? path.join(process.cwd(), "bookmarks.json");
-  try {
-    const raw    = await fs.readFile(filePath, "utf8");
-    const parsed = JSON.parse(raw) as unknown;
-    if (Array.isArray(parsed)) {
-      bookmarksCache = { data: parsed as BookmarkColumn[], ts: Date.now() };
-      return parsed as BookmarkColumn[];
-    }
-  } catch { /* fall through to default — file missing or malformed */ }
-  bookmarksCache = { data: DEFAULT_BOOKMARKS, ts: Date.now() };
-  return DEFAULT_BOOKMARKS;
 }
 
 export async function GET() {
