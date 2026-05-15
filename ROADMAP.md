@@ -101,12 +101,14 @@ All tiers shipped. Order was:
 
 ---
 
-## Tier 4 — next up (proposed)
+## Tier 4 — shipped ✅
 
-Focus: turn the dashboard from passive monitoring into an active control panel,
-and fix the rough edges visible in production today.
+All P0/P1/P2 items below are now in main. See commits 84b2a17 (Grafana
+troubleshooter), 49a1f56 (alerts), 59e0fec (drag/refresh/search),
+eb0f199 (PWA + update banner), 8b2f18c (MikroTik devices + WoL),
+724aecc (Docker actions), b18ca57 (native Grafana panels).
 
-### Alerts & notifications (P0)
+### ✅ Alerts & notifications (P0)
 Right now metric and service thresholds change a colour pill and nothing else.
 Add real alerting:
 
@@ -127,7 +129,7 @@ metric poll, dedupes, and dispatches. Persist last-fire timestamp per
 `(event, target)` in `data/alerts.json` so a container restart doesn't
 re-fire stale alerts.
 
-### Grafana embed troubleshooter (P0)
+### ✅ Grafana embed troubleshooter (P0)
 Current production shows "Forbidden" in the Grafana iframe because anonymous
 access isn't enabled on Grafana, and iframes don't carry session cookies. The
 card should explain *why* and offer fixes:
@@ -143,13 +145,13 @@ card should explain *why* and offer fixes:
 - Pre-flight check on `/setup` — when user enters Grafana URL, test
   `?orgId=1` *and* `/render/d-solo/...` to detect anon vs token setup.
 
-### Native Grafana panels (no iframe) (P1)
+### ✅ Native Grafana panels (no iframe) (P1)
 Longer fix: replace the iframe with a server-side proxy that fetches the
 panel as PNG via Grafana's `/render` API, or queries the underlying
 datasource via the `/api/ds/query` endpoint and renders with our own Canvas
 chart code. Removes the auth / X-Frame issue entirely and respects our theme.
 
-### Drag-to-rearrange cards (P1)
+### ✅ Drag-to-rearrange cards (P1)
 The 3-column metric grid is hardcoded. Users want different priorities.
 
 - HTML5 drag-drop on every Card top-stripe (cursor change on hover).
@@ -158,7 +160,7 @@ The 3-column metric grid is hardcoded. Users want different priorities.
 - "Reset layout" button in Settings.
 - Same treatment for the services panel grid (within a category).
 
-### Per-card refresh override (P1)
+### ✅ Per-card refresh override (P1)
 Single `settings.refreshInterval` applies everywhere. Some users want metrics
 at 1s but services at 30s. Add a sub-config:
 
@@ -166,7 +168,7 @@ at 1s but services at 30s. Add a sub-config:
 - UI in Settings → "Polling intervals" section with sliders per endpoint.
 - Default-on toggle: "pause polling when tab not visible" (uses `document.hidden`).
 
-### Container actions (P1)
+### ✅ Container actions (P1)
 Wire up the Docker socket (`-v /var/run/docker.sock:/var/run/docker.sock:ro`)
 to expose:
 
@@ -177,7 +179,7 @@ to expose:
 Behind a `--cap-add` and an explicit env-var opt-in (`ENABLE_DOCKER_CONTROL=1`)
 since the Docker socket grants root-equivalent on the host.
 
-### MikroTik device list + bandwidth (P1)
+### ✅ MikroTik device list + WoL (P1) · ⏸ per-IP bandwidth deferred
 Mikrotik tab currently shows only router-level stats. Add:
 
 - DHCP leases table (host, MAC, IP, last-seen, vendor lookup).
@@ -187,18 +189,18 @@ Mikrotik tab currently shows only router-level stats. Add:
 - Block/unblock toggle (writes to firewall rule). Behind same Docker-control
   env opt-in for safety.
 
-### Service-search (P1)
+### ✅ Service-search (P1)
 Press `/` to focus a fuzzy filter that highlights matching service cards and
 scrolls them into view. Useful once the services panel grows past 10–15
 cards.
 
-### PWA + offline shell (P2)
+### ✅ PWA manifest (P2) · ⏸ offline shell deferred (needs service worker)
 Add `manifest.json` + a minimal service worker so the dashboard can be
 installed as an app icon on phones/tablets/desktops. Offline shell falls back
 to the last cached metrics with a "stale since {ts}" banner — useful when
 the wifi blips but the user just wants to glance at the dashboard.
 
-### Update-available banner (P2)
+### ✅ Update-available banner (P2)
 On every page load, compare `process.env.IMAGE_DIGEST` (baked at build time
 via Dockerfile `ARG`) with the digest of `:latest` on GHCR. If newer, show a
 dismissable banner: "v1.4 available — release notes". Click-through links to
@@ -258,7 +260,13 @@ prop combo (`Card alertLevel`, `Sparkline gradient`, `RadialGauge thresholds`).
 
 ## How to pick next
 
-If you ask "what should we build next?", the answer is **alerts + Grafana
+Tier 4 is fully shipped. The Tier 5 list above is what remains. My
+recommendation: **arm64 multi-arch + historical persistence** are the two
+that have the broadest user impact. Auth & HTTPS only matters if you're
+exposing ComExe to the internet (don't, without a reverse proxy + auth
+in front).
+
+Earlier recommendation (now stale): build **alerts + Grafana
 fix** (Tier 4 P0). Both have visible user value, both are reasonably scoped,
 and neither requires new infra. Auth / HTTPS only matters once someone
 actually wants to expose ComExe to the internet — and the docs already
