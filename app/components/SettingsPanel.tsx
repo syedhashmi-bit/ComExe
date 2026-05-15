@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import type { Settings, ServiceResult, SearchEngine, TempUnit, DataUnit } from "@/app/lib/types";
 import { THEMES, TIMEZONES } from "@/app/lib/constants";
 import { SearchEngineIcon } from "@/app/components/SearchBar";
@@ -209,9 +210,164 @@ export function SettingsPanel({ settings, onUpdate, onClose, services }: {
           </div>
         )}
 
+        <AlertsSection />
+
         <div style={{ height: 1, background: "var(--settings-input)", marginTop: "auto" }} />
         <span className="text-[9px] text-center" style={{ color: "var(--settings-input-border)" }}>resets on page reload</span>
       </div>
     </>
+  );
+}
+
+// ── AlertsSection ────────────────────────────────────────────────────────────
+// Self-contained: loads alert config from /api/alerts on mount, PATCHes on
+// change with a debounce on the webhook URL so we don't spam the server on
+// every keystroke.
+
+interface AlertConfig {
+  enabled:              boolean;
+  webhookUrl:           string;
+  webhookFormat:        "generic" | "discord" | "slack" | "ntfy";
+  throttleMs:           number;
+  browserNotifications: boolean;
+  quietHoursEnabled:    boolean;
+  quietHoursStart:      number;
+  quietHoursEnd:        number;
+}
+
+function AlertsSection() {
+  const [cfg, setCfg]       = useState<AlertConfig | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError]   = useState<string | null>(null);
+  const [notifPerm, setNotifPerm] = useState<NotificationPermission | "unsupported">(
+    typeof Notification === "undefined" ? "unsupported" : Notification.permission
+  );
+
+  useEffect(() => {
+    fetch("/api/alerts")
+      .then(r => r.json())
+      .then(d => setCfg(d.config))
+      .catch(() => setError("Could not load alert config"));
+  }, []);
+
+  async function patch(partial: Partial<AlertConfig>) {
+    if (!cfg) return;
+    const next = { ...cfg, ...partial };
+    setCfg(next);
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/alerts", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(partial),
+      });
+      const body = await res.json();
+      if (!res.ok || !body.ok) setError(body.message ?? `Save failed (HTTP ${res.status})`);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function requestNotificationPermission() {
+    if (typeof Notification === "undefined") return;
+    const p = await Notification.requestPermission();
+    setNotifPerm(p);
+  }
+
+  if (!cfg) return null;
+
+  const inputStyle: React.CSSProperties = {
+    fontSize: 10, background: "var(--settings-input)", color: "var(--settings-text)",
+    border: "1px solid var(--settings-input-border)", borderRadius: 4, padding: "4px 8px",
+    width: "100%", fontFamily: "monospace", outline: "none",
+  };
+
+  return (
+    <div className="flex flex-col gap-2">
+      <span className="text-[10px] uppercase tracking-widest" style={{ color: "var(--settings-label)" }}>Alerts</span>
+
+      {/* Master toggle */}
+      <label className="flex items-center gap-2 cursor-pointer" style={{ fontSize: 10, color: "var(--settings-text)" }}>
+        <input type="checkbox" checked={cfg.enabled} onChange={e => patch({ enabled: e.target.checked })} />
+        <span>Enabled</span>
+        {saving && <span style={{ marginLeft: "auto", fontSize: 9, color: "var(--settings-label)" }}>saving…</span>}
+      </label>
+
+      {cfg.enabled && (
+        <>
+          {/* Browser notifications */}
+          <label className="flex items-center gap-2 cursor-pointer" style={{ fontSize: 10, color: "var(--settings-text)" }}>
+            <input type="checkbox" checked={cfg.browserNotifications} onChange={e => patch({ browserNotifications: e.target.checked })} />
+            <span>Browser notifications</span>
+          </label>
+          {cfg.browserNotifications && notifPerm !== "granted" && notifPerm !== "unsupported" && (
+            <button onClick={requestNotificationPermission}
+              style={{ fontSize: 9, padding: "4px 8px", borderRadius: 4, background: "var(--brand)", color: "#0a0c12", border: "none", cursor: "pointer", alignSelf: "flex-start", fontWeight: 600 }}>
+              {notifPerm === "denied" ? "Permission denied — check browser site settings" : "Grant browser permission"}
+            </button>
+          )}
+
+          {/* Webhook URL */}
+          <input
+            type="url"
+            placeholder="https://discord.com/api/webhooks/… (optional)"
+            value={cfg.webhookUrl}
+            onChange={e => setCfg({ ...cfg, webhookUrl: e.target.value })}
+            onBlur={e => patch({ webhookUrl: e.target.value })}
+            style={inputStyle}
+          />
+
+          {/* Webhook format */}
+          {cfg.webhookUrl && (
+            <select value={cfg.webhookFormat} onChange={e => patch({ webhookFormat: e.target.value as AlertConfig["webhookFormat"] })}
+              style={{ ...inputStyle, fontFamily: "inherit" }}>
+              <option value="generic">Generic JSON</option>
+              <option value="discord">Discord</option>
+              <option value="slack">Slack</option>
+              <option value="ntfy">ntfy</option>
+            </select>
+          )}
+
+          {/* Throttle */}
+          <div className="flex flex-col gap-1" style={{ fontSize: 9, color: "var(--settings-label)" }}>
+            Throttle per event
+            <select value={cfg.throttleMs} onChange={e => patch({ throttleMs: Number(e.target.value) })}
+              style={{ ...inputStyle, fontFamily: "inherit" }}>
+              <option value={60_000}>1 minute</option>
+              <option value={5 * 60_000}>5 minutes</option>
+              <option value={15 * 60_000}>15 minutes</option>
+              <option value={60 * 60_000}>1 hour</option>
+            </select>
+          </div>
+
+          {/* Quiet hours */}
+          <label className="flex items-center gap-2 cursor-pointer" style={{ fontSize: 10, color: "var(--settings-text)" }}>
+            <input type="checkbox" checked={cfg.quietHoursEnabled} onChange={e => patch({ quietHoursEnabled: e.target.checked })} />
+            <span>Quiet hours (suppress webhook)</span>
+          </label>
+          {cfg.quietHoursEnabled && (
+            <div className="flex gap-2 items-center" style={{ fontSize: 9, color: "var(--settings-label)" }}>
+              From
+              <select value={cfg.quietHoursStart} onChange={e => patch({ quietHoursStart: Number(e.target.value) })}
+                style={{ ...inputStyle, width: "auto", fontFamily: "inherit" }}>
+                {Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{String(h).padStart(2, "0")}:00</option>)}
+              </select>
+              to
+              <select value={cfg.quietHoursEnd} onChange={e => patch({ quietHoursEnd: Number(e.target.value) })}
+                style={{ ...inputStyle, width: "auto", fontFamily: "inherit" }}>
+                {Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{String(h).padStart(2, "0")}:00</option>)}
+              </select>
+            </div>
+          )}
+
+          {error && (
+            <div style={{ fontSize: 9, color: "var(--critical)", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 4, padding: "4px 8px" }}>{error}</div>
+          )}
+        </>
+      )}
+    </div>
   );
 }

@@ -102,6 +102,9 @@ export default function Dashboard() {
   const [bookmarkDraft,  setBookmarkDraft]  = useState<BookmarkColumn[] | null>(null);
   const [bookmarkSaving, setBookmarkSaving] = useState(false);
   const [bookmarkError,  setBookmarkError]  = useState<string | null>(null);
+  const [alertsEnabled,  setAlertsEnabled]  = useState(false);
+  const [alertCount,     setAlertCount]     = useState(0);   // session-level fire counter for the header pill
+  const [alertsBrowserNotif, setAlertsBrowserNotif] = useState(true);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const [cpuHistory,     setCpuHistory]     = useState<number[]>([]);
@@ -294,6 +297,48 @@ export default function Dashboard() {
   useEffect(() => { if (demoMode) return; fetchServices(); const id = setInterval(fetchServices, 3_000); return () => clearInterval(id); }, [fetchServices, demoMode]);
   useEffect(() => { if (demoMode) return; fetchSpeedtest(); const id = setInterval(fetchSpeedtest, 300_000); return () => clearInterval(id); }, [fetchSpeedtest, demoMode]);
   useEffect(() => { if (demoMode) return; fetchActivity(); const id = setInterval(fetchActivity, 60_000); return () => clearInterval(id); }, [fetchActivity, demoMode]);
+
+  // Load alert config on mount so we know whether to dispatch (server is the
+  // source of truth — POST /api/alerts is a cheap no-op if disabled).
+  useEffect(() => {
+    fetch("/api/alerts")
+      .then(r => r.json())
+      .then(d => { setAlertsEnabled(!!d.config?.enabled); setAlertsBrowserNotif(d.config?.browserNotifications !== false); })
+      .catch(() => {});
+  }, []);
+
+  // After every metric+services update, send to /api/alerts. Server evaluates
+  // thresholds, throttles, dispatches webhook. Returns the new fires for us
+  // to push as browser notifications. Server-side throttle handles dedupe.
+  useEffect(() => {
+    if (demoMode || !alertsEnabled) return;
+    if (!metrics && !services) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/alerts", {
+          method:  "POST",
+          headers: { "Content-Type": "application/json" },
+          body:    JSON.stringify({ metrics, services }),
+        });
+        if (cancelled) return;
+        const data = await res.json();
+        const fires: { key: string; level: "warning" | "critical"; msg: string }[] = data.fires ?? [];
+        if (fires.length === 0) return;
+        setAlertCount(c => c + fires.length);
+
+        // Browser notifications — only if permission granted and not in tab focus
+        if (alertsBrowserNotif && typeof Notification !== "undefined" && Notification.permission === "granted" && document.visibilityState !== "visible") {
+          for (const f of fires) {
+            try {
+              new Notification(`ComExe · ${f.level === "critical" ? "critical" : "warning"}`, { body: f.msg, tag: f.key, icon: "/icon.svg" });
+            } catch { /* some browsers reject if not in user gesture; ignore */ }
+          }
+        }
+      } catch { /* ignore — alerts shouldn't break the dashboard */ }
+    })();
+    return () => { cancelled = true; };
+  }, [metrics, services, demoMode, alertsEnabled, alertsBrowserNotif]);
 
   // Client config — fetched once on mount
   useEffect(() => {
@@ -512,6 +557,22 @@ export default function Dashboard() {
                 boxShadow: error ? "0 0 6px #ef444466" : !loading ? "0 0 6px #10b98166" : "none",
                 animation: !error && !loading ? "pulseDot 2s ease-in-out infinite" : "none",
               }} />
+            {alertsEnabled && alertCount > 0 && (
+              <button
+                title={`${alertCount} alert${alertCount === 1 ? "" : "s"} this session — open settings`}
+                onClick={() => { setShowSettings(true); setAlertCount(0); }}
+                style={{
+                  display: "flex", alignItems: "center", gap: 4,
+                  fontSize: 10, fontWeight: 600,
+                  color: "#fff",
+                  background: alertCount > 0 ? "var(--critical)" : "transparent",
+                  border: "none", borderRadius: 999,
+                  padding: "2px 8px", cursor: "pointer",
+                  boxShadow: `0 0 8px ${alertCount > 0 ? "var(--critical)" : "transparent"}55`,
+                  transition: "background 0.2s",
+                }}
+              >🔔 {alertCount}</button>
+            )}
             <button
               title="Open TrueNAS"
               onClick={() => window.open(`http://${clientConfig?.truenasIp ?? "192.168.88.196"}`, "_blank")}
