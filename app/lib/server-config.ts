@@ -246,16 +246,21 @@ export function invalidateConfigCache(): void {
 // Helper for /api/config GET to know whether the file is writable, so the
 // wizard can disable "Save & apply" with a friendly message.
 export async function isConfigWritable(): Promise<boolean> {
+  return (await probeWritable()).ok;
+}
+
+// Diagnostic version — returns the OS error if the probe fails, so the UI can
+// tell the user why /app/data isn't writable (permissions, missing mount, etc.).
+export async function probeWritable(): Promise<{ ok: true } | { ok: false; reason: string; path: string }> {
   const dir = path.dirname(CONFIG_PATH);
   try {
     await fs.mkdir(dir, { recursive: true });
-    // Touch a probe file
     const probe = path.join(dir, ".write-probe");
     await fs.writeFile(probe, "");
     await fs.unlink(probe);
-    return true;
-  } catch {
-    return false;
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, reason: (e as Error).message, path: dir };
   }
 }
 

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { loadConfig, writeConfigFile, isConfigWritable, invalidateConfigCache, type PartialFileConfig } from "@/app/lib/server-config";
+import { loadConfig, writeConfigFile, probeWritable, invalidateConfigCache, type PartialFileConfig } from "@/app/lib/server-config";
 import { loadBookmarks } from "@/app/lib/bookmarks";
 import type { BookmarkColumn } from "@/app/lib/types";
 
@@ -37,11 +37,15 @@ export interface ClientConfig {
   // True when the data/ volume is writable, i.e. POST will succeed. The wizard
   // shows different copy if false.
   writable: boolean;
+  // OS error explaining why /app/data is not writable (only set when writable=false).
+  // Surfaced in the UI to help users debug missing volume mounts or wrong uid.
+  writableReason?: string;
+  writablePath?:   string;
 }
 
 export async function GET() {
   const config = await loadConfig();
-  const writable = await isConfigWritable();
+  const writableProbe = await probeWritable();
 
   // Helper: build a Grafana panel iframe URL for a given panelId.
   function buildPanelUrl(panelId: string): string | null {
@@ -93,7 +97,9 @@ export async function GET() {
     bookmarks:    await loadBookmarks(),
     fsPathPrefix: config.fsPathPrefix,
     preferences:  config.preferences,
-    writable,
+    writable:     writableProbe.ok,
+    writableReason: writableProbe.ok ? undefined : writableProbe.reason,
+    writablePath:   writableProbe.ok ? undefined : writableProbe.path,
   };
 
   return NextResponse.json(response);
@@ -182,7 +188,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, message: validated.message }, { status: 400 });
   }
 
-  const writable = await isConfigWritable();
+  const writable = (await probeWritable()).ok;
   if (!writable) {
     return NextResponse.json({
       ok: false,

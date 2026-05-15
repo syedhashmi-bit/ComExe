@@ -127,6 +127,7 @@ docker run -d \
   --name "$NAME" \
   --network host \
   --restart unless-stopped \
+  -v /root/comexe-data:/app/data \
   -v /root/bookmarks.json:/app/bookmarks.json:ro \
   -e TRUENAS_IP=192.168.88.196 \
   -e RADARR_API_KEY='<your-key>' \
@@ -154,9 +155,14 @@ docker logs -f --tail 30 "$NAME"
 Make it executable + run:
 
 ```bash
+mkdir -p /root/comexe-data && chown 1001:1001 /root/comexe-data
 chmod +x update-dashboard.sh
 ./update-dashboard.sh
 ```
+
+The `/root/comexe-data` mount is **required** for the in-app setup wizard and the bookmark editor — that's where `config.json` and `bookmarks.json` get written when you click Save. The container runs as uid 1001 (the `nextjs` user baked into the image), so the host directory needs to be writable by that uid (`chown 1001:1001 /root/comexe-data`, or `chmod 777` if you don't care about ownership).
+
+Without this mount, edits to bookmarks or the setup wizard will fail with a "Read-only install" banner explaining what to fix.
 
 To update later, just re-run the script. It pulls the latest image and restarts.
 

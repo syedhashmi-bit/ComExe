@@ -156,4 +156,9 @@ export interface ClientConfig {
     timezone:     string;
     theme:        string;
   };
+  // True when /app/data is writable (POST /api/bookmarks and /api/config will
+  // succeed). False on read-only installs — the UI disables save and explains.
+  writable?:       boolean;
+  writableReason?: string;
+  writablePath?:   string;
 }

@@ -101,6 +101,7 @@ export default function Dashboard() {
   const [editBookmarks,  setEditBookmarks]  = useState(false);
   const [bookmarkDraft,  setBookmarkDraft]  = useState<BookmarkColumn[] | null>(null);
   const [bookmarkSaving, setBookmarkSaving] = useState(false);
+  const [bookmarkError,  setBookmarkError]  = useState<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const [cpuHistory,     setCpuHistory]     = useState<number[]>([]);
@@ -1272,18 +1273,24 @@ export default function Dashboard() {
           {showBookmarks && (() => {
             const columns = editBookmarks && bookmarkDraft ? bookmarkDraft : (clientConfig?.bookmarks ?? BOOKMARKS_FALLBACK);
             const updateDraft = (next: BookmarkColumn[]) => setBookmarkDraft(next);
-            const startEdit = () => { setBookmarkDraft(JSON.parse(JSON.stringify(columns))); setEditBookmarks(true); };
-            const cancelEdit = () => { setBookmarkDraft(null); setEditBookmarks(false); };
+            const startEdit = () => { setBookmarkDraft(JSON.parse(JSON.stringify(columns))); setEditBookmarks(true); setBookmarkError(null); };
+            const cancelEdit = () => { setBookmarkDraft(null); setEditBookmarks(false); setBookmarkError(null); };
             const saveBookmarks = async () => {
               if (!bookmarkDraft) return;
               setBookmarkSaving(true);
+              setBookmarkError(null);
               try {
                 const res = await fetch("/api/bookmarks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ bookmarks: bookmarkDraft }) });
+                const body = await res.json().catch(() => ({}));
                 if (res.ok) {
                   if (clientConfig) setClientConfig({ ...clientConfig, bookmarks: bookmarkDraft });
                   setEditBookmarks(false); setBookmarkDraft(null);
+                } else {
+                  setBookmarkError(body?.message ?? `Save failed (HTTP ${res.status})`);
                 }
-              } catch { /* ignore */ }
+              } catch (e) {
+                setBookmarkError(`Save failed: ${(e as Error).message}`);
+              }
               setBookmarkSaving(false);
             };
             const addColumn = () => { if (!bookmarkDraft) return; updateDraft([...bookmarkDraft, { title: "New Section", accentColor: "#06b6d4", items: [] }]); };
@@ -1308,6 +1315,7 @@ export default function Dashboard() {
               d[ci] = { ...d[ci], items }; updateDraft(d);
             };
 
+            const readonly = editBookmarks && clientConfig?.writable === false;
             return (
               <div className="flex flex-col gap-4" style={{ background: "var(--surface-dim)", border: "1px solid var(--border-subtle)", borderRadius: 14, padding: "20px 24px" }}>
                 <div className="flex items-center gap-2">
@@ -1317,7 +1325,7 @@ export default function Dashboard() {
                       <>
                         <button onClick={addColumn} style={{ fontSize: 9, color: "var(--brand)", background: "none", border: "1px solid var(--border)", borderRadius: 5, padding: "3px 8px", cursor: "pointer" }}>+ Section</button>
                         <button onClick={cancelEdit} style={{ fontSize: 9, color: "var(--text-dim)", background: "none", border: "1px solid var(--border)", borderRadius: 5, padding: "3px 8px", cursor: "pointer" }}>Cancel</button>
-                        <button onClick={saveBookmarks} disabled={bookmarkSaving} style={{ fontSize: 9, color: "#0a0c12", background: "var(--brand)", border: "none", borderRadius: 5, padding: "3px 10px", cursor: "pointer", fontWeight: 600 }}>
+                        <button onClick={saveBookmarks} disabled={bookmarkSaving || readonly} title={readonly ? "Mount /app/data to enable saves" : undefined} style={{ fontSize: 9, color: "#0a0c12", background: readonly ? "var(--text-ghost)" : "var(--brand)", border: "none", borderRadius: 5, padding: "3px 10px", cursor: (bookmarkSaving || readonly) ? "not-allowed" : "pointer", fontWeight: 600, opacity: readonly ? 0.6 : 1 }}>
                           {bookmarkSaving ? "Saving..." : "Save"}
                         </button>
                       </>
@@ -1329,6 +1337,20 @@ export default function Dashboard() {
                     )}
                   </div>
                 </div>
+
+                {editBookmarks && readonly && (
+                  <div style={{ fontSize: 11, color: "var(--warning)", background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.3)", borderRadius: 6, padding: "8px 10px", lineHeight: 1.5 }}>
+                    <strong>Read-only install.</strong> <code style={{ fontFamily: "monospace" }}>{clientConfig?.writablePath ?? "/app/data"}</code> is not writable, so saves will fail. Add <code style={{ fontFamily: "monospace" }}>-v /host/path/data:/app/data</code> to your <code>docker run</code> command (host dir must be writable by uid 1001) and restart the container.
+                    {clientConfig?.writableReason && (
+                      <div style={{ marginTop: 4, fontFamily: "monospace", fontSize: 10, opacity: 0.85 }}>OS error: {clientConfig.writableReason}</div>
+                    )}
+                  </div>
+                )}
+                {editBookmarks && bookmarkError && (
+                  <div style={{ fontSize: 11, color: "var(--critical)", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 6, padding: "8px 10px", lineHeight: 1.5 }}>
+                    <strong>Save failed:</strong> {bookmarkError}
+                  </div>
+                )}
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                   {columns.map((col, ci) => (
