@@ -170,4 +170,5 @@ export interface ClientConfig {
   writable?:       boolean;
   writableReason?: string;
   writablePath?:   string;
+  dockerEnabled?:  boolean;
 }

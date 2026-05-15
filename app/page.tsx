@@ -39,6 +39,7 @@ import { GrafanaCard } from "@/app/components/GrafanaCard";
 import { ActivityFeed } from "@/app/components/ActivityFeed";
 import { DraggableCard } from "@/app/components/DraggableCard";
 import { DevicesPanel } from "@/app/components/DevicesPanel";
+import { ContainerLogsSheet } from "@/app/components/ContainerLogsSheet";
 import { loadCardOrder, saveCardOrder, reorder } from "@/app/lib/card-order";
 
 // ── module constants ─────────────────────────────────────────────────────────
@@ -112,6 +113,29 @@ export default function Dashboard() {
   const serviceFilterRef = useRef<HTMLInputElement>(null);
   const [versionInfo,    setVersionInfo]    = useState<{ current: string; latest: string | null; hasUpdate: boolean; repoUrl: string } | null>(null);
   const [updateDismissed,setUpdateDismissed]= useState(false);
+  const [logsContainer,  setLogsContainer]  = useState<string | null>(null);
+  const [restartingSvc,  setRestartingSvc]  = useState<string | null>(null);
+  const [restartMsg,     setRestartMsg]     = useState<{ name: string; ok: boolean; text: string } | null>(null);
+
+  // Hit /api/docker/restart and surface the result inline for a few seconds.
+  const restartService = useCallback(async (containerName: string) => {
+    setRestartingSvc(containerName);
+    setRestartMsg(null);
+    try {
+      const res = await fetch("/api/docker/restart", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: containerName }),
+      });
+      const body = await res.json();
+      setRestartMsg({ name: containerName, ok: !!body.ok, text: body.message ?? (body.ok ? "Restarted" : "Failed") });
+    } catch (e) {
+      setRestartMsg({ name: containerName, ok: false, text: (e as Error).message });
+    } finally {
+      setRestartingSvc(null);
+      setTimeout(() => setRestartMsg(null), 4000);
+    }
+  }, []);
   const [cardOrder,      setCardOrder]      = useState<string[]>(() => loadCardOrder());
   const reorderCards = useCallback((draggedKey: string, targetKey: string) => {
     setCardOrder(prev => {
@@ -1338,6 +1362,21 @@ export default function Dashboard() {
                                   <div className="flex items-center justify-between gap-2">
                                     <ServiceIcon src={icon} label={label} color={color} />
                                     <div className="flex items-center gap-1.5 shrink-0">
+                                      {clientConfig?.dockerEnabled && (
+                                        <>
+                                          <button
+                                            onClick={e => { e.stopPropagation(); setLogsContainer(name); }}
+                                            title="View container logs"
+                                            style={{ background: "var(--card-alt)", border: "1px solid var(--border)", borderRadius: 4, padding: "1px 5px", fontSize: 9, color: "var(--text-dim)", cursor: "pointer" }}
+                                          >logs</button>
+                                          <button
+                                            onClick={e => { e.stopPropagation(); if (confirm(`Restart ${name}?`)) restartService(name); }}
+                                            disabled={restartingSvc === name}
+                                            title="Restart container"
+                                            style={{ background: "var(--card-alt)", border: "1px solid var(--border)", borderRadius: 4, padding: "1px 5px", fontSize: 9, color: restartingSvc === name ? "var(--text-faint)" : "var(--text-dim)", cursor: restartingSvc === name ? "wait" : "pointer" }}
+                                          >{restartingSvc === name ? "…" : "↻"}</button>
+                                        </>
+                                      )}
                                       {up && health && (health.error > 0 || health.warning > 0) && (() => {
                                         const isError = health.error > 0;
                                         const accent  = isError ? "#ef4444" : "#f59e0b";
@@ -1588,6 +1627,21 @@ export default function Dashboard() {
 
       {showSettings && (
         <SettingsPanel settings={settings} onUpdate={setSettings} onClose={() => setShowSettings(false)} services={services} />
+      )}
+
+      {logsContainer && (
+        <ContainerLogsSheet containerName={logsContainer} onClose={() => setLogsContainer(null)} />
+      )}
+
+      {restartMsg && (
+        <div className="fixed bottom-6 right-6 z-50" style={{
+          background: restartMsg.ok ? "rgba(16,185,129,0.95)" : "rgba(239,68,68,0.95)",
+          color: "#0a0c12", fontSize: 11, fontWeight: 600,
+          padding: "8px 14px", borderRadius: 8,
+          boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
+        }}>
+          {restartMsg.text}
+        </div>
       )}
     </>
   );

@@ -41,6 +41,9 @@ export interface ClientConfig {
   // Surfaced in the UI to help users debug missing volume mounts or wrong uid.
   writableReason?: string;
   writablePath?:   string;
+  // True when COMEXE_DOCKER_ENABLED=1. The dashboard renders restart/logs
+  // buttons on service cards when this is on.
+  dockerEnabled?:  boolean;
 }
 
 export async function GET() {
@@ -100,6 +103,7 @@ export async function GET() {
     writable:     writableProbe.ok,
     writableReason: writableProbe.ok ? undefined : writableProbe.reason,
     writablePath:   writableProbe.ok ? undefined : writableProbe.path,
+    dockerEnabled: process.env.COMEXE_DOCKER_ENABLED === "1" || process.env.COMEXE_DOCKER_ENABLED === "true",
   };
 
   return NextResponse.json(response);
