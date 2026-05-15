@@ -57,13 +57,22 @@ export interface Metrics {
 }
 
 export interface Settings {
-  refreshInterval: number;
+  refreshInterval: number;       // global default poll interval in seconds
   tempUnit: TempUnit;
   dataUnit: DataUnit;
   visibleCards: Record<string, boolean>;
   searchEngine: SearchEngine;
-  timezone: string; // IANA timezone, "" = browser local
+  timezone: string;              // IANA timezone, "" = browser local
   theme: ThemeKey;
+  // Per-endpoint override of refreshInterval. Each key is a number of seconds;
+  // omitted/0 means "use refreshInterval". Keeps the single-slider default
+  // working while letting power users tune individual endpoints.
+  refreshOverrides?: {
+    metrics?:  number;
+    services?: number;
+    mikrotik?: number;
+    activity?: number;
+  };
 }
 
 export interface SpeedtestResult {

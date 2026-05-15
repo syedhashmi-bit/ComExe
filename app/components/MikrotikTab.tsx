@@ -15,7 +15,7 @@ interface MtData {
   temp: number | null;
 }
 
-export function MikrotikTab({ mikrotikUrl }: { mikrotikUrl: string }) {
+export function MikrotikTab({ mikrotikUrl, refreshSec = 5 }: { mikrotikUrl: string; refreshSec?: number }) {
   const [data, setData] = useState<MtData | null>(null);
   const [corsBlocked, setCorsBlocked] = useState(false);
   const mikrotikHost = mikrotikUrl.replace(/^https?:\/\//, "").replace(/\/$/, "");
@@ -45,9 +45,9 @@ export function MikrotikTab({ mikrotikUrl }: { mikrotikUrl: string }) {
       }
     }
     load();
-    const id = setInterval(load, 5_000);
+    const id = setInterval(load, Math.max(1, refreshSec) * 1000);
     return () => clearInterval(id);
-  }, []);
+  }, [refreshSec]);
 
   const pill = (label: string, value: string, pctVal?: number, tempVal?: number | null) => {
     const tempColor = tempVal == null ? null : tempVal > 80 ? "var(--critical)" : tempVal > 60 ? "var(--warn)" : "var(--ok)";

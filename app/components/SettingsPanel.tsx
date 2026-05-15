@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { Settings, ServiceResult, SearchEngine, TempUnit, DataUnit } from "@/app/lib/types";
 import { THEMES, TIMEZONES } from "@/app/lib/constants";
 import { SearchEngineIcon } from "@/app/components/SearchBar";
+import { resetCardOrder } from "@/app/lib/card-order";
 
 export const CARD_KEYS = ["cpu", "memory", "filesystems", "network", "gpu", "speedtest", "system", "grafana", "services", "activity"] as const;
 
@@ -50,6 +51,19 @@ export function SettingsPanel({ settings, onUpdate, onClose, services }: {
             </div>
           </div>
         ))}
+
+        <RefreshOverrides settings={settings} onUpdate={onUpdate} />
+
+        <button
+          onClick={() => { resetCardOrder(); window.location.reload(); }}
+          style={{
+            fontSize: 10, padding: "4px 8px", borderRadius: 4,
+            background: "var(--settings-input)", color: "var(--settings-text)",
+            border: "1px solid var(--settings-input-border)", cursor: "pointer",
+            alignSelf: "flex-start",
+          }}
+          title="Reset the dashboard card order to defaults (this browser only)"
+        >Reset card layout</button>
 
         <div className="flex flex-col gap-2">
           <span className="text-[10px] uppercase tracking-widest" style={{ color: "var(--settings-label)" }}>Temperature</span>
@@ -216,6 +230,55 @@ export function SettingsPanel({ settings, onUpdate, onClose, services }: {
         <span className="text-[9px] text-center" style={{ color: "var(--settings-input-border)" }}>resets on page reload</span>
       </div>
     </>
+  );
+}
+
+// ── RefreshOverrides ─────────────────────────────────────────────────────────
+// Expandable details block letting power users override the global poll
+// interval for individual endpoints. Omitted/0 = use the global value.
+
+function RefreshOverrides({ settings, onUpdate }: { settings: Settings; onUpdate: (s: Settings) => void }) {
+  const fallback = settings.refreshInterval;
+  const rows: { key: keyof NonNullable<Settings["refreshOverrides"]>; label: string }[] = [
+    { key: "metrics",  label: "Metrics" },
+    { key: "services", label: "Services" },
+    { key: "mikrotik", label: "MikroTik" },
+    { key: "activity", label: "Activity feed" },
+  ];
+
+  function setOverride(key: keyof NonNullable<Settings["refreshOverrides"]>, value: number) {
+    const next = { ...(settings.refreshOverrides ?? {}) };
+    if (!value) delete next[key]; else next[key] = value;
+    onUpdate({ ...settings, refreshOverrides: next });
+  }
+
+  return (
+    <details style={{ background: "var(--settings-input)", border: "1px solid var(--settings-input-border)", borderRadius: 6, padding: "6px 10px" }}>
+      <summary style={{ fontSize: 10, cursor: "pointer", color: "var(--settings-text)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Per-endpoint overrides</summary>
+      <div className="flex flex-col gap-2" style={{ marginTop: 8 }}>
+        {rows.map(({ key, label }) => {
+          const v = settings.refreshOverrides?.[key];
+          const using = v ?? 0;
+          return (
+            <div key={key} className="flex items-center gap-2" style={{ fontSize: 10, color: "var(--settings-text)" }}>
+              <span style={{ width: 78 }}>{label}</span>
+              <select value={using} onChange={e => setOverride(key, Number(e.target.value))}
+                style={{ fontSize: 10, background: "var(--settings-bg)", color: "var(--settings-text)", border: "1px solid var(--settings-input-border)", borderRadius: 4, padding: "2px 4px", flex: 1, outline: "none" }}>
+                <option value={0}>default ({fallback}s)</option>
+                <option value={1}>1s</option>
+                <option value={3}>3s</option>
+                <option value={5}>5s</option>
+                <option value={10}>10s</option>
+                <option value={30}>30s</option>
+                <option value={60}>60s</option>
+                <option value={300}>5m</option>
+                <option value={600}>10m</option>
+              </select>
+            </div>
+          );
+        })}
+      </div>
+    </details>
   );
 }
 

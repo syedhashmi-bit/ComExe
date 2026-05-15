@@ -37,6 +37,8 @@ import { SettingsPanel } from "@/app/components/SettingsPanel";
 import { MikrotikTab } from "@/app/components/MikrotikTab";
 import { GrafanaCard } from "@/app/components/GrafanaCard";
 import { ActivityFeed } from "@/app/components/ActivityFeed";
+import { DraggableCard } from "@/app/components/DraggableCard";
+import { loadCardOrder, saveCardOrder, reorder } from "@/app/lib/card-order";
 
 // ── module constants ─────────────────────────────────────────────────────────
 
@@ -105,6 +107,20 @@ export default function Dashboard() {
   const [alertsEnabled,  setAlertsEnabled]  = useState(false);
   const [alertCount,     setAlertCount]     = useState(0);   // session-level fire counter for the header pill
   const [alertsBrowserNotif, setAlertsBrowserNotif] = useState(true);
+  const [serviceFilter,  setServiceFilter]  = useState("");
+  const serviceFilterRef = useRef<HTMLInputElement>(null);
+  const [cardOrder,      setCardOrder]      = useState<string[]>(() => loadCardOrder());
+  const reorderCards = useCallback((draggedKey: string, targetKey: string) => {
+    setCardOrder(prev => {
+      const next = reorder(prev, draggedKey, targetKey);
+      saveCardOrder(next);
+      return next;
+    });
+  }, []);
+  const orderIndex = useCallback((key: string) => {
+    const i = cardOrder.indexOf(key);
+    return i < 0 ? 999 : i;
+  }, [cardOrder]);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const [cpuHistory,     setCpuHistory]     = useState<number[]>([]);
@@ -294,9 +310,21 @@ export default function Dashboard() {
 
   // Polling effects
   useEffect(() => { if (demoMode) return; fetchWeather(); const id = setInterval(fetchWeather, 600_000); return () => clearInterval(id); }, [fetchWeather, demoMode]);
-  useEffect(() => { if (demoMode) return; fetchServices(); const id = setInterval(fetchServices, 3_000); return () => clearInterval(id); }, [fetchServices, demoMode]);
+  useEffect(() => {
+    if (demoMode) return;
+    const sec = settings.refreshOverrides?.services || 3;
+    fetchServices();
+    const id = setInterval(fetchServices, sec * 1000);
+    return () => clearInterval(id);
+  }, [fetchServices, demoMode, settings.refreshOverrides?.services]);
   useEffect(() => { if (demoMode) return; fetchSpeedtest(); const id = setInterval(fetchSpeedtest, 300_000); return () => clearInterval(id); }, [fetchSpeedtest, demoMode]);
-  useEffect(() => { if (demoMode) return; fetchActivity(); const id = setInterval(fetchActivity, 60_000); return () => clearInterval(id); }, [fetchActivity, demoMode]);
+  useEffect(() => {
+    if (demoMode) return;
+    const sec = settings.refreshOverrides?.activity || 60;
+    fetchActivity();
+    const id = setInterval(fetchActivity, sec * 1000);
+    return () => clearInterval(id);
+  }, [fetchActivity, demoMode, settings.refreshOverrides?.activity]);
 
   // Load alert config on mount so we know whether to dispatch (server is the
   // source of truth — POST /api/alerts is a cheap no-op if disabled).
@@ -378,10 +406,11 @@ export default function Dashboard() {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   useEffect(() => {
     if (demoMode) return;
+    const sec = settings.refreshOverrides?.metrics || settings.refreshInterval;
     fetchMetrics();
-    intervalRef.current = setInterval(() => { fetchMetrics(); }, settings.refreshInterval * 1000);
+    intervalRef.current = setInterval(() => { fetchMetrics(); }, sec * 1000);
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, [fetchMetrics, settings.refreshInterval, demoMode]);
+  }, [fetchMetrics, settings.refreshInterval, settings.refreshOverrides?.metrics, demoMode]);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -392,6 +421,7 @@ export default function Dashboard() {
       if (e.key === "r" || e.key === "R") { e.preventDefault(); fetchMetrics(); }
       if (e.key === "g" || e.key === "G") { e.preventDefault(); searchInputRef.current?.focus(); }
       if (e.key === "h" || e.key === "H") setShowBookmarks(v => !v);
+      if (e.key === "/")                  { e.preventDefault(); serviceFilterRef.current?.focus(); }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -601,7 +631,7 @@ export default function Dashboard() {
         <div className="max-w-5xl mx-auto px-6 pb-10 flex flex-col gap-6" style={{ paddingTop: 80 }}>
 
           <SearchBar inputRef={searchInputRef} engine={settings.searchEngine} />
-          <MikrotikTab mikrotikUrl={clientConfig?.mikrotikUrl ?? "http://192.168.88.1"} />
+          <MikrotikTab mikrotikUrl={clientConfig?.mikrotikUrl ?? "http://192.168.88.1"} refreshSec={settings.refreshOverrides?.mikrotik} />
 
           {!loading && showHealth && health.status !== "healthy" && (
             <StatusBanner result={health} visible={mounted} />
@@ -644,6 +674,7 @@ export default function Dashboard() {
 
             {/* CPU */}
             {isVisible("cpu") && (
+              <div style={{ order: orderIndex("cpu") }}><DraggableCard cardKey="cpu" onReorder={reorderCards}>
               <Card label="cpu" accent="var(--accent-cpu)"
                 subtitle={!loading ? (metrics?.sysInfo?.cpuModel ?? undefined) : undefined}
                 alertLevel={cpuAlert} icon={<IconCPU />}
@@ -691,10 +722,12 @@ export default function Dashboard() {
                   );
                 })()}
               </Card>
+              </DraggableCard></div>
             )}
 
             {/* Memory */}
             {isVisible("memory") && (
+              <div style={{ order: orderIndex("memory") }}><DraggableCard cardKey="memory" onReorder={reorderCards}>
               <Card label="memory" accent="var(--accent-memory)" alertLevel={memAlert} icon={<IconMemory />}
                 animDelay={50} expanded={expandedCard === "memory"} onToggle={() => toggleCard("memory")}>
                 {loading ? <Skeleton /> : (
@@ -728,10 +761,12 @@ export default function Dashboard() {
                   </>
                 )}
               </Card>
+              </DraggableCard></div>
             )}
 
             {/* Filesystems */}
             {isVisible("filesystems") && (
+              <div style={{ order: orderIndex("filesystems") }}><DraggableCard cardKey="filesystems" onReorder={reorderCards}>
               <Card label="filesystems" accent="var(--accent-fs)" alertLevel={maxDiskAlert} icon={<IconDisk />}
                 animDelay={100} expanded={expandedCard === "filesystems"} onToggle={() => toggleCard("filesystems")}>
                 {loading ? <Skeleton /> : !metrics?.disks.length ? (
@@ -810,10 +845,12 @@ export default function Dashboard() {
                   );
                 })()}
               </Card>
+              </DraggableCard></div>
             )}
 
             {/* Network */}
             {isVisible("network") && (
+              <div style={{ order: orderIndex("network") }}><DraggableCard cardKey="network" onReorder={reorderCards}>
               <Card label="network" accent="var(--accent-network)" icon={<IconNetwork />}
                 animDelay={150} expanded={expandedCard === "network"} onToggle={() => toggleCard("network")}>
                 {!loading && metrics?.network?.interfaceName && (
@@ -864,10 +901,12 @@ export default function Dashboard() {
                   </div>
                 )}
               </Card>
+              </DraggableCard></div>
             )}
 
             {/* GPU */}
             {isVisible("gpu") && (
+              <div style={{ order: orderIndex("gpu") }}><DraggableCard cardKey="gpu" onReorder={reorderCards}>
               <Card label="gpu" accent={gpuColor} alertLevel={gpuTempAlert} icon={<IconGPU />}
                 animDelay={200} expanded={expandedCard === "gpu"} onToggle={() => toggleCard("gpu")}>
                 {loading ? <Skeleton /> : (
@@ -958,10 +997,12 @@ export default function Dashboard() {
                   </>
                 )}
               </Card>
+              </DraggableCard></div>
             )}
 
             {/* Speedtest */}
             {isVisible("speedtest") && (
+              <div style={{ order: orderIndex("speedtest") }}><DraggableCard cardKey="speedtest" onReorder={reorderCards}>
               <Card label="speedtest" accent="var(--accent-speedtest)" icon={<IconSpeedtest />}
                 animDelay={250} externalLink={`http://${clientConfig?.truenasIp ?? "192.168.88.196"}:${SVC_PORTS.speedtest}`}>
                 {speedtestLoading ? <Skeleton /> : !speedtestResults.length ? (
@@ -1050,11 +1091,12 @@ export default function Dashboard() {
                   );
                 })()}
               </Card>
+              </DraggableCard></div>
             )}
 
-            {/* System + Grafana */}
+            {/* System + Grafana — pinned to the end regardless of card reorder */}
             {(isVisible("system") || isVisible("grafana")) && (
-              <div className="lg:col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
+              <div className="lg:col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch" style={{ order: 9999 }}>
                 {isVisible("system") && (
                   <Card label="system" accent="var(--accent-system)" icon={<IconTerminal />}
                     expanded={expandedCard === "system"} onToggle={() => toggleCard("system")}>
@@ -1159,10 +1201,20 @@ export default function Dashboard() {
                     </span>
                   );
                 })()}
+                <input
+                  ref={serviceFilterRef}
+                  type="text"
+                  placeholder="filter (/ to focus)"
+                  value={serviceFilter}
+                  onChange={e => setServiceFilter(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Escape") { setServiceFilter(""); e.currentTarget.blur(); } }}
+                  className="text-[10px] ml-auto"
+                  style={{ background: "var(--card-alt)", border: "1px solid var(--border)", borderRadius: 6, padding: "3px 8px", color: "var(--text)", outline: "none", width: 160, fontFamily: "monospace" }}
+                />
                 {servicesUpdatedAt != null && (() => {
                   const sec = Math.round((Date.now() - servicesUpdatedAt) / 1000);
                   const rel = sec < 60 ? `${sec}s ago` : `${Math.round(sec / 60)}m ago`;
-                  return <span className="text-[9px] ml-auto" style={{ color: "var(--text-ghost)" }}>updated {rel}</span>;
+                  return <span className="text-[9px]" style={{ color: "var(--text-ghost)" }}>updated {rel}</span>;
                 })()}
               </div>
               {servicesLoading ? <Skeleton /> : !services ? (
@@ -1170,10 +1222,12 @@ export default function Dashboard() {
               ) : (
                 <div className="flex flex-col gap-5">
                   {SVC_CATEGORIES.map(cat => {
+                    const filter = serviceFilter.trim().toLowerCase();
                     const catCards = cat.services
                       .map(svcName => services.find(s => s.name === svcName))
                       .filter((s): s is NonNullable<typeof s> => Boolean(s))
-                      .filter(s => s.configured !== false);
+                      .filter(s => s.configured !== false)
+                      .filter(s => !filter || s.name.toLowerCase().includes(filter));
                     if (catCards.length === 0) return null;
                     const upCount = catCards.filter(s => s.up).length;
                     const allUp = upCount === catCards.length;
