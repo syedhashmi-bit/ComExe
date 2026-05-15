@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { appendHistory } from "@/app/lib/history";
 
 const TRUENAS_IP = process.env.TRUENAS_IP || "192.168.88.196";
 const PROMETHEUS = process.env.PROMETHEUS_URL ?? `http://${TRUENAS_IP}:30104`;
@@ -217,5 +218,18 @@ export async function GET() {
     timestamp: Date.now(),
   };
   metricsCache = { data: responseData, ts: Date.now() };
+
+  // Persist a slim data point for historical charting (fire-and-forget)
+  const worstDisk = disks.length > 0 ? Math.max(...disks.map(d => d.usedPct)) : null;
+  appendHistory({
+    ts:       responseData.timestamp,
+    cpu:      cpuUsed != null ? Math.round(cpuUsed * 10) / 10 : null,
+    mem:      memTotal && memUsed ? Math.round((memUsed / memTotal) * 1000) / 10 : null,
+    net_rx:   Math.round(netRx),
+    net_tx:   Math.round(netTx),
+    gpu:      gpuUtil != null ? Math.round(gpuUtil * 10) / 10 : null,
+    disk_pct: worstDisk != null ? Math.round(worstDisk * 10) / 10 : null,
+  }).catch(() => {});
+
   return NextResponse.json(responseData);
 }

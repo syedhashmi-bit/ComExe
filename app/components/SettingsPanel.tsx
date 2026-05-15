@@ -5,6 +5,7 @@ import type { Settings, ServiceResult, SearchEngine, TempUnit, DataUnit } from "
 import { THEMES, TIMEZONES } from "@/app/lib/constants";
 import { SearchEngineIcon } from "@/app/components/SearchBar";
 import { resetCardOrder } from "@/app/lib/card-order";
+import { CustomCardEditor } from "@/app/components/CustomCardEditor";
 
 export const CARD_KEYS = ["cpu", "memory", "filesystems", "network", "gpu", "speedtest", "system", "grafana", "services", "activity"] as const;
 
@@ -64,6 +65,8 @@ export function SettingsPanel({ settings, onUpdate, onClose, services }: {
           }}
           title="Reset the dashboard card order to defaults (this browser only)"
         >Reset card layout</button>
+
+        <CustomCardSection />
 
         <div className="flex flex-col gap-2">
           <span className="text-[10px] uppercase tracking-widest" style={{ color: "var(--settings-label)" }}>Temperature</span>
@@ -234,6 +237,24 @@ export function SettingsPanel({ settings, onUpdate, onClose, services }: {
 }
 
 // ── RefreshOverrides ─────────────────────────────────────────────────────────
+function CustomCardSection() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="flex flex-col gap-2">
+      <button
+        onClick={() => setOpen(!open)}
+        style={{
+          fontSize: 10, padding: "4px 8px", borderRadius: 4,
+          background: "var(--settings-input)", color: "var(--settings-text)",
+          border: "1px solid var(--settings-input-border)", cursor: "pointer",
+          alignSelf: "flex-start",
+        }}
+      >{open ? "Close card editor" : "Custom cards…"}</button>
+      {open && <CustomCardEditor onClose={() => setOpen(false)} />}
+    </div>
+  );
+}
+
 // Expandable details block letting power users override the global poll
 // interval for individual endpoints. Omitted/0 = use the global value.
 

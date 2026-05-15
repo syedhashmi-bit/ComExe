@@ -222,6 +222,10 @@ Server-side only. **Never** prefix with `NEXT_PUBLIC_` (would expose to client b
 - `SEARCH_ENGINE` (default `google` — options: `google`, `bing`, `duckduckgo`, `kagi`)
 - `TIMEZONE` (default `` empty = browser local — any IANA timezone string like `Australia/Hobart`)
 
+### Authentication (optional — off by default, fine for LAN-only)
+- `DASHBOARD_PASSWORD` — set to enable native basic auth. Single shared password, cookie session (7d), rate-limited login endpoint. Shows `/login` page.
+- `AUTH_PROXY_HEADER` — set to e.g. `X-Authenticated-User` to trust an upstream auth proxy (Authelia, Authentik, Cloudflare Access). No login page needed.
+
 ### Bookmarks file path
 - `BOOKMARKS_PATH` (default `<cwd>/bookmarks.json` ⇒ `/app/bookmarks.json` in the image)
 

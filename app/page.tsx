@@ -40,6 +40,8 @@ import { ActivityFeed } from "@/app/components/ActivityFeed";
 import { DraggableCard } from "@/app/components/DraggableCard";
 import { DevicesPanel } from "@/app/components/DevicesPanel";
 import { ContainerLogsSheet } from "@/app/components/ContainerLogsSheet";
+import { CustomCardsGrid } from "@/app/components/CustomCards";
+import { CustomCardEditor } from "@/app/components/CustomCardEditor";
 import { loadCardOrder, saveCardOrder, reorder } from "@/app/lib/card-order";
 
 // ── module constants ─────────────────────────────────────────────────────────
@@ -1201,6 +1203,9 @@ export default function Dashboard() {
               </div>
             )}
           </div>
+
+          {/* ── Custom cards (user-defined PromQL) ── */}
+          <CustomCardsGrid refreshInterval={settings.refreshInterval} />
 
           {/* ── NOW PLAYING banner ── */}
           {(() => {

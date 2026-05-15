@@ -208,66 +208,72 @@ the GitHub release page.
 
 ---
 
-## Tier 5 — bigger initiatives
+## Tier 5 — bigger initiatives ✅ shipped
 
-### Authentication & HTTPS (P0 for internet-exposed, P3 for LAN-only)
-Today there's no auth on any endpoint. Acceptable for LAN-only but blocks
-anyone wanting to expose ComExe behind their reverse proxy. Two levels:
+### ✅ Authentication & HTTPS
+Shipped. Two auth modes, controlled by env vars:
 
-- **Reverse-proxy mode** — trust an `X-Authenticated-User` header from an
-  upstream auth-proxy (Authelia, Authentik, Cloudflare Access). Env-flagged.
-- **Native basic auth** — single shared password via `DASHBOARD_PASSWORD`
-  env var, cookie-based session, rate-limited login endpoint.
+- **Reverse-proxy mode** — `AUTH_PROXY_HEADER` env var (e.g.
+  `X-Authenticated-User`). Trusts the upstream auth proxy (Authelia, Authentik,
+  Cloudflare Access) to set the header. No login page needed.
+- **Native basic auth** — `DASHBOARD_PASSWORD` env var. Single shared
+  password, cookie-based session (7-day expiry), rate-limited login endpoint
+  (10 attempts/min per IP). Branded `/login` page with theme support.
 
-Either way: a per-route guard in `middleware.ts` that protects all `/api/*`
-and the page itself.
+Next.js `middleware.ts` guards all routes. Public paths: `/login`,
+`/api/auth/*`, `/_next`, static assets. API routes return 401 JSON;
+page routes redirect to `/login?from=<path>`.
 
-### Multi-arch image (arm64) (P2)
-Today CI publishes amd64 only. Add arm64 to the matrix so Raspberry Pi /
-Apple Silicon mini-server users can run it. `docker buildx build
---platform linux/amd64,linux/arm64` in the workflow.
+### ✅ Multi-arch image (arm64)
+Shipped. CI workflow updated with `docker/setup-qemu-action@v3` and
+`platforms: linux/amd64,linux/arm64` on the build step. Raspberry Pi /
+Apple Silicon users can now pull the same `:latest` tag.
 
-### Historical persistence (P2)
-All in-memory history (`MAX_HISTORY = 60`) is lost on browser refresh.
-Server-side ring buffer in `data/history.jsonl` (append-only, rotate at 7d /
-50MB), exposed via `/api/history?metric=cpu&range=24h`. Powers richer
-sparklines and lets new tabs immediately see the last hour.
+### ✅ Historical persistence
+Shipped. `data/history.jsonl` — append-only ring buffer rotated at 7d / 50MB.
+Each metrics poll writes a slim data point (cpu, mem%, net_rx/tx, gpu%,
+worst disk%). Exposed via `/api/history?metric=cpu&range=24h` with
+auto-downsampling. POST endpoint for manual recording.
 
-### Custom card builder (P3)
-Right now adding a new metric requires editing `app/page.tsx`. Let users
-define ad-hoc cards in the wizard:
+### ✅ Custom card builder
+Shipped. Users define ad-hoc PromQL cards in Settings → Custom Cards:
 
-- Pick a PromQL query
-- Pick a viz type (sparkline / gauge / number / bar)
-- Pick a colour and a position
-- Save → stored in `data/custom-cards.json` and rendered after the built-in grid.
+- Pick a PromQL query (with live "Test query" button)
+- Pick a viz type (sparkline / gauge / number / bar chart)
+- Pick a color from 8 presets
+- Optional unit suffix (%, °C, MB/s)
+- Stored in `data/custom-cards.json`, rendered after the built-in grid.
 
-### Automated tests (P2)
-There are currently zero tests. Add:
+### ✅ Automated tests
+Shipped. Test infrastructure:
 
-- Playwright smoke tests for the three critical flows: welcome → setup →
-  dashboard, bookmark add/edit/save, theme switcher.
-- Unit tests for the resolvers in `app/lib/server-config.ts` and
-  `app/lib/bookmarks.ts`.
-- Vitest + Playwright `@playwright/test` runner, CI step gated on PRs.
+- **Vitest** — 22 unit tests covering `server-config.ts` (config resolution,
+  service manifest, defaults), `auth.ts` (sessions, rate limiting, password
+  verification), and `history.ts` (downsampling).
+- **Playwright** — 8 E2E smoke tests: page loads (dashboard, setup, welcome,
+  login), API endpoint responses (config, auth status, history), theme
+  switching via localStorage.
+- CI: `.github/workflows/test.yml` runs `npm test` on push to main and PRs.
+- Scripts: `npm test`, `npm run test:watch`, `npm run test:e2e`.
 
-### Storybook for primitives (P3)
-20+ primitive components live in `app/components/primitives.tsx` with no
-isolated rendering. A Storybook would catch regressions and document every
-prop combo (`Card alertLevel`, `Sparkline gradient`, `RadialGauge thresholds`).
+### ✅ Storybook for primitives
+Shipped. Storybook 10 with `@storybook/react-vite` and `addon-essentials`.
+16 stories covering all major primitives: AnimatedNumber, GaugeBar, Sparkline,
+RadialGauge, BigValue, Card (default/warning/critical), Skeleton, LabeledBar,
+SubRow/StatRow, TrendDelta, HeroStat, StatusBanner. Dark dashboard background
+by default. Run via `npm run storybook` (port 6006).
 
 ---
 
-## How to pick next
+## Sequencing (completed)
 
-Tier 4 is fully shipped. The Tier 5 list above is what remains. My
-recommendation: **arm64 multi-arch + historical persistence** are the two
-that have the broadest user impact. Auth & HTTPS only matters if you're
-exposing ComExe to the internet (don't, without a reverse proxy + auth
-in front).
+All tiers shipped. Full build order:
 
-Earlier recommendation (now stale): build **alerts + Grafana
-fix** (Tier 4 P0). Both have visible user value, both are reasonably scoped,
-and neither requires new infra. Auth / HTTPS only matters once someone
-actually wants to expose ComExe to the internet — and the docs already
-warn against doing that without a proxy.
+**Tier 1** — Search engine picker + timezone + forecast
+**Tier 2** — Editable bookmarks + multi-Grafana
+**Tier 3** — CSS variable refactor + themes + welcome flow + beginner pass
+**Tier 4** — Alerts, Grafana troubleshooter/native panels, drag reorder,
+  per-card refresh, Docker actions, MikroTik devices/WoL, service search,
+  PWA manifest, update banner
+**Tier 5** — Auth/HTTPS, arm64, historical persistence, custom card builder,
+  automated tests, Storybook
