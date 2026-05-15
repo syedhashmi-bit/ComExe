@@ -38,6 +38,7 @@ import { MikrotikTab } from "@/app/components/MikrotikTab";
 import { GrafanaCard } from "@/app/components/GrafanaCard";
 import { ActivityFeed } from "@/app/components/ActivityFeed";
 import { DraggableCard } from "@/app/components/DraggableCard";
+import { DevicesPanel } from "@/app/components/DevicesPanel";
 import { loadCardOrder, saveCardOrder, reorder } from "@/app/lib/card-order";
 
 // ── module constants ─────────────────────────────────────────────────────────
@@ -672,6 +673,7 @@ export default function Dashboard() {
 
           <SearchBar inputRef={searchInputRef} engine={settings.searchEngine} />
           <MikrotikTab mikrotikUrl={clientConfig?.mikrotikUrl ?? "http://192.168.88.1"} refreshSec={settings.refreshOverrides?.mikrotik} />
+          {!demoMode && <DevicesPanel />}
 
           {!loading && showHealth && health.status !== "healthy" && (
             <StatusBanner result={health} visible={mounted} />
