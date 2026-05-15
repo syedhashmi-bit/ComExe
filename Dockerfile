@@ -25,6 +25,12 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# Build-time tag — CI passes --build-arg COMEXE_GIT_SHA=${{ github.sha }}.
+# Baked into the runtime env so /api/version can compare against the
+# latest commit on GitHub and show an "update available" banner.
+ARG COMEXE_GIT_SHA=""
+ENV COMEXE_GIT_SHA=$COMEXE_GIT_SHA
+
 RUN groupadd --system --gid 1001 nodejs && \
     useradd --system --uid 1001 --gid 1001 --shell /bin/false nextjs
 

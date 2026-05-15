@@ -109,6 +109,8 @@ export default function Dashboard() {
   const [alertsBrowserNotif, setAlertsBrowserNotif] = useState(true);
   const [serviceFilter,  setServiceFilter]  = useState("");
   const serviceFilterRef = useRef<HTMLInputElement>(null);
+  const [versionInfo,    setVersionInfo]    = useState<{ current: string; latest: string | null; hasUpdate: boolean; repoUrl: string } | null>(null);
+  const [updateDismissed,setUpdateDismissed]= useState(false);
   const [cardOrder,      setCardOrder]      = useState<string[]>(() => loadCardOrder());
   const reorderCards = useCallback((draggedKey: string, targetKey: string) => {
     setCardOrder(prev => {
@@ -335,6 +337,22 @@ export default function Dashboard() {
       .catch(() => {});
   }, []);
 
+  // Check for new image release once on mount + every 30 min. Dismissable per
+  // session via the X — comes back on next page reload (not localStorage)
+  // since we want a nudge per session, not forever.
+  useEffect(() => {
+    let cancelled = false;
+    function check() {
+      fetch("/api/version")
+        .then(r => r.json())
+        .then(d => { if (!cancelled) setVersionInfo({ current: d.current, latest: d.latest, hasUpdate: !!d.hasUpdate, repoUrl: d.repoUrl }); })
+        .catch(() => {});
+    }
+    check();
+    const id = setInterval(check, 30 * 60 * 1000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, []);
+
   // After every metric+services update, send to /api/alerts. Server evaluates
   // thresholds, throttles, dispatches webhook. Returns the new fires for us
   // to push as browser notifications. Server-side throttle handles dedupe.
@@ -480,6 +498,28 @@ export default function Dashboard() {
           Demo mode — showing sample data.{" "}
           <span style={{ textDecoration: "underline", fontWeight: 700, cursor: "pointer" }}
             onClick={() => { window.location.href = "/"; }}>Exit demo</span>
+        </div>
+      )}
+
+      {/* Update-available banner — only shows when image SHA differs from
+          main HEAD on GitHub. Hidden during demo to avoid confusing the
+          showcase flow. */}
+      {!demoMode && mounted && versionInfo?.hasUpdate && !updateDismissed && (
+        <div className="fixed top-0 left-0 right-0 z-50 flex items-center justify-center gap-3" style={{
+          background: "linear-gradient(90deg, #06b6d4, #0ea5e9)",
+          padding: "4px 12px", fontSize: 11, fontWeight: 600, color: "#0a0c12",
+          letterSpacing: "0.02em",
+        }}>
+          <span>
+            ComExe update available — running <code style={{ fontFamily: "monospace" }}>{versionInfo.current.slice(0, 7)}</code>, latest{" "}
+            <a href={`${versionInfo.repoUrl}/commits/main`} target="_blank" rel="noopener noreferrer"
+              style={{ color: "#0a0c12", textDecoration: "underline", fontWeight: 700 }}>
+              {versionInfo.latest?.slice(0, 7)}
+            </a>. Run <code style={{ fontFamily: "monospace" }}>update-dashboard.sh</code> to pull.
+          </span>
+          <button onClick={() => setUpdateDismissed(true)}
+            style={{ background: "transparent", border: "none", color: "#0a0c12", fontSize: 14, cursor: "pointer", padding: "0 6px", lineHeight: 1, fontWeight: 700 }}
+            aria-label="Dismiss">×</button>
         </div>
       )}
 
