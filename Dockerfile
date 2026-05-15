@@ -9,7 +9,7 @@
 
 FROM node:20-slim AS deps
 WORKDIR /app
-COPY package.json package-lock.json* ./
+COPY package.json package-lock.json* .npmrc* ./
 RUN npm ci
 
 FROM node:20-slim AS builder
@@ -41,7 +41,7 @@ RUN groupadd --system --gid 1001 nodejs && \
 RUN mkdir -p /app/data && chown nextjs:nodejs /app/data
 
 # Production deps only — saves ~150 MB vs the full builder node_modules.
-COPY package.json package-lock.json* ./
+COPY package.json package-lock.json* .npmrc* ./
 RUN npm ci --omit=dev && npm cache clean --force
 
 # Compiled output + public assets (icons, etc.) + optional bookmarks.json.
