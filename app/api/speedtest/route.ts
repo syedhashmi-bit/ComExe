@@ -23,7 +23,7 @@ async function fetchHistory(): Promise<{ records: HistoryRecord[]; total: number
     const res = await fetch(`${BASE}/api/v1/results?take=5`, {
       headers: { Authorization: `Bearer ${BEARER}`, Accept: "application/json" },
       next: { revalidate: 0 },
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(4000),
     });
     if (!res.ok) return { records: [], total: null };
     const json = await res.json() as { data?: HistoryRecord[]; meta?: { total?: number } };
@@ -37,10 +37,12 @@ async function fetchHistory(): Promise<{ records: HistoryRecord[]; total: number
 }
 
 export async function GET() {
+  // Short timeouts (4s each) — when SpeedTracker is offline we'd rather return
+  // empty results quickly than hold up the dashboard's polling cycle.
   const [latestRes, historyData] = await Promise.all([
     fetch(`${BASE}/api/speedtest/latest`, {
       next: { revalidate: 0 },
-      signal: AbortSignal.timeout(10000),
+      signal: AbortSignal.timeout(4000),
     }).catch(() => null),
     fetchHistory(),
   ]);

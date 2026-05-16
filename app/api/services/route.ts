@@ -70,7 +70,7 @@ function fmtEta(sec: number | null | undefined): string | null {
 async function apiFetch(url: string, headers?: Record<string, string>): Promise<unknown> {
   const res = await fetch(url, {
     headers: { Accept: "application/json", ...headers },
-    signal: AbortSignal.timeout(5000),
+    signal: AbortSignal.timeout(8000),
     next: { revalidate: 0 },
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -89,9 +89,11 @@ async function apiFetchOpt(url: string, headers?: Record<string, string>): Promi
 }
 
 // Returns true if the server at baseUrl responds to any HTTP request (even 4xx/5xx)
+// Generous timeout (6s) — when the homelab is under load, services may take a while
+// to respond to even an unauthed base-URL probe.
 async function checkReachable(baseUrl: string): Promise<boolean> {
   try {
-    await fetch(baseUrl, { signal: AbortSignal.timeout(3000), next: { revalidate: 0 } });
+    await fetch(baseUrl, { signal: AbortSignal.timeout(6000), next: { revalidate: 0 } });
     return true;
   } catch {
     return false;
@@ -367,7 +369,7 @@ async function qbittorrent(creds: ServiceCreds): Promise<ServiceResult> {
         "Referer": BASE,
       },
       body: new URLSearchParams({ username: USER, password: PASS }).toString(),
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(8000),
       next: { revalidate: 0 },
     });
     const setCookie = loginRes.headers.get("set-cookie");
@@ -376,7 +378,7 @@ async function qbittorrent(creds: ServiceCreds): Promise<ServiceResult> {
 
     const torrentsRes = await fetch(`${BASE}/api/v2/torrents/info`, {
       headers: { "Cookie": `SID=${sid}`, "Referer": BASE },
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(8000),
       next: { revalidate: 0 },
     });
     if (!torrentsRes.ok) throw new Error(`torrents HTTP ${torrentsRes.status}`);
@@ -451,7 +453,7 @@ async function pihole(creds: ServiceCreds): Promise<ServiceResult> {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ password: PASSWORD }),
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(8000),
     });
     const authData = await authRes.json() as { session?: { sid?: string; validity?: number } };
     const sid = authData?.session?.sid;
@@ -467,7 +469,7 @@ async function pihole(creds: ServiceCreds): Promise<ServiceResult> {
     try {
       const r = await fetch(`${BASE}${path}`, {
         headers: { sid },
-        signal: AbortSignal.timeout(5000),
+        signal: AbortSignal.timeout(8000),
       });
       if (!r.ok) return null;
       return await r.json() as T;
@@ -478,7 +480,7 @@ async function pihole(creds: ServiceCreds): Promise<ServiceResult> {
     const sid = await getSid();
     const statsRes = await fetch(`${BASE}/api/stats/summary`, {
       headers: { sid },
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(8000),
     });
     if (!statsRes.ok) throw new Error(`stats HTTP ${statsRes.status}`);
     const stats = await statsRes.json() as {
@@ -610,7 +612,7 @@ async function nginxProxy(creds: ServiceCreds): Promise<ServiceResult> {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ identity: USER, secret: PASS }),
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(8000),
       next: { revalidate: 0 },
     });
     if (!tokenRes.ok) throw new Error("auth");
