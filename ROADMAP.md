@@ -425,43 +425,54 @@ All tiers shipped. Full build order:
   header sparklines, uptime timeline
 **Tier 8** — Command palette, layout presets, SMART monitoring, network
   topology map, multi-server support
+**Tier 9** — Log viewer, anomaly detection, SLA reports, resource
+  forecasting, dependency health map
 
 ---
 
-## Tier 9 — observability & insights (planned)
+## Tier 9 — observability & insights ✅ shipped
 
-### Log aggregation viewer
-Centralized log viewer pulling from Docker container logs, syslog, and
-journal. Full-text search with regex, severity filtering (debug → critical),
-timestamp range picker. Tail mode streams new lines via SSE. Syntax
-highlighting for JSON log lines. Accessible from each service card's
-context menu as "View logs → aggregated".
+### ✅ Log aggregation viewer
+Shipped. Full `/logs` route with centralized log viewer pulling from Docker
+container logs. Container selector grouped by running/stopped state with
+configurable line count (100/500/1000/5000). Full-text search with highlight,
+severity level filter pills (info/warn/error/debug) with live counts.
+Tail mode polls every 3s with auto-scroll toggle. Table layout with line
+numbers, level dots, timestamp extraction, colored error/warn lines.
+Accessible from command palette → "Log viewer".
 
-### Anomaly detection & predictive alerts
-ML-lite anomaly detection on historical metrics: compute rolling mean + stddev
-over 7d and flag data points >3σ. Surface anomalies on the analytics page as
-highlighted regions. Predictive disk-full alert: linear extrapolation on
-`disk_pct` trend → "Pool will be full in ~14 days" warning. CPU/memory
-baseline profiles per time-of-day to distinguish "Tuesday 2am backup spike"
-from genuine overload.
+### ✅ Anomaly detection & predictive alerts
+Shipped. New `/api/insights` route computes z-score anomaly detection across
+all 6 core metrics (CPU, mem, GPU, disk%, net_rx, net_tx). Points with
+z-score ≥ 3 flagged as anomalies, sorted by severity. Linear regression on
+each metric produces trend predictions with rate-per-day and days-until-full
+for percentage metrics. Disk-full and memory-exhaustion warnings generated
+automatically. Combined insights page at `/forecast`.
 
-### SLA & uptime reports
-Monthly/weekly uptime reports generated from `history.jsonl`. Per-service
-availability percentage, incident timeline, MTTR (mean time to recover),
-longest outage. Exportable as PDF or Markdown. Email digest option via
-webhook (compose the report server-side, POST to a mail relay or ntfy).
+### ✅ SLA & uptime reports
+Shipped. SLA computation in `/api/insights`: uptime percentage, incident
+count, MTTR (mean time to recover), longest outage duration. Incident
+timeline extracted from gaps in `history.jsonl` data. Per-range reporting
+(24h / 7d / 30d). Displayed in the `/forecast` page SLA Report section
+with large stat cards and incident list.
 
-### Resource forecasting dashboard
-Dedicated `/forecast` page. Takes 30d of historical data and projects
-storage consumption, memory pressure, and network bandwidth growth.
-Visualized as dashed trend lines extending past the current data on the
-area charts. Configurable confidence intervals (68% / 95%).
+### ✅ Resource forecasting dashboard
+Shipped. Dedicated `/forecast` page combining SLA reports, resource
+forecasting, and anomaly detection. Per-metric forecast cards show current
+value, trend arrow (rising/falling/stable), rate of change per day, and
+estimated days until full. Warnings surface for disk approaching full
+(<30 days) and memory exhaustion (<7 days). Range selector (24h/7d/30d)
+refetches all computations.
 
-### Dependency health map
-Service-to-service dependency graph — e.g. Sonarr depends on Prowlarr and
-qBittorrent. If a dependency goes down, highlight the upstream impact chain.
-Config stored in `data/dependencies.json` with a visual editor. Overlay on
-the existing services panel: "Prowlarr down → Sonarr/Radarr search degraded."
+### ✅ Dependency health map
+Shipped. New `/api/dependencies` route with full CRUD (GET/POST/DELETE)
+backed by `data/dependencies.json`. Default graph covers the *arr media
+stack (Sonarr→Prowlarr, Sonarr→qBit, Radarr→Prowlarr, etc.). Interactive
+SVG `DependencyMap` component with topological layering, brand-colored
+nodes, status dots (online/down/not configured), edge labels. Hover a
+down service to see the impact chain via BFS traversal — affected
+dependents highlighted with dashed amber rings and "IMPACTED" label.
+Accessible via command palette → "Dependency map".
 
 ---
 

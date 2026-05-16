@@ -51,6 +51,7 @@ import { CommandPalette, type CommandAction } from "@/app/components/CommandPale
 import { DiskHealthPanel } from "@/app/components/DiskHealthPanel";
 import { NetworkTopology } from "@/app/components/NetworkTopology";
 import { ServerFleetPanel } from "@/app/components/ServerFleetPanel";
+import { DependencyMap } from "@/app/components/DependencyMap";
 import { loadCardOrder, saveCardOrder, reorder } from "@/app/lib/card-order";
 import { useEventStream } from "@/app/hooks/useEventStream";
 
@@ -85,6 +86,7 @@ export default function Dashboard() {
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [showTopology,       setShowTopology]       = useState(false);
   const [showServerFleet,    setShowServerFleet]    = useState(false);
+  const [showDependencyMap,  setShowDependencyMap]  = useState(false);
   const [serviceFilter,  setServiceFilter]  = useState("");
   const serviceFilterRef = useRef<HTMLInputElement>(null);
   const [versionInfo,    setVersionInfo]    = useState<{ current: string; latest: string | null; hasUpdate: boolean; repoUrl: string } | null>(null);
@@ -560,7 +562,10 @@ export default function Dashboard() {
     { id: "notifications", label: "Notifications", section: "Panels", icon: "🔔", action: () => setShowNotifications(true) },
     { id: "topology", label: "Network topology", section: "Panels", icon: "🕸️", action: () => setShowTopology(true) },
     { id: "fleet", label: "Server fleet", section: "Panels", icon: "🖥️", action: () => setShowServerFleet(true) },
+    { id: "dependencies", label: "Dependency map", section: "Panels", icon: "🔗", action: () => setShowDependencyMap(true) },
     { id: "analytics", label: "Open analytics", section: "Navigate", icon: "📊", action: () => { window.location.href = "/analytics"; } },
+    { id: "logs", label: "Log viewer", section: "Navigate", icon: "📜", action: () => { window.location.href = "/logs"; } },
+    { id: "forecast", label: "Insights & forecasting", section: "Navigate", icon: "🔮", action: () => { window.location.href = "/forecast"; } },
     { id: "setup", label: "Setup wizard", section: "Navigate", icon: "🧙", action: () => { window.location.href = "/setup"; } },
     { id: "truenas", label: "Open TrueNAS UI", section: "Navigate", icon: "🖥️", action: () => window.open(`http://${clientConfig?.truenasIp ?? "192.168.88.196"}`, "_blank") },
     { id: "prometheus", label: "Open Prometheus", section: "Navigate", icon: "📈", action: () => window.open(`http://${clientConfig?.truenasIp ?? "192.168.88.196"}:30104`, "_blank") },
@@ -1423,6 +1428,13 @@ export default function Dashboard() {
 
       {showServerFleet && (
         <ServerFleetPanel onClose={() => setShowServerFleet(false)} />
+      )}
+
+      {showDependencyMap && (
+        <DependencyMap
+          onClose={() => setShowDependencyMap(false)}
+          services={services?.map(s => ({ name: s.name, up: s.up, configured: s.configured !== false })) ?? []}
+        />
       )}
 
       {logsContainer && (
