@@ -39,6 +39,12 @@ let servicesCache: { data: { services: ServiceResult[]; timestamp: number }; ts:
 // now sees ~2-3 light requests/minute from this dashboard instead of
 // the original 30+ calls/minute that was crashing *arr containers.
 const CACHE_TTL = 30_000;
+// Stale-while-revalidate window. Serve cached data immediately even after
+// expiry as long as it's <5 min old, while a background refresh runs. Makes
+// the API consistently fast even when upstream services are timing out at
+// 8s each — the dashboard never hangs on a service call.
+const STALE_WHILE_REVALIDATE_MS = 300_000;
+let backgroundRefresh: Promise<void> | null = null;
 
 // Per-service last-known-good results. If a service was up in the last
 // STALE_WINDOW_MS but a fresh poll fails, we surface the cached good result
@@ -724,22 +730,10 @@ async function nginxProxy(creds: ServiceCreds): Promise<ServiceResult> {
   }
 }
 
-export async function GET() {
-  if (servicesCache && Date.now() - servicesCache.ts < CACHE_TTL) {
-    return NextResponse.json(servicesCache.data);
-  }
-
-  // Bound the in-memory caches before each cache-miss path.
-  pruneMemoCache();
-
-  // Single config resolve per request — see app/lib/server-config.ts.
-  const cfg = await loadConfig();
-
+// Hits all 10 upstream services (in 2 batches to avoid a thundering herd)
+// and produces the cached payload shape. Per-service stale fallback applied.
+async function fetchAllServicesData(cfg: Awaited<ReturnType<typeof loadConfig>>) {
   const names = ["radarr","sonarr","bazarr","tautulli","qbittorrent","overseerr","pihole","prowlarr","nginx","uptimekuma"];
-  // Stagger upstream calls in two batches with a small gap so we don't
-  // create a thundering herd of ~30 concurrent API requests against a
-  // potentially overloaded host. Each batch still uses Promise.allSettled
-  // so failures don't sink the others.
   const batch1 = await Promise.allSettled([
     radarr(cfg.services.radarr),
     sonarr(cfg.services.sonarr),
@@ -763,15 +757,11 @@ export async function GET() {
       ? r.value
       : { name, up: false, configured: true, lines: [] };
 
-    // If this poll succeeded with real data, remember it.
     const hasRealData = fresh.up && fresh.lines.length > 0 && fresh.lines[0] !== "—";
     if (hasRealData) {
       lastGoodResults.set(name, { result: fresh, ts: now });
       return fresh;
     }
-
-    // Fresh poll didn't yield useful data. If we have a recent good result,
-    // surface it as stale so the user still sees their last known state.
     const cached = lastGoodResults.get(name);
     if (cached && now - cached.ts < STALE_WINDOW_MS) {
       return { ...cached.result, stale: true, staleSince: cached.ts };
@@ -779,7 +769,44 @@ export async function GET() {
     return fresh;
   });
 
-  const data = { services: results, timestamp: now };
-  servicesCache = { data, ts: now };
+  return { services: results, timestamp: now };
+}
+
+// Actual upstream-fetch worker. Called from GET directly on cold start, or
+// in the background from the stale-while-revalidate path.
+async function refreshServicesCache(): Promise<void> {
+  pruneMemoCache();
+  const cfg = await loadConfig();
+  const data = await fetchAllServicesData(cfg);
+  servicesCache = { data, ts: Date.now() };
+}
+
+export async function GET() {
+  const now = Date.now();
+
+  if (servicesCache) {
+    const age = now - servicesCache.ts;
+    // Fresh: serve cached data, no upstream work.
+    if (age < CACHE_TTL) {
+      return NextResponse.json(servicesCache.data);
+    }
+    // Stale but within SWR window: serve cached data immediately, kick off
+    // a background refresh (deduped via the backgroundRefresh promise).
+    if (age < STALE_WHILE_REVALIDATE_MS) {
+      if (!backgroundRefresh) {
+        backgroundRefresh = refreshServicesCache()
+          .catch(() => { /* leave existing cache untouched */ })
+          .finally(() => { backgroundRefresh = null; });
+      }
+      return NextResponse.json(servicesCache.data);
+    }
+  }
+
+  // Cold start (no cache) or cache older than SWR window — must do the work
+  // inline since we have nothing to serve.
+  pruneMemoCache();
+  const cfg = await loadConfig();
+  const data = await fetchAllServicesData(cfg);
+  servicesCache = { data, ts: Date.now() };
   return NextResponse.json(data);
 }

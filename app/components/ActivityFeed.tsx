@@ -88,8 +88,9 @@ export function ActivityFeed({ events, loading }: { events: ActivityEvent[]; loa
       }}>
       <div className="absolute inset-y-0 left-0 z-10 flex items-center pointer-events-none"
         style={{
-          paddingLeft: 12, paddingRight: 18,
-          background: "linear-gradient(to right, var(--fade-to) 60%, transparent)",
+          paddingLeft: 12, paddingRight: 32,
+          minWidth: 110,
+          background: "linear-gradient(to right, var(--fade-to) 70%, transparent)",
         }}>
         <span className="text-[9px] uppercase" style={{
           color: "var(--text-label)", letterSpacing: "0.22em", fontWeight: 700,
@@ -98,7 +99,7 @@ export function ActivityFeed({ events, loading }: { events: ActivityEvent[]; loa
         </span>
       </div>
       <div className="absolute inset-y-0 flex items-center" style={{
-        left: 80,
+        left: 120,
         animation: `tickerScroll ${duration}s linear infinite`,
         animationPlayState: hov ? "paused" : "running",
         willChange: "transform",

@@ -51,10 +51,18 @@ export async function GET() {
     }
   } catch { /* upstream down — return empty */ }
 
+  // linuxserver/speedtest-tracker v1 API returns download/upload in BYTES/SEC.
+  // The dashboard UI labels these as Mbps and expects Mbps values (the older
+  // gistia /api/speedtest/latest endpoint we used to also call returned Mbps
+  // directly). Convert here so the client contract stays "always Mbps".
+  // bytes/sec × 8 / 1,000,000 = Mbps.
+  const toMbps = (bps: number | null | undefined): number | null =>
+    bps == null ? null : Math.round((bps * 8) / 10_000) / 100; // 2dp precision
+
   const latest = records[0] ?? null;
   const primary = latest ? {
-    download:       latest.download   ?? null,
-    upload:         latest.upload     ?? null,
+    download:       toMbps(latest.download),
+    upload:         toMbps(latest.upload),
     ping:           latest.ping       ?? null,
     jitter:         latest.jitter     ?? null,
     timestamp:      latest.created_at ?? null,
@@ -64,7 +72,7 @@ export async function GET() {
   } : null;
 
   const history = records
-    .map(r => r.download ?? null)
+    .map(r => toMbps(r.download))
     .filter((v): v is number => v !== null)
     .reverse(); // oldest → newest for sparkline left-to-right
 
