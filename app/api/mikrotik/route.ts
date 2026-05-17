@@ -15,8 +15,9 @@ function formatMikrotikUptime(uptime: string): string {
 }
 
 let mikrotikCache: { data: unknown; ts: number } | null = null;
-// Just under the client poll interval (5s) for the same reasons as the other routes.
-const CACHE_TTL = 4_000;
+// 9s — router stats don't change rapidly and the RouterOS REST API is
+// noticeably slow under any contention. Match the new 10s SSE interval.
+const CACHE_TTL = 9_000;
 
 export async function GET() {
   if (mikrotikCache && Date.now() - mikrotikCache.ts < CACHE_TTL) {

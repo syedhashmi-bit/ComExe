@@ -14,9 +14,10 @@ const POOL_PATH      = process.env.POOL_PATH      ?? "/mnt/Pool";
 const NET_EXCLUDE = process.env.NETWORK_DEVICE_EXCLUDE ?? "lo|veth.*|docker.*|br.*";
 
 let metricsCache: { data: unknown; ts: number } | null = null;
-// Slightly under the client poll interval (3s) so each poll gets fresh data
-// without forcing all ~30 PromQL queries through duplicate work on adjacent ticks.
-const CACHE_TTL = 2_500;
+// 4.5s — enough to dedupe a 5s SSE cycle but still keep the dashboard
+// feeling live. Each refresh fires ~30 PromQL queries; halving the rate
+// halves Prometheus load without harming UX.
+const CACHE_TTL = 4_500;
 
 const FS_EXCLUDE = `fstype!~"tmpfs|devtmpfs|overlay|squashfs|ramfs"`;
 

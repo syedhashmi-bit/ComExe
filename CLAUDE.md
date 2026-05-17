@@ -117,15 +117,15 @@ All UI components live in this one file. Categories:
 
 | Endpoint | Interval |
 |----------|----------|
-| `/api/metrics` | `settings.refreshInterval`s (default 3s, options 3/5/10/30) |
-| `/api/services` | 3s |
-| `/api/mikrotik` | 5s |
+| `/api/metrics` | `settings.refreshInterval`s (default 5s, options 5/10/15/30) |
+| `/api/services` | 15s |
+| `/api/mikrotik` | 10s |
 | `/api/activity` | 60s |
 | `/api/speedtest` | 300s |
 | `/api/weather` | 600s |
 | Clock | 1s |
 
-Server-side cache TTLs are tuned just under the client poll interval (services/metrics: 2.5s, mikrotik: 4s) so each poll gets fresh data without forcing duplicate upstream calls on adjacent ticks. Activity/speedtest/weather TTLs match their slower polls.
+**Throttling philosophy:** the original 3s polling generated ~20 upstream API calls/sec which contributed to *arr container instability on resource-constrained hosts. New defaults are deliberately slow — services (cards rarely change rapidly) at 15s, mikrotik at 10s, metrics at 5s. Server-side cache TTLs match: services 12s, mikrotik 9s, metrics 4.5s. Users can override per-endpoint in Settings → Polling intervals, but each endpoint has a hard floor (services ≥10s, metrics ≥3s, mikrotik ≥5s) enforced in the SSE route to prevent accidental flooding. The services route also stages its 10 upstream fetches in 2 batches of 5 with a 250ms gap to avoid a thundering herd. Per-service last-known-good cache (60s window) keeps cards populated across brief failures, flagged `stale: true`.
 
 ### Components — what to know
 

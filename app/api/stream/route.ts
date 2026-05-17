@@ -3,13 +3,29 @@ import { NextRequest } from "next/server";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// Much more conservative defaults than the original 3s — the *arr stack +
+// PiHole + qBit don't change rapidly enough to justify hammering them every
+// 3 seconds, and the aggregate request rate was contributing to upstream
+// container instability on resource-constrained hosts.
 const DEFAULT_INTERVALS: Record<string, number> = {
-  metrics:   3000,
-  services:  3000,
-  mikrotik:  5000,
+  metrics:   5000,
+  services:  15000,
+  mikrotik:  10000,
   activity:  60000,
   speedtest: 300000,
   weather:   600000,
+};
+
+// Floor each endpoint's poll interval so user overrides can't accidentally
+// flood the homelab. These are the absolute minimums; the defaults above
+// are what new installs see.
+const MIN_INTERVALS: Record<string, number> = {
+  metrics:   3000,
+  services:  10000,
+  mikrotik:  5000,
+  activity:  30000,
+  speedtest: 60000,
+  weather:   60000,
 };
 
 const ENDPOINTS: Record<string, string> = {
@@ -28,7 +44,8 @@ export async function GET(req: NextRequest) {
   const intervals: Record<string, number> = {};
   for (const [key, def] of Object.entries(DEFAULT_INTERVALS)) {
     const param = searchParams.get(key);
-    intervals[key] = param ? Math.max(1000, parseInt(param, 10) || def) : def;
+    const requested = param ? (parseInt(param, 10) || def) : def;
+    intervals[key] = Math.max(MIN_INTERVALS[key] ?? 1000, requested);
   }
 
   const encoder = new TextEncoder();

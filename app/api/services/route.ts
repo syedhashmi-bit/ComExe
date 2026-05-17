@@ -34,9 +34,12 @@ function unconfigured(name: string, envVar: string[]): ServiceResult {
 }
 
 let servicesCache: { data: { services: ServiceResult[]; timestamp: number }; ts: number } | null = null;
-// Slightly under the client poll interval (3s) so each poll gets fresh data
-// without forcing the upstream services through duplicate work on adjacent ticks.
-const CACHE_TTL = 2_500;
+// Generous cache so even an aggressive client poll cycle (or multiple browser
+// tabs sharing the SSE stream) doesn't generate a flood of upstream API
+// calls. 12s means each of the 10 services gets hit at most ~5×/minute total,
+// not 20×/minute. Crucial when the homelab is resource-constrained — the
+// dashboard's own polling was contributing to *arr container instability.
+const CACHE_TTL = 12_000;
 
 // Per-service last-known-good results. If a service was up in the last
 // STALE_WINDOW_MS but a fresh poll fails, we surface the cached good result
@@ -651,18 +654,26 @@ export async function GET() {
   const cfg = await loadConfig();
 
   const names = ["radarr","sonarr","bazarr","tautulli","qbittorrent","overseerr","pihole","prowlarr","nginx","uptimekuma"];
-  const settled = await Promise.allSettled([
+  // Stagger upstream calls in two batches with a small gap so we don't
+  // create a thundering herd of ~30 concurrent API requests against a
+  // potentially overloaded host. Each batch still uses Promise.allSettled
+  // so failures don't sink the others.
+  const batch1 = await Promise.allSettled([
     radarr(cfg.services.radarr),
     sonarr(cfg.services.sonarr),
     bazarr(cfg.services.bazarr),
     tautulli(cfg.services.tautulli),
     qbittorrent(cfg.services.qbittorrent),
+  ]);
+  await new Promise(r => setTimeout(r, 250));
+  const batch2 = await Promise.allSettled([
     overseerr(cfg.services.overseerr),
     pihole(cfg.services.pihole),
     prowlarr(cfg.services.prowlarr),
     nginxProxy(cfg.services.nginx),
     uptimeKuma(cfg.services.uptimekuma),
   ]);
+  const settled = [...batch1, ...batch2];
   const now = Date.now();
   const results: ServiceResult[] = settled.map((r, i) => {
     const name = names[i];
