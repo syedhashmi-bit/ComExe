@@ -131,7 +131,7 @@ export function ServicesPanel({
                       return 4;
                     };
                     return tier(a) - tier(b);
-                  }).map(({ name, up, lines, pct: svcPct, downCount, queueItem, queueItems, streams: svcStreams, health, url }) => {
+                  }).map(({ name, up, lines, pct: svcPct, downCount, queueItem, queueItems, streams: svcStreams, health, url, stale, staleSince }) => {
                     const color = SVC_COLORS[name] ?? "#666";
                     const icon  = SVC_ICONS[name]  ?? "";
                     const label = SVC_LABELS[name]  ?? name;
@@ -202,10 +202,18 @@ export function ServicesPanel({
                                   }}>{pillLabel}</span>
                                 );
                               })()}
+                              {stale && (
+                                <span title={staleSince ? `Last update ${Math.round((Date.now() - staleSince) / 1000)}s ago` : "Cached"}
+                                  style={{
+                                    background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.4)",
+                                    color: "#f59e0b", borderRadius: 4, padding: "1px 5px",
+                                    fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em",
+                                  }}>STALE</span>
+                              )}
                               <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{
-                                background: up ? "#10b981" : "#ef4444",
-                                boxShadow: up ? "0 0 6px #10b981aa" : "0 0 4px #ef444455",
-                                animation: up ? "pulseDot 2s ease-in-out infinite" : "none",
+                                background: stale ? "#f59e0b" : up ? "#10b981" : "#ef4444",
+                                boxShadow: stale ? "0 0 6px #f59e0baa" : up ? "0 0 6px #10b981aa" : "0 0 4px #ef444455",
+                                animation: up && !stale ? "pulseDot 2s ease-in-out infinite" : "none",
                               }} />
                             </div>
                           </div>

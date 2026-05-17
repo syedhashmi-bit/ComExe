@@ -120,6 +120,8 @@ export interface ServiceResult {
   streams?:    ServiceStream[];
   health?:     ServiceHealth;
   weekly?:     ServiceWeekly;
+  stale?:      boolean;          // true => cached data from a previous good poll (server-side last-known-good fallback)
+  staleSince?: number;           // ms epoch of the last successful fetch when stale=true
 }
 
 export interface ActivityEvent {

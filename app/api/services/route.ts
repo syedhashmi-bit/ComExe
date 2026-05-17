@@ -24,6 +24,8 @@ interface ServiceResult {
   streams?:    Stream[];
   health?:     HealthSummary;
   weekly?:     WeeklyStats;
+  stale?:      boolean;                // true ⇒ this is cached data from a previous successful poll
+  staleSince?: number;                 // timestamp of the last successful fetch when stale=true
 }
 
 // Helper: build a "needs configuration" placeholder result.
@@ -35,6 +37,13 @@ let servicesCache: { data: { services: ServiceResult[]; timestamp: number }; ts:
 // Slightly under the client poll interval (3s) so each poll gets fresh data
 // without forcing the upstream services through duplicate work on adjacent ticks.
 const CACHE_TTL = 2_500;
+
+// Per-service last-known-good results. If a service was up in the last
+// STALE_WINDOW_MS but a fresh poll fails, we surface the cached good result
+// flagged as stale rather than a blank "down" card — much smoother UX when
+// the homelab is under load and services briefly stop responding.
+const lastGoodResults = new Map<string, { result: ServiceResult; ts: number }>();
+const STALE_WINDOW_MS = 60_000;
 
 let piholeSession: { sid: string; expiry: number } | null = null;
 
@@ -654,11 +663,30 @@ export async function GET() {
     nginxProxy(cfg.services.nginx),
     uptimeKuma(cfg.services.uptimekuma),
   ]);
-  const results: ServiceResult[] = settled.map((r, i) =>
-    r.status === "fulfilled" ? r.value : { name: names[i], up: false, configured: true, lines: [] }
-  );
+  const now = Date.now();
+  const results: ServiceResult[] = settled.map((r, i) => {
+    const name = names[i];
+    const fresh: ServiceResult = r.status === "fulfilled"
+      ? r.value
+      : { name, up: false, configured: true, lines: [] };
 
-  const data = { services: results, timestamp: Date.now() };
-  servicesCache = { data, ts: Date.now() };
+    // If this poll succeeded with real data, remember it.
+    const hasRealData = fresh.up && fresh.lines.length > 0 && fresh.lines[0] !== "—";
+    if (hasRealData) {
+      lastGoodResults.set(name, { result: fresh, ts: now });
+      return fresh;
+    }
+
+    // Fresh poll didn't yield useful data. If we have a recent good result,
+    // surface it as stale so the user still sees their last known state.
+    const cached = lastGoodResults.get(name);
+    if (cached && now - cached.ts < STALE_WINDOW_MS) {
+      return { ...cached.result, stale: true, staleSince: cached.ts };
+    }
+    return fresh;
+  });
+
+  const data = { services: results, timestamp: now };
+  servicesCache = { data, ts: now };
   return NextResponse.json(data);
 }
