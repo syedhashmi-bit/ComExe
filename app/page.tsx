@@ -351,12 +351,14 @@ export default function Dashboard() {
     }
   }, []);
 
+  // Defaults match the server-side DEFAULT_INTERVALS in app/api/stream/route.ts
+  // (which also enforces MIN_INTERVALS floors regardless of what we send).
   const sseIntervals = {
     metrics:  (settings.refreshOverrides?.metrics || settings.refreshInterval) * 1000,
-    services: (settings.refreshOverrides?.services || 3) * 1000,
-    mikrotik: (settings.refreshOverrides?.mikrotik || 5) * 1000,
-    activity: (settings.refreshOverrides?.activity || 60) * 1000,
-    speedtest: 300000,
+    services: (settings.refreshOverrides?.services || 30) * 1000,
+    mikrotik: (settings.refreshOverrides?.mikrotik || 15) * 1000,
+    activity: (settings.refreshOverrides?.activity || 120) * 1000,
+    speedtest: 600000,
     weather:   600000,
   };
 
@@ -1445,6 +1447,7 @@ export default function Dashboard() {
           padding: "8px 14px", borderRadius: 8,
           boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
         }}>
+          <span style={{ fontFamily: "monospace", marginRight: 6 }}>{restartMsg.name}</span>
           {restartMsg.text}
         </div>
       )}

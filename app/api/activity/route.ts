@@ -25,6 +25,26 @@ const MAX_EVENTS = 30;
 
 let activityCache: { data: { events: ActivityEvent[]; timestamp: number }; ts: number } | null = null;
 
+// Per-source memo so a cache miss on the top-level doesn't always re-hit all
+// three /history endpoints. Each source independently cached 5 min — the
+// *arr /history endpoints are real DB queries and were on the list of things
+// the throttling pass was meant to spare. 5 min × 3 sources = at most ~36
+// history fetches/hour across all browsers, vs the old ~60/hour each.
+const memo = new Map<string, { value: ActivityEvent[]; ts: number }>();
+const SOURCE_TTL = 300_000;
+async function memoSource(key: string, fn: () => Promise<ActivityEvent[]>): Promise<ActivityEvent[]> {
+  const c = memo.get(key);
+  if (c && Date.now() - c.ts < SOURCE_TTL) return c.value;
+  try {
+    const v = await fn();
+    memo.set(key, { value: v, ts: Date.now() });
+    return v;
+  } catch {
+    memo.set(key, { value: [], ts: Date.now() });
+    return [];
+  }
+}
+
 async function jsonFetch(url: string, headers?: Record<string, string>): Promise<unknown> {
   const res = await fetch(url, {
     headers: { Accept: "application/json", ...headers },
@@ -184,9 +204,9 @@ export async function GET() {
 
   const cfg = await loadConfig();
   const [sonarr, radarr, tautulli] = await Promise.all([
-    sonarrEvents(cfg.services.sonarr),
-    radarrEvents(cfg.services.radarr),
-    tautulliEvents(cfg.services.tautulli),
+    memoSource(`sonarr:${cfg.services.sonarr.url}`,     () => sonarrEvents(cfg.services.sonarr)),
+    memoSource(`radarr:${cfg.services.radarr.url}`,     () => radarrEvents(cfg.services.radarr)),
+    memoSource(`tautulli:${cfg.services.tautulli.url}`, () => tautulliEvents(cfg.services.tautulli)),
   ]);
 
   const events = [...sonarr, ...radarr, ...tautulli]

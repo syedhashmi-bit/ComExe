@@ -131,7 +131,7 @@ export function ServicesPanel({
                       return 4;
                     };
                     return tier(a) - tier(b);
-                  }).map(({ name, up, lines, pct: svcPct, downCount, queueItem, queueItems, streams: svcStreams, health, url, stale, staleSince }) => {
+                  }).map(({ name, up, lines, pct: svcPct, downCount, queueItems, streams: svcStreams, health, stale, staleSince }) => {
                     const color = SVC_COLORS[name] ?? "#666";
                     const icon  = SVC_ICONS[name]  ?? "";
                     const label = SVC_LABELS[name]  ?? name;

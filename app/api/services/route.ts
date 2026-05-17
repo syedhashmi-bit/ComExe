@@ -94,6 +94,20 @@ async function apiFetch(url: string, headers?: Record<string, string>): Promise<
 // minutes means each upstream gets hit a handful of times per hour instead of
 // hundreds, which is the difference between "homelab stable" and "*arr crash".
 const memoCache = new Map<string, { value: unknown; ts: number }>();
+// Belt-and-suspenders cap on the memo cache. Keys include the upstream URL so
+// /setup writes (which can change URLs at runtime) won't grow the map forever.
+// Prune anything older than 10 min on each call, and hard-cap at 100 entries.
+function pruneMemoCache(): void {
+  const cutoff = Date.now() - 600_000;
+  for (const [k, v] of memoCache) {
+    if (v.ts < cutoff) memoCache.delete(k);
+  }
+  if (memoCache.size > 100) {
+    // Drop the oldest entries until we're back under cap.
+    const sorted = Array.from(memoCache.entries()).sort((a, b) => a[1].ts - b[1].ts);
+    for (let i = 0; i < sorted.length - 100; i++) memoCache.delete(sorted[i][0]);
+  }
+}
 async function apiFetchMemo<T>(key: string, ttlMs: number, fetcher: () => Promise<T>): Promise<T> {
   const cached = memoCache.get(key);
   if (cached && Date.now() - cached.ts < ttlMs) return cached.value as T;
@@ -714,6 +728,9 @@ export async function GET() {
   if (servicesCache && Date.now() - servicesCache.ts < CACHE_TTL) {
     return NextResponse.json(servicesCache.data);
   }
+
+  // Bound the in-memory caches before each cache-miss path.
+  pruneMemoCache();
 
   // Single config resolve per request — see app/lib/server-config.ts.
   const cfg = await loadConfig();
