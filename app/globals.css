@@ -414,6 +414,19 @@ body {
   to   { transform: translateX(-50%); }
 }
 
+/* Sparkline empty-state shimmer — used while we have <2 data points. */
+@keyframes sparklineShimmer {
+  0%   { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+/* Service card mount-in — staggered via inline animationDelay in ServicesPanel
+   so the cards visually settle into the grid instead of snapping in all at once. */
+@keyframes serviceCardIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 /* ── Mobile responsive ─────────────────────────────────────────────────── */
 
 @media (max-width: 640px) {

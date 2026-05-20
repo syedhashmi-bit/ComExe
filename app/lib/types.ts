@@ -104,7 +104,7 @@ export interface SpeedtestRaw {
 
 export interface ServiceQueueItem { title: string; pct: number; etaSec?: number | null }
 export interface ServiceStream    { title: string; user: string; progress: number; posStr: string }
-export interface ServiceHealth    { warning: number; error: number }
+export interface ServiceHealth    { warning: number; error: number; messages?: string[] }
 export interface ServiceWeekly    { plays?: number; topShow?: string; topUser?: string }
 export interface ServiceResult {
   name: string;

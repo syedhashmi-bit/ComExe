@@ -12,7 +12,7 @@ import type {
 import {
   fmtBytes, fmtTemp, fmtUptime, fmtSince, fmtPct,
   pct, barColor, gpuUtilColor, tempColor,
-  normalizeSpeedResult, histStats,
+  normalizeSpeedResult, histStats, ageColor,
 } from "@/app/lib/formatters";
 import {
   cpuAlertLevel, memAlertLevel, diskAlertLevel, gpuTempAlertLevel,
@@ -1180,12 +1180,17 @@ export default function Dashboard() {
                 ) : (() => {
                   const latest = speedtestResults[0];
                   const ts   = latest.timestamp ?? latest.created_at;
-                  const diff = ts ? (Date.now() - new Date(ts).getTime()) / 1000 : null;
+                  const tsMs = ts ? new Date(ts).getTime() : null;
+                  const diff = tsMs != null ? (Date.now() - tsMs) / 1000 : null;
                   const rel  = diff == null ? null
                     : diff < 60    ? "just now"
                     : diff < 3600  ? `${Math.round(diff / 60)}m ago`
                     : diff < 86400 ? `${Math.round(diff / 3600)}h ago`
                     : `${Math.round(diff / 86400)}d ago`;
+                  // Color the timestamp by age — a result from 278 days ago
+                  // should be visibly stale rather than blending into the bg.
+                  const relColor = ageColor(tsMs, { warnSec: 7 * 86400, critSec: 30 * 86400 });
+                  const isStale = diff != null && diff > 7 * 86400;
                   const dl = latest.download;
                   const quality = dl == null ? null
                     : dl >= 500 ? { label: "Excellent", color: "var(--ok)", bg: "rgba(16,185,129,0.12)", border: "rgba(16,185,129,0.3)" }
@@ -1198,7 +1203,7 @@ export default function Dashboard() {
                         <div className="flex flex-col gap-0.5">
                           {latest.isp && <span className="text-[12px] font-semibold" style={{ color: "var(--text-mid)" }}>{latest.isp}</span>}
                           {latest.serverLocation && <span className="text-[10px]" style={{ color: "var(--text-label)" }}>{latest.serverLocation}</span>}
-                          {latest.serverHost && <span className="text-[9px] font-mono truncate" style={{ color: "var(--text-ghost)", maxWidth: 160 }}>{latest.serverHost}</span>}
+                          {latest.serverHost && <span title={latest.serverHost} className="text-[9px] font-mono truncate" style={{ color: "var(--text-ghost)", maxWidth: 160 }}>{latest.serverHost}</span>}
                         </div>
                         {quality && (
                           <span className="text-[9px] font-semibold uppercase tracking-wider shrink-0 mt-0.5"
@@ -1250,7 +1255,14 @@ export default function Dashboard() {
                         </div>
                       )}
                       <div className="flex items-center justify-between flex-wrap gap-1">
-                        {rel && <span className="text-[9px] tabular-nums" style={{ color: "var(--text-faint)" }}>auto-tested · {rel}</span>}
+                        {rel && (
+                          <span
+                            title={tsMs ? new Date(tsMs).toLocaleString() : undefined}
+                            className="text-[9px] tabular-nums"
+                            style={{ color: relColor, fontWeight: isStale ? 600 : 400 }}>
+                            {isStale ? "⚠ " : ""}auto-tested · {rel}
+                          </span>
+                        )}
                         {speedtestTotalTests != null && (
                           <span className="text-[9px] tabular-nums" style={{ color: "var(--text-ghost)" }}>
                             {speedtestTotalTests.toLocaleString()} tests recorded

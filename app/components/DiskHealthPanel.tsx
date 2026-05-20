@@ -111,7 +111,7 @@ export function DiskHealthPanel() {
               <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text)", fontFamily: "monospace" }}>
                 {disk.device}
               </span>
-              <span style={{ fontSize: 9, color: "var(--text-ghost)", marginLeft: "auto", maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <span title={disk.model} style={{ fontSize: 9, color: "var(--text-ghost)", marginLeft: "auto", maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {disk.model}
               </span>
             </div>

@@ -1,12 +1,14 @@
 "use client";
 
+import { useState } from "react";
 import type { ServiceResult, ClientConfig } from "@/app/lib/types";
 import { SVC_PORTS } from "@/app/lib/constants";
-import { cleanTitle, fmtEtaShort } from "@/app/lib/formatters";
+import { cleanTitle, fmtEtaShort, fmtSmoothAgo } from "@/app/lib/formatters";
 import { IconServices } from "@/app/components/icons";
 import {
   animatedLine, HeroStat, GaugeBar, Skeleton, ServiceIcon,
 } from "@/app/components/primitives";
+import { ServiceDetailSheet } from "@/app/components/ServiceDetailSheet";
 
 const SVC_COLORS: Record<string, string> = {
   radarr: "#f5c518", sonarr: "#35c5f4", bazarr: "#4a90d9",
@@ -63,6 +65,13 @@ export function ServicesPanel({
   serviceFilter, setServiceFilter, serviceFilterRef,
   clientConfig, setLogsContainer, restartingSvc, restartService,
 }: ServicesPanelProps) {
+  // Track which service card is expanded into the right-side detail sheet.
+  // Null = no card expanded. Stored by name (matches ServiceResult.name).
+  const [detailServiceName, setDetailServiceName] = useState<string | null>(null);
+  const detailService = detailServiceName
+    ? services?.find(s => s.name === detailServiceName) ?? null
+    : null;
+
   return (
     <div className="flex flex-col gap-4" style={{ background: "var(--surface-dim)", border: "1px solid var(--border-subtle)", borderRadius: 14, padding: 20 }}>
       <div className="flex items-center gap-3 flex-wrap">
@@ -77,21 +86,42 @@ export function ServicesPanel({
             </span>
           );
         })()}
-        <input
-          ref={serviceFilterRef}
-          type="text"
-          placeholder="filter (/ to focus)"
-          value={serviceFilter}
-          onChange={e => setServiceFilter(e.target.value)}
-          onKeyDown={e => { if (e.key === "Escape") { setServiceFilter(""); e.currentTarget.blur(); } }}
-          className="text-[10px] ml-auto"
-          style={{ background: "var(--card-alt)", border: "1px solid var(--border)", borderRadius: 6, padding: "3px 8px", color: "var(--text)", outline: "none", width: 160, fontFamily: "monospace" }}
-        />
-        {servicesUpdatedAt != null && (() => {
-          const sec = Math.round((Date.now() - servicesUpdatedAt) / 1000);
-          const rel = sec < 60 ? `${sec}s ago` : `${Math.round(sec / 60)}m ago`;
-          return <span className="text-[9px]" style={{ color: "var(--text-ghost)" }}>updated {rel}</span>;
-        })()}
+        <div className="ml-auto relative" style={{ width: 160 }}>
+          <input
+            ref={serviceFilterRef}
+            type="text"
+            placeholder="filter (/ to focus)"
+            value={serviceFilter}
+            onChange={e => setServiceFilter(e.target.value)}
+            onKeyDown={e => { if (e.key === "Escape") { setServiceFilter(""); e.currentTarget.blur(); } }}
+            className="text-[10px] w-full"
+            style={{
+              background: "var(--card-alt)", border: "1px solid var(--border)", borderRadius: 6,
+              padding: serviceFilter ? "3px 22px 3px 8px" : "3px 8px",
+              color: "var(--text)", outline: "none", fontFamily: "monospace",
+            }}
+          />
+          {serviceFilter && (
+            <button
+              onClick={() => { setServiceFilter(""); serviceFilterRef.current?.focus(); }}
+              title="Clear filter (Esc)"
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center justify-center"
+              style={{
+                background: "transparent", border: "none", cursor: "pointer",
+                color: "var(--text-ghost)", padding: 2, lineHeight: 1,
+                fontSize: 14, width: 16, height: 16, borderRadius: 3,
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = "var(--surface)"; e.currentTarget.style.color = "var(--text)"; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--text-ghost)"; }}
+            >&times;</button>
+          )}
+        </div>
+        {servicesUpdatedAt != null && (
+          <span title={`Last update: ${new Date(servicesUpdatedAt).toLocaleTimeString()}`}
+            className="text-[9px]" style={{ color: "var(--text-ghost)" }}>
+            updated {fmtSmoothAgo(servicesUpdatedAt)}
+          </span>
+        )}
       </div>
       {servicesLoading ? <Skeleton /> : !services ? (
         <span style={{ fontSize: 12, color: "var(--text-label)" }}>unavailable</span>
@@ -131,7 +161,7 @@ export function ServicesPanel({
                       return 4;
                     };
                     return tier(a) - tier(b);
-                  }).map(({ name, up, lines, pct: svcPct, downCount, queueItems, streams: svcStreams, health, stale, staleSince, authError }) => {
+                  }).map(({ name, up, lines, pct: svcPct, downCount, queueItems, streams: svcStreams, health, stale, staleSince, authError }, cardIdx) => {
                     const color = SVC_COLORS[name] ?? "#666";
                     const icon  = SVC_ICONS[name]  ?? "";
                     const label = SVC_LABELS[name]  ?? name;
@@ -150,7 +180,14 @@ export function ServicesPanel({
                             : "rgba(255,255,255,0.03)",
                           border: "1px solid var(--border-subtle)",
                           borderRadius: 12, padding: 0, minHeight: 140,
-                          transition: "transform 0.15s, border-color 0.15s, box-shadow 0.2s",
+                          transition: "transform 0.15s, border-color 0.15s, box-shadow 0.2s, opacity 0.3s",
+                          // Stagger mount: each card fades+slides in 30ms after the previous.
+                          animation: `serviceCardIn 0.35s ease-out both`,
+                          animationDelay: `${cardIdx * 35}ms`,
+                          // Dim the card body slightly when serving cached (stale) data,
+                          // so a glance tells you the data isn't live. The pill says STALE,
+                          // but the dimming reinforces it at the card level.
+                          opacity: stale ? 0.78 : 1,
                         }}
                         onMouseEnter={e => {
                           e.currentTarget.style.transform = "translateY(-3px)";
@@ -172,6 +209,17 @@ export function ServicesPanel({
                           <div className="flex items-center justify-between gap-2">
                             <ServiceIcon src={icon} label={label} color={color} />
                             <div className="flex items-center gap-1.5 shrink-0">
+                              <button
+                                onClick={e => { e.stopPropagation(); setDetailServiceName(name); }}
+                                title="Show details"
+                                style={{
+                                  background: "var(--card-alt)", border: "1px solid var(--border)",
+                                  borderRadius: 4, padding: "1px 5px", fontSize: 9,
+                                  color: "var(--text-dim)", cursor: "pointer", lineHeight: 1.2,
+                                }}
+                                onMouseEnter={e => { e.currentTarget.style.color = color; e.currentTarget.style.borderColor = `${color}66`; }}
+                                onMouseLeave={e => { e.currentTarget.style.color = "var(--text-dim)"; e.currentTarget.style.borderColor = "var(--border)"; }}
+                              >&rsaquo;</button>
                               {clientConfig?.dockerEnabled && (
                                 <>
                                   <button
@@ -194,12 +242,21 @@ export function ServicesPanel({
                                 const pillLabel = isError
                                   ? `${total} ${total === 1 ? "err" : "errs"}`
                                   : `${total} ${total === 1 ? "warn" : "warns"}`;
+                                // Build a multi-line tooltip from the messages (server caps at 5).
+                                // Each message is prefixed with a • bullet for readability.
+                                const tooltip = health.messages && health.messages.length > 0
+                                  ? health.messages.map(m => `• ${m}`).join("\n")
+                                  : `${total} health ${isError ? "error" : "warning"}${total === 1 ? "" : "s"} reported by ${name} — open the service to inspect.`;
                                 return (
-                                  <span style={{
-                                    background: `${accent}1a`, border: `1px solid ${accent}55`, color: accent,
-                                    borderRadius: 4, padding: "1px 5px", fontSize: 9, fontWeight: 700,
-                                    textTransform: "uppercase", letterSpacing: "0.05em", fontVariantNumeric: "tabular-nums",
-                                  }}>{pillLabel}</span>
+                                  <span
+                                    title={tooltip}
+                                    onClick={e => { e.stopPropagation(); }}
+                                    style={{
+                                      background: `${accent}1a`, border: `1px solid ${accent}55`, color: accent,
+                                      borderRadius: 4, padding: "1px 5px", fontSize: 9, fontWeight: 700,
+                                      textTransform: "uppercase", letterSpacing: "0.05em", fontVariantNumeric: "tabular-nums",
+                                      cursor: "help",
+                                    }}>{pillLabel}</span>
                                 );
                               })()}
                               {stale && (
@@ -226,15 +283,43 @@ export function ServicesPanel({
                             </div>
                           </div>
                           <span style={{ fontSize: 14, fontWeight: 700, color: up ? "#ffffff" : "rgba(255,255,255,0.3)", letterSpacing: "0.01em" }}>{label}</span>
-                          {up && lines[0] && <HeroStat line={lines[0]} keyPrefix={`${name}-h`} />}
-                          {up && lines.slice(1).map((line, i) => (
-                            <span key={i} style={{
-                              color: name === "uptimekuma"
-                                ? ((downCount ?? 0) > 0 ? "#ef4444" : "#10b981")
-                                : name === "qbittorrent" && i === 0 ? "#06b6d4" : "rgba(255,255,255,0.5)",
-                              fontSize: 11, lineHeight: 1.5, fontVariantNumeric: "tabular-nums",
-                            }}>{animatedLine(line, `${name}-${i + 1}`)}</span>
-                          ))}
+                          {(() => {
+                            // "No real data" = service is up but we have either no
+                            // lines, or just a sentinel dash. Render a clearer
+                            // placeholder + a "Open service" link instead of just
+                            // showing a bare em-dash in the hero slot.
+                            const noRealData = up && !authError && (
+                              lines.length === 0 ||
+                              (lines.length === 1 && (lines[0] === "—" || lines[0] === "loading…"))
+                            );
+                            if (noRealData) {
+                              const isLoading = lines[0] === "loading…";
+                              return (
+                                <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 2 }}>
+                                  <span style={{ fontSize: 11, color: "var(--text-label)", fontStyle: isLoading ? "italic" : "normal" }}>
+                                    {isLoading ? "collecting data…" : "no data"}
+                                  </span>
+                                  {!isLoading && (
+                                    <span style={{ fontSize: 9, color: "var(--text-ghost)", lineHeight: 1.4 }}>
+                                      Service is reachable but the dashboard couldn&apos;t fetch detail.
+                                      {resolvedUrl && <> Try opening <code style={{ fontSize: 8, color: "var(--text-dim)" }}>{resolvedUrl.replace(/^https?:\/\//, "")}</code> directly.</>}
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            }
+                            return (<>
+                              {up && lines[0] && <HeroStat line={lines[0]} keyPrefix={`${name}-h`} />}
+                              {up && lines.slice(1).map((line, i) => (
+                                <span key={i} style={{
+                                  color: name === "uptimekuma"
+                                    ? ((downCount ?? 0) > 0 ? "#ef4444" : "#10b981")
+                                    : name === "qbittorrent" && i === 0 ? "#06b6d4" : "rgba(255,255,255,0.5)",
+                                  fontSize: 11, lineHeight: 1.5, fontVariantNumeric: "tabular-nums",
+                                }}>{animatedLine(line, `${name}-${i + 1}`)}</span>
+                              ))}
+                            </>);
+                          })()}
                           {!up && (
                             <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                               <span style={{ fontSize: 10, color: "#ef4444" }}>offline</span>
@@ -263,7 +348,7 @@ export function ServicesPanel({
                                 return (
                                   <div key={qi} className="flex flex-col gap-1">
                                     <div className="flex items-center gap-1.5">
-                                      <span style={{ fontSize: 10, fontWeight: 500, color: c, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0 }}>↓ {cleanTitle(q.title)}</span>
+                                      <span title={q.title} style={{ fontSize: 10, fontWeight: 500, color: c, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0 }}>↓ {cleanTitle(q.title)}</span>
                                       {fmtEtaShort(q.etaSec) && (
                                         <span style={{ fontSize: 9, color: "var(--text-label)", fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>{fmtEtaShort(q.etaSec)}</span>
                                       )}
@@ -278,7 +363,7 @@ export function ServicesPanel({
                             <div className="flex flex-col gap-2 mt-0.5">
                               {svcStreams.slice(0, 3).map((st, si) => (
                                 <div key={si} className="flex flex-col gap-1">
-                                  <span style={{ fontSize: 12, color: "var(--text-muted)", fontStyle: "italic", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{st.title}</span>
+                                  <span title={`${st.title}${st.user ? ` — ${st.user}` : ""}${st.posStr ? ` (${st.posStr})` : ""}`} style={{ fontSize: 12, color: "var(--text-muted)", fontStyle: "italic", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{st.title}</span>
                                   <div style={{ height: 3, background: "var(--border-subtle)", borderRadius: 2 }}>
                                     <div style={{ height: "100%", borderRadius: 2, width: `${Math.min(100, st.progress)}%`, background: "#8b5cf6", transition: "width 0.6s ease-out" }} />
                                   </div>
@@ -296,6 +381,25 @@ export function ServicesPanel({
           })}
         </div>
       )}
+
+      {/* Right-side detail sheet for the currently-expanded service card. */}
+      {detailService && (() => {
+        const svcUrls = buildSvcUrls(clientConfig?.truenasIp ?? "192.168.88.196");
+        const resolvedUrl = clientConfig?.serviceUrls?.[detailService.name] ?? svcUrls[detailService.name];
+        return (
+          <ServiceDetailSheet
+            service={detailService}
+            resolvedUrl={resolvedUrl}
+            color={SVC_COLORS[detailService.name] ?? "#666"}
+            iconSrc={SVC_ICONS[detailService.name]}
+            label={SVC_LABELS[detailService.name] ?? detailService.name}
+            onClose={() => setDetailServiceName(null)}
+            onViewLogs={(n) => { setDetailServiceName(null); setLogsContainer(n); }}
+            onRestart={(n) => { restartService(n); }}
+            dockerEnabled={clientConfig?.dockerEnabled}
+          />
+        );
+      })()}
     </div>
   );
 }

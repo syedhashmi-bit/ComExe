@@ -7,7 +7,14 @@ import "@/app/lib/fetch-agent";
 
 interface QueueItem { title: string; pct: number; etaSec?: number | null }
 interface Stream    { title: string; user: string; progress: number; posStr: string }
-interface HealthSummary { warning: number; error: number }
+interface HealthSummary {
+  warning: number;
+  error:   number;
+  // First few human-readable messages — surfaced in the UI as a tooltip on
+  // the ERR/WARN pill so the user can see what's actually wrong without
+  // having to open the upstream service's UI.
+  messages?: string[];
+}
 interface WeeklyStats {
   plays?:        number;
   topShow?:      string;
@@ -230,10 +237,25 @@ function parseTimeleft(t?: string): number | null {
 }
 function summarizeHealth(records: ArrHealthRecord[] | null): HealthSummary | undefined {
   if (!records || records.length === 0) return undefined;
-  const warning = records.filter(r => (r.type ?? "").toLowerCase() === "warning").length;
-  const error   = records.filter(r => (r.type ?? "").toLowerCase() === "error"  ).length;
-  if (warning === 0 && error === 0) return undefined;
-  return { warning, error };
+  const interesting = records.filter(r => {
+    const t = (r.type ?? "").toLowerCase();
+    return t === "warning" || t === "error";
+  });
+  if (interesting.length === 0) return undefined;
+  const warning = interesting.filter(r => (r.type ?? "").toLowerCase() === "warning").length;
+  const error   = interesting.filter(r => (r.type ?? "").toLowerCase() === "error").length;
+  // Errors first so the most-important messages are visible in the tooltip
+  // even when there's a long list. Cap at 5 to keep the title attr readable.
+  const sorted = [...interesting].sort((a, b) => {
+    const at = (a.type ?? "").toLowerCase() === "error" ? 0 : 1;
+    const bt = (b.type ?? "").toLowerCase() === "error" ? 0 : 1;
+    return at - bt;
+  });
+  const messages = sorted
+    .map(r => r.message)
+    .filter((m): m is string => typeof m === "string" && m.length > 0)
+    .slice(0, 5);
+  return { warning, error, messages: messages.length > 0 ? messages : undefined };
 }
 
 async function radarr(creds: ServiceCreds): Promise<ServiceResult> {

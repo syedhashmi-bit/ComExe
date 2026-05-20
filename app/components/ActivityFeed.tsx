@@ -32,15 +32,19 @@ function ActivityEventPill({ ev }: { ev: ActivityEvent }) {
         textTransform: "uppercase", letterSpacing: "0.1em",
       }}>{ev.source}</span>
       <span style={{ color: "var(--text-faint)", fontSize: 10 }}>{verb}</span>
-      <span style={{
-        color: "var(--text-secondary)", fontSize: 11, fontWeight: 500,
-        maxWidth: 280, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-      }}>{ev.title}</span>
+      <span
+        title={`${ev.title}${ev.subtitle ? ` · ${ev.subtitle}` : ""} — ${new Date(ev.timestamp).toLocaleString()}`}
+        style={{
+          color: "var(--text-secondary)", fontSize: 11, fontWeight: 500,
+          maxWidth: 280, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+        }}>{ev.title}</span>
       {ev.subtitle && (
-        <span style={{
-          color: "var(--text-faint)", fontSize: 10,
-          maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-        }}>· {ev.subtitle}</span>
+        <span
+          title={ev.subtitle}
+          style={{
+            color: "var(--text-faint)", fontSize: 10,
+            maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+          }}>· {ev.subtitle}</span>
       )}
       <span style={{
         color: "var(--text-ghost)", fontSize: 9,

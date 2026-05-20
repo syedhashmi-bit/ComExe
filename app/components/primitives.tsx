@@ -110,10 +110,12 @@ export function HeroStat({ line, keyPrefix }: { line: string; keyPrefix: string 
       }}>
         <AnimatedNumber value={value} decimals={decimals} useCommas={useCommas} />
       </span>
-      {rest && <span style={{
-        fontSize: 11, color: "var(--text-dim)",
-        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-      }}>{animatedLine(rest, `${keyPrefix}-rest`)}</span>}
+      {rest && <span
+        title={rest}
+        style={{
+          fontSize: 11, color: "var(--text-dim)",
+          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+        }}>{animatedLine(rest, `${keyPrefix}-rest`)}</span>}
     </div>
   );
 }
@@ -137,7 +139,27 @@ export function Sparkline({ data, color, autoMax = false, height = 32 }: {
   data: number[]; color: string; autoMax?: boolean; height?: number;
 }) {
   const uid = useId();
-  if (data.length < 2) return <div style={{ height }} />;
+  // "Collecting data…" state — after a deploy or for a slow-changing
+  // metric the buffer can be empty or have a single point. A bare empty div
+  // (the previous behavior) made the dashboard look broken; instead show
+  // a muted shimmering hint so the user knows we're waiting for samples.
+  if (data.length < 2) {
+    return (
+      <div
+        style={{
+          height, display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: 9, color: "var(--text-ghost)", fontStyle: "italic",
+          letterSpacing: "0.05em",
+          background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.025) 50%, transparent 100%)",
+          backgroundSize: "200% 100%",
+          animation: "sparklineShimmer 2.4s linear infinite",
+          borderRadius: 4,
+        }}
+        title="Waiting for additional data points">
+        collecting data…
+      </div>
+    );
+  }
   const W = 100, H = height, PAD = 1;
   const maxVal = autoMax ? Math.max(...data, 0.001) : 100;
   const pts = data.map((v, i) => {
@@ -335,7 +357,7 @@ export function Card({
       <div className="flex items-center gap-2 overflow-hidden px-[18px] pt-[18px] pb-0">
         {icon && <span style={{ color: accent, opacity: 0.7 }}>{icon}</span>}
         <span className="text-[10px] uppercase shrink-0" style={{ color: "var(--text-label)", letterSpacing: "0.12em" }}>{label}</span>
-        {subtitle && <span className="text-[10px] truncate" style={{ color: "var(--text-faint)" }}>{subtitle}</span>}
+        {subtitle && <span title={subtitle} className="text-[10px] truncate" style={{ color: "var(--text-faint)" }}>{subtitle}</span>}
         {infoText && (
           <span className="relative shrink-0" style={{ lineHeight: 1 }}
             onMouseEnter={e => { e.stopPropagation(); setShowInfo(true); }}
@@ -513,7 +535,7 @@ export function BookmarkItem({ name, url, icon }: { name: string; url: string; i
           {name[0].toUpperCase()}
         </span>
       )}
-      <span className="truncate" style={{ color: "var(--text-secondary)", fontSize: 13 }}>{name}</span>
+      <span title={name} className="truncate" style={{ color: "var(--text-secondary)", fontSize: 13 }}>{name}</span>
     </a>
   );
 }

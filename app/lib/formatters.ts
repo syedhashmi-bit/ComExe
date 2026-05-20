@@ -26,6 +26,37 @@ export function fmtUptime(s: number | null): string {
   return `${m}m`;
 }
 
+// Smoothly bucketed "X ago" formatter — avoids twitchy 0s → 1s → 2s ticks
+// in the UI. Used by anywhere that displays a poll's last-success timestamp.
+// Buckets:
+//   <5s    → "just now"
+//   <60s   → rounded to nearest 5s
+//   <60m   → rounded to nearest minute
+//   <24h   → rounded to nearest hour
+//   else   → days
+export function fmtSmoothAgo(unixMs: number | null): string {
+  if (unixMs == null) return "—";
+  const sec = Math.max(0, Math.floor((Date.now() - unixMs) / 1000));
+  if (sec < 5)     return "just now";
+  if (sec < 60)    return `${Math.round(sec / 5) * 5}s ago`;
+  if (sec < 3600)  return `${Math.round(sec / 60)}m ago`;
+  if (sec < 86400) return `${Math.round(sec / 3600)}h ago`;
+  return `${Math.round(sec / 86400)}d ago`;
+}
+
+// Color the "X ago" text by age — useful for "auto-tested X days ago" type
+// displays so a stale-by-weeks indicator looks visibly stale at a glance.
+// Returns a CSS color variable name.
+export function ageColor(unixMs: number | null, opts?: { warnSec?: number; critSec?: number }): string {
+  if (unixMs == null) return "var(--text-faint)";
+  const age = (Date.now() - unixMs) / 1000;
+  const warn = opts?.warnSec ?? 30 * 86400;   // default: amber after 30 days
+  const crit = opts?.critSec ?? 180 * 86400;  // default: red after 180 days
+  if (age >= crit) return "var(--critical)";
+  if (age >= warn) return "var(--warn)";
+  return "var(--text-faint)";
+}
+
 export function fmtSince(s: number | null): string {
   if (s === null) return "—";
   const b = new Date(Date.now() - s * 1000);
