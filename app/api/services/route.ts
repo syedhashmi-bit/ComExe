@@ -486,15 +486,25 @@ async function qbittorrent(creds: ServiceCreds): Promise<ServiceResult> {
       signal: AbortSignal.timeout(6000),
       next: { revalidate: 0 },
     });
+    if (loginRes.status === 401 || loginRes.status === 403) throw new AuthError(loginRes.status);
     const setCookie = loginRes.headers.get("set-cookie");
     const sid = setCookie?.match(/SID=([^;]+)/)?.[1];
-    if (!sid) throw new Error("no SID cookie in login response");
+    // Two-path auth handling:
+    //  - Normal case: login succeeds → SID cookie → send with subsequent calls.
+    //  - "Bypass authentication for localhost" enabled in qBit's WebUI settings:
+    //    login returns 200 OK with body "Ok." but NO SID cookie. Subsequent
+    //    calls without auth are accepted by qBit anyway. We support this by
+    //    proceeding without the SID header.
+    const cookieHeader: Record<string, string> = sid
+      ? { Cookie: `SID=${sid}`, Referer: BASE }
+      : { Referer: BASE };
 
     const torrentsRes = await fetch(`${BASE}/api/v2/torrents/info`, {
-      headers: { "Cookie": `SID=${sid}`, "Referer": BASE },
+      headers: cookieHeader,
       signal: AbortSignal.timeout(6000),
       next: { revalidate: 0 },
     });
+    if (torrentsRes.status === 401 || torrentsRes.status === 403) throw new AuthError(torrentsRes.status);
     if (!torrentsRes.ok) throw new Error(`torrents HTTP ${torrentsRes.status}`);
     const torrents = await torrentsRes.json() as QbitTorrent[];
 
@@ -650,6 +660,17 @@ async function pihole(creds: ServiceCreds): Promise<ServiceResult> {
   }
 }
 
+// Prowlarr/Radarr/Sonarr (Servarr) return error responses as 200 OK with a
+// JSON body shaped { message, description? } when something blows up inside
+// the app (e.g. a corrupt date in the SQLite history table will produce
+// "Error parsing column ... was not recognized as a valid DateTime").
+// Detect this shape and treat it as a recoverable upstream error so the
+// card surfaces it instead of silently showing "0 indexers".
+interface ServarrError { message?: string; description?: string }
+function isServarrError(o: unknown): o is ServarrError {
+  return typeof o === "object" && o !== null && typeof (o as ServarrError).message === "string";
+}
+
 async function prowlarr(creds: ServiceCreds): Promise<ServiceResult> {
   if (!creds.configured) return unconfigured("prowlarr", creds.envVar ?? ["PROWLARR_API_KEY"]);
   const KEY  = creds.apiKey ?? "";
@@ -662,12 +683,24 @@ async function prowlarr(creds: ServiceCreds): Promise<ServiceResult> {
       apiFetchMemo(`prowlarr:stats:${BASE}`, 300_000, () =>
         apiFetch(`${BASE}/api/v1/indexerstats?apikey=${KEY}`) as Promise<{
           indexers?: { numberOfGrabs?: number; numberOfQueries?: number }[];
-        }>
+        } | ServarrError>
       ),
       apiFetchMemoOpt(`prowlarr:health:${BASE}`, 180_000, () =>
         apiFetchOpt(`${BASE}/api/v1/health?apikey=${KEY}`) as Promise<ArrHealthRecord[] | null>
       ),
     ]);
+
+    // 200 OK with an error body — Prowlarr's SQLite history table has a row
+    // it can't parse (commonly: corrupted timestamp from a clock-skew event).
+    // Surface this clearly instead of pretending we have 0 indexers.
+    if (isServarrError(stats)) {
+      return {
+        name: "prowlarr", up: true, configured: true, url: BASE,
+        lines: ["indexer stats unavailable", "restart prowlarr to refresh"],
+        health: summarizeHealth(healthData),
+      };
+    }
+
     const indexers = stats.indexers ?? [];
     const grabs    = indexers.reduce((s, i) => s + (i.numberOfGrabs   ?? 0), 0);
     const queries  = indexers.reduce((s, i) => s + (i.numberOfQueries ?? 0), 0);
