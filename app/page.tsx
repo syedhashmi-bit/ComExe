@@ -351,16 +351,27 @@ export default function Dashboard() {
     }
   }, []);
 
-  // Defaults match the server-side DEFAULT_INTERVALS in app/api/stream/route.ts
-  // (which also enforces MIN_INTERVALS floors regardless of what we send).
-  const sseIntervals = {
-    metrics:  (settings.refreshOverrides?.metrics || settings.refreshInterval) * 1000,
+  // CRITICAL: this object must be memoized. A fresh literal every render
+  // would make useEventStream's connect callback churn, tearing down and
+  // re-opening the SSE EventSource on every Dashboard render (the 1Hz
+  // clock alone causes one render/sec). Each new connection refetches
+  // ALL 6 upstream endpoints immediately — past versions of this code
+  // were hammering radarr/sonarr/prowlarr with hundreds of requests/min
+  // from a single tab. Keep the dep list to primitive values only.
+  const sseIntervals = useMemo(() => ({
+    metrics:  (settings.refreshOverrides?.metrics  || settings.refreshInterval) * 1000,
     services: (settings.refreshOverrides?.services || 30) * 1000,
     mikrotik: (settings.refreshOverrides?.mikrotik || 15) * 1000,
     activity: (settings.refreshOverrides?.activity || 120) * 1000,
     speedtest: 600000,
     weather:   600000,
-  };
+  }), [
+    settings.refreshOverrides?.metrics,
+    settings.refreshOverrides?.services,
+    settings.refreshOverrides?.mikrotik,
+    settings.refreshOverrides?.activity,
+    settings.refreshInterval,
+  ]);
 
   const { fallback: usePolling } = useEventStream({
     enabled: !demoMode,

@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import { loadConfig, type ServiceCreds } from "@/app/lib/server-config";
+// Side-effect import: installs a process-wide undici Agent capped at 2
+// connections per origin. Defense-in-depth against connection-storm
+// regressions.
+import "@/app/lib/fetch-agent";
 
 interface QueueItem { title: string; pct: number; etaSec?: number | null }
 interface Stream    { title: string; user: string; progress: number; posStr: string }
