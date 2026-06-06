@@ -60,4 +60,9 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
+# Liveness probe — node:20-slim has no curl/wget, so use Node's global fetch
+# against the local-only /api/health route. start-period covers Next.js boot.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD node -e "fetch('http://localhost:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+
 CMD ["node_modules/.bin/next", "start"]
