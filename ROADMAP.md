@@ -545,3 +545,166 @@ Winbox.
 PiHole query log visualization: top queried domains, top blocked domains,
 query volume over time, per-client breakdown. Complements the existing
 PiHole card stats with a dedicated drilldown view.
+
+---
+
+## Tier 12 — deployment resilience & upstream protection (planned)
+
+**Why this tier exists.** Two recurring operational pains, neither of which is
+fully solved yet:
+
+1. **The dashboard has crashed upstream containers before.** The original 3s
+   polling fired ~20 API calls/sec and SIGKILL'd *arr / PiHole / Prowlarr on
+   this host. We mitigated it with fixed throttling (services 30s, metrics 10s,
+   2×5 batched fetches, per-endpoint memoization, per-service last-known-good
+   cache, an undici dispatcher capped at 2 connections/origin). That's all
+   *static* — it lowers the steady-state rate but doesn't *react* when an
+   upstream is already struggling, and it doesn't account for load multiplying
+   across browser tabs. The goal here is real backpressure: when a service is
+   slow or erroring, hit it **less**, not the same.
+2. **Deploys are a stop-rm-run with a visible gap.** `update-dashboard.sh` does
+   `docker pull && docker stop && docker rm && docker run`. If the new image is
+   broken, the old container is already gone — there's downtime and no rollback.
+   Now that the image has a `HEALTHCHECK`, we can gate the swap on it.
+
+Ordered P0 → P2. P0 items directly prevent the crash-the-homelab failure mode.
+
+### Circuit breaker per upstream (P0)
+A per-origin breaker in `services/route.ts` (and the custom-card + metrics
+paths). After N consecutive failures/timeouts to a given service, **open** the
+circuit: stop fetching it for a cooldown window and serve last-known-good (the
+`stale: true` cache we already emit) or `"—"`. After the cooldown, send a single
+**half-open** probe; success closes the breaker, failure re-opens with backoff.
+This is the single highest-value change — it stops the dashboard from machine-
+gunning a container that's already on its knees, which is precisely what turns a
+slow service into a dead one.
+
+### Adaptive poll backoff (P1)
+Today intervals are constants. Make them elastic per endpoint: when an upstream's
+rolling p95 latency climbs or it returns 429/5xx, automatically **lengthen** that
+endpoint's effective interval (e.g. 30s → 60s → 120s) and restore it as the
+service recovers. Surface the current effective interval in the Connections panel
+so it's visible *why* a card is updating slowly ("backed off — qBittorrent
+returned 3 timeouts").
+
+### Single-flight upstream fetches across clients (P1)
+Right now each browser tab opens its own SSE connection, and each connection
+drives its own upstream fetches — so N open tabs ≈ N× the upstream load, undoing
+the throttling. Move the actual upstream polling to a **single server-side
+scheduler** that runs once regardless of connected clients; SSE streams just fan
+out the latest cached snapshot to every connection. One poller, many readers.
+Also add request coalescing (single-flight) so a manual refresh that lands mid-
+poll reuses the in-flight request instead of issuing a duplicate.
+
+### Global per-origin rate budget (P1)
+A token-bucket limiter keyed by upstream origin, sitting under `fetchWithTimeout`,
+so the **combined** traffic from services + metrics + custom cards + activity can
+never exceed a safe ceiling per service (default e.g. 30 req/min/origin,
+env-overridable). Hard ceiling that no feature can accidentally blow past — the
+backstop behind all the per-feature throttling. Add ±10% interval jitter so the
+batched pollers don't re-align into a synchronized thundering herd after a
+restart.
+
+### Health-gated zero-downtime deploy (P0)
+Rework `update-dashboard.sh` (the script on TrueNAS, bash) into a blue-green swap:
+pull the new image → start it as `comexe-next` on a temp port → poll
+`docker inspect --format '{{.State.Health.Status}}'` until `healthy` (or time out)
+→ only then stop/rename the old container and promote the new one → keep the
+previous image tagged `:rollback` for one-command revert. If the new container
+never goes healthy, leave the old one running untouched and exit non-zero. Removes
+the current visible downtime window and the "broken image, old container already
+deleted" trap.
+
+### Graceful shutdown (P1)
+Handle `SIGTERM` in the Next.js server: stop accepting new SSE connections, flush
+any pending `history.jsonl` append, close the EventSource fan-out cleanly, then
+exit — so `docker stop` (10s default grace) never truncates a history write or
+drops the connection mid-frame. Pairs with the blue-green swap above.
+
+### Readiness vs liveness split (P2)
+Split the single `/api/health` (liveness — "process is up") from a new
+`/api/ready` (readiness — "config loaded, first metrics poll succeeded"). The
+deploy script waits on `/api/ready` before promoting, so traffic never lands on a
+container that's booted but not yet warm. Keep the existing `HEALTHCHECK` on the
+liveness route.
+
+### Slimmer, faster-booting image (P2)
+Switch `next.config.ts` to `output: "standalone"` and copy only the standalone
+bundle in the runner stage instead of a full `npm ci --omit=dev` (~150 MB of prod
+node_modules). Smaller image = faster pull + faster boot = the healthcheck goes
+green sooner = shorter swap window. Pin the `node:20-slim` base by digest for
+reproducible CI builds. No behavior change, pure deploy ergonomics.
+
+### Self-update safety (P2)
+The existing "Pull & restart ComExe" Docker action (Tier 4) should reuse the same
+health-gated swap path rather than a blind restart, so a one-click update from the
+UI can't brick the dashboard it's running on. Show the rollback option in the
+update banner if the new container fails its readiness probe.
+
+---
+
+## Hardening & phase plan (recommended next 15 phases)
+
+ComExe has shipped 9 tiers of features but is light on the engineering health
+that keeps a feature-rich app alive: thin tests relative to surface area, four
+stuck major-version upgrades, real security surfaces (SSRF write routes, no auth
+by default), and the upstream-protection work isn't built yet. The guidance below
+is a **consolidation arc first, expansion second** — phases 1–4 are the ones that
+actually matter; everything after is optional polish. Ordered so each unblocks
+the next.
+
+### Part A — Stabilize (do first, in order)
+
+1. **Dependency modernization.** Migrate `next lint` → ESLint flat-config CLI
+   (`eslint.config.mjs`), then land Next 16, ESLint 10, eslint-config-next 16,
+   and Tailwind v4 *with a visual check*. Unblocks the 4 stuck Dependabot major
+   PRs (#7 Tailwind, #8 Next, #9 ESLint, #10 eslint-config-next), all currently
+   red because `next lint` is removed/incompatible in the new majors.
+2. **Upstream protection (Tier 12 P0s).** Circuit breaker + adaptive backoff +
+   single-flight + per-origin rate budget. The literal "stop crashing the
+   *arr/PiHole containers" work — highest-value reliability change in the roadmap.
+3. **Zero-downtime deploy (Tier 12 P0s).** Health-gated blue-green
+   `update-dashboard.sh`, graceful SIGTERM, readiness/liveness split,
+   `output: "standalone"` slim image. Seamless, reversible deploys.
+4. **Security hardening.** Rotate the previously-exposed Prowlarr + qBit keys,
+   allowlist/validate upstream URLs on the SSRF-prone write routes
+   (`/api/servers`, `/api/dependencies`, custom-cards), add CSP + security
+   headers, rate-limit write endpoints, document auth-on as the default before
+   any Cloudflare Tunnel exposure.
+
+### Part B — Harden & maintain
+
+5. **Test coverage to match the surface.** ~53 unit + 8 e2e is thin. Add route
+   tests for every API route (especially write/SSRF ones), component tests for
+   primitives, e2e for critical flows (setup wizard, alerts, custom cards), and a
+   coverage floor enforced in CI.
+6. **`page.tsx` decomposition round 2 + state architecture.** Extract remaining
+   feature blocks, split context to cut whole-tree re-renders, formalize the data
+   layer around `useEventStream`.
+7. **Self-observability.** The dashboard watches everything except itself.
+   Surface internal metrics — per-upstream call count/latency, circuit-breaker
+   states, SSE connection count, cache hit rates — in a diagnostics panel.
+   Validates phases 2–3 in production.
+8. **Performance & bundle budget.** Code-split heavy routes (analytics, logs,
+   forecast), lazy-load panels, virtualize the logs viewer, set a
+   Lighthouse/First-Load-JS budget in CI so it can't regress.
+
+### Part C — Expand (only once A & B are solid)
+
+9. **Container orchestration dashboard** (Tier 10). Grow Docker control into a
+   mini-Portainer: all containers, per-container resource usage, bulk actions,
+   image cleanup. Behind `ENABLE_DOCKER_CONTROL`. Highest homelab value.
+10. **Advanced networking suite** (Tier 11). Per-client bandwidth, VPN status,
+    firewall viewer, DNS analytics — build on existing MikroTik + PiHole.
+11. **Production-grade alerting.** Webhook marketplace
+    (PagerDuty/Telegram/ntfy/SMTP), escalation + on-call windows, alert
+    grouping/dedup tuning, mobile push.
+12. **Multi-user & RBAC** (Tier 10). Per-user accounts, admin/operator/viewer
+    roles, audit log. Prerequisite for sharing or exposing the dashboard.
+13. **Plugin system** (Tier 10). Sandboxed third-party cards from `data/plugins/`
+    so the app is extensible without forking.
+14. **Mobile companion + push.** Native-ish PWA/React-Native experience with real
+    push notifications and glanceable CPU/MEM/GPU widgets.
+15. **Data & intelligence layer.** Optional SQLite/Postgres backend to replace
+    `history.jsonl` for long retention, smarter forecasting, and energy-cost
+    tracking (GPU watts → $/kWh + capacity planning).
