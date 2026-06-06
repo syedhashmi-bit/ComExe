@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-// Middleware runs on the Edge runtime, so we can't import Node crypto helpers
-// directly. Instead we do lightweight cookie checks here and let the API routes
-// do the heavy crypto validation. This keeps the middleware fast and avoids
-// Edge runtime incompatibilities.
+// Renamed from middleware.ts for Next 16 (the `middleware` convention is
+// deprecated in favour of `proxy`, which runs on the nodejs runtime). We keep
+// the same lightweight cookie check here and let the API routes do the heavy
+// crypto validation, so this stays fast and runtime-agnostic.
 
 const SESSION_COOKIE = "comexe_session";
 
@@ -24,7 +24,7 @@ function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATHS.some(p => pathname === p || pathname.startsWith(p + "/"));
 }
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Check if auth is enabled via env vars
