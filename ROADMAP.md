@@ -220,9 +220,9 @@ Shipped. Two auth modes, controlled by env vars:
   password, cookie-based session (7-day expiry), rate-limited login endpoint
   (10 attempts/min per IP). Branded `/login` page with theme support.
 
-Next.js `middleware.ts` guards all routes. Public paths: `/login`,
-`/api/auth/*`, `/_next`, static assets. API routes return 401 JSON;
-page routes redirect to `/login?from=<path>`.
+Next.js `proxy.ts` (renamed from `middleware.ts` in the Next 16 upgrade) guards
+all routes. Public paths: `/login`, `/api/auth/*`, `/_next`, static assets. API
+routes return 401 JSON; page routes redirect to `/login?from=<path>`.
 
 ### ✅ Multi-arch image (arm64)
 Shipped. CI workflow updated with `docker/setup-qemu-action@v3` and
@@ -646,20 +646,32 @@ update banner if the new container fails its readiness probe.
 ## Hardening & phase plan (recommended next 15 phases)
 
 ComExe has shipped 9 tiers of features but is light on the engineering health
-that keeps a feature-rich app alive: thin tests relative to surface area, four
-stuck major-version upgrades, real security surfaces (SSRF write routes, no auth
-by default), and the upstream-protection work isn't built yet. The guidance below
+that keeps a feature-rich app alive: thin tests relative to surface area, two
+still-stuck major-version upgrades (ESLint 10, Tailwind v4 — Next 16 and
+eslint-config-next 16 now landed), real security surfaces (SSRF write routes, no
+auth by default), and the upstream-protection work isn't built yet. The guidance below
 is a **consolidation arc first, expansion second** — phases 1–4 are the ones that
 actually matter; everything after is optional polish. Ordered so each unblocks
 the next.
 
 ### Part A — Stabilize (do first, in order)
 
-1. **Dependency modernization.** Migrate `next lint` → ESLint flat-config CLI
-   (`eslint.config.mjs`), then land Next 16, ESLint 10, eslint-config-next 16,
-   and Tailwind v4 *with a visual check*. Unblocks the 4 stuck Dependabot major
-   PRs (#7 Tailwind, #8 Next, #9 ESLint, #10 eslint-config-next), all currently
-   red because `next lint` is removed/incompatible in the new majors.
+1. **Dependency modernization.** ⏳ *mostly done — 2 of 4 majors landed.*
+   - ✅ `next lint` → ESLint flat-config CLI (`eslint.config.mjs`) — #11.
+   - ✅ **Next 16 + eslint-config-next 16** landed together (interlocked) — #12,
+     superseding #8 and #10. Switched to config-next 16's native flat config;
+     renamed `middleware.ts` → `proxy.ts` (Next 16 deprecation, now nodejs
+     runtime); downgraded the 3 new `eslint-plugin-react-hooks@7` rules
+     (`set-state-in-effect`/`purity`/`refs`) to **warnings** — they flag ~22
+     long-standing intentional patterns, so a dedicated React-Compiler pass owns
+     the real fix (see Part B item 6). Verified locally incl. `npm run build`
+     (PR CI doesn't build).
+   - ⏸ **ESLint 10 (#9)** — held: 10.4.1 crashes the `eslint-plugin-react` /
+     `typescript-eslint` versions config-next 16 bundles (`context.getFilename`
+     removed; `scopeManager.addGlobals` missing). Stay on ESLint 9 until those
+     plugins support 10.
+   - ⏸ **Tailwind v4 (#7)** — held: needs a deliberate migration
+     (`@tailwindcss/postcss` + visual-regression check), not a blind bump.
 2. **Upstream protection (Tier 12 P0s).** Circuit breaker + adaptive backoff +
    single-flight + per-origin rate budget. The literal "stop crashing the
    *arr/PiHole containers" work — highest-value reliability change in the roadmap.

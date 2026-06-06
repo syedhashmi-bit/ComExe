@@ -104,6 +104,19 @@ Renamed end-to-end:
 
 Icon at `app/icon.svg` (Next.js auto-serves as favicon). Minimalist letterform: open half-arc C on the left + bare 3-bar E on the right, both in cyan `#06b6d4`, single 2.6px stroke, rounded caps, no fills, no background plate. Same SVG embedded inline in the dashboard's header next to the wordmark "Com**Exe**".
 
+### Next 16 + ESLint flat-config upgrade (Jun 6 2026)
+
+Resolved the cluster of stuck Dependabot major PRs. Landed in two commits: `next lint` → flat-config CLI migration (#11), then the combined framework major (#12: `next` 15.5.19 → 16.2.7 + `eslint-config-next` 15.5.19 → 16.2.7).
+
+- **Why combined:** `eslint-config-next` 16 ships a *native* flat-config array and won't work through `FlatCompat`; landing it required the Next 16 bump and the flat-config switch together. PRs #8 (Next 16) and #10 (config-next 16) were interlocked and red on their own — superseded by #12 (auto-closed).
+- **`eslint.config.mjs`:** dropped `FlatCompat`/`@eslint/eslintrc`; spreads `eslint-config-next/core-web-vitals` (native array). Pins `settings.react.version` to `"19.2"` so `eslint-plugin-react` skips its filesystem auto-detection (and pre-empts the ESLint 10 crash).
+- **react-hooks 7 (React Compiler ruleset):** config-next 16 bundles `eslint-plugin-react-hooks@7`, which adds 3 rules absent under config-next 15 — `set-state-in-effect`, `purity`, `refs`. They flag ~22 long-standing intentional patterns (polling effects, `setMounted` hydration guards, `Date.now()` in render). **Downgraded to `warn`** in `eslint.config.mjs` so the bump stays behaviour-preserving; the real fix is a dedicated React-Compiler pass. Lint is now 0 errors / 26 warnings (incl. the 4 pre-existing `<img>` ones); warnings don't fail CI (no `--max-warnings`).
+- **ESLint 10 held (#9):** ESLint 10.4.1 crashes the plugin versions config-next 16 pins — `eslint-plugin-react@7.37` calls the removed `context.getFilename()`, and the typescript-eslint parser path hits `scopeManager.addGlobals is not a function`. Their peer is still `eslint: >=9` and they target 9. **Stayed on ESLint 9.** Revisit when those plugins ship ESLint 10 support.
+- **Tailwind v4 held (#7):** still on v3; needs a deliberate migration (`@tailwindcss/postcss` + visual-regression check), not a blind bump.
+- **`middleware.ts` → `proxy.ts`:** Next 16 deprecates the `middleware` file convention. Renamed the file and the exported fn `middleware` → `proxy`. **Proxy runs on the nodejs runtime, not edge** — fine here (we only do lightweight cookie checks; auth logic unchanged). `config.matcher` unchanged.
+- **Auto-migrations Next 16 wrote:** `next-env.d.ts` (reference → import form), `tsconfig.json` (`jsx: preserve` → `react-jsx`, added `.next/dev/types` to includes). Committed as-is.
+- **Gotcha — PR CI doesn't build:** `test.yml` (the PR `unit` gate) runs lint+tsc+test only, **not** `npm run build`. For framework majors, verify `npm run build` locally — `build.yml` only runs the real Docker build on push-to-main. All four (lint, tsc, 53 tests, build) verified green locally before merge.
+
 ## Known CORS / quirks
 
 | Service | Symptom | Handled by |

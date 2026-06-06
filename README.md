@@ -12,7 +12,7 @@ Aggregates Prometheus metrics, service-health checks, speedtest history, weather
 
 Configure everything via the built-in `/setup` wizard — fill in your service URLs and API keys in a web form with live "Test connection" buttons, click **Save & apply**, and the dashboard picks up the new config within ~3 seconds. No env-var editing, no compose-file fiddling, no redeploys.
 
-![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js)
+![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?logo=typescript)
 ![Tailwind](https://img.shields.io/badge/Tailwind-3-38bdf8?logo=tailwindcss)
 ![Docker](https://img.shields.io/badge/Docker-ready-2496ed?logo=docker)
@@ -69,7 +69,7 @@ Live status pills for **Radarr · Sonarr · Bazarr · Tautulli · qBittorrent ·
 
 | Layer | Choice |
 |---|---|
-| Framework | Next.js 15 (App Router, single `"use client"` SPA) |
+| Framework | Next.js 16 (App Router, single `"use client"` SPA) |
 | Language | TypeScript 5 |
 | Styling | Tailwind CSS 3 + inline `style` for dynamic colours |
 | Charts | Canvas API + inline SVG, **zero chart libraries** |
