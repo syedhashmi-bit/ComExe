@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { fetchJson } from "@/app/lib/http";
+import { createTTLCache } from "@/app/lib/cache";
 
 // ── /api/version ─────────────────────────────────────────────────────────────
 // Reports the running image's git SHA (baked at Docker build time via
@@ -17,32 +19,22 @@ interface VersionInfo {
   repoUrl:    string;
 }
 
-let cache: { data: VersionInfo; ts: number } | null = null;
-const CACHE_TTL = 30 * 60 * 1000;
+const cache = createTTLCache<VersionInfo>(30 * 60 * 1000);
 const REPO_API  = "https://api.github.com/repos/syedhashmi-bit/ComExe/commits/main";
 const REPO_URL  = "https://github.com/syedhashmi-bit/ComExe";
 
 export async function GET() {
   const current = process.env.COMEXE_GIT_SHA?.trim() || "dev";
 
-  if (cache && Date.now() - cache.ts < CACHE_TTL) {
-    return NextResponse.json(cache.data);
-  }
+  const cached = cache.get();
+  if (cached) return NextResponse.json(cached);
 
-  let latest: string | null = null;
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 4000);
-    const res = await fetch(REPO_API, {
-      signal:  controller.signal,
-      headers: { Accept: "application/vnd.github+json" },
-    });
-    clearTimeout(timeout);
-    if (res.ok) {
-      const body = await res.json() as { sha?: string };
-      if (typeof body.sha === "string") latest = body.sha;
-    }
-  } catch { /* swallow — banner just won't show */ }
+  // Swallowed on failure — the banner just won't show.
+  const body = await fetchJson<{ sha?: string }>(REPO_API, {
+    timeoutMs: 4000,
+    headers: { Accept: "application/vnd.github+json" },
+  });
+  const latest: string | null = typeof body?.sha === "string" ? body.sha : null;
 
   // Compare on first 7 chars — the short SHA. Same convention as `git log
   // --oneline` and what the banner displays.
@@ -57,6 +49,6 @@ export async function GET() {
     fetchedAt: Date.now(),
     repoUrl:   REPO_URL,
   };
-  cache = { data, ts: Date.now() };
+  cache.set(data);
   return NextResponse.json(data);
 }

@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { appendHistory } from "@/app/lib/history";
+import { promScalar, promVector } from "@/app/lib/prometheus";
+import { createTTLCache } from "@/app/lib/cache";
 
 const TRUENAS_IP = process.env.TRUENAS_IP || "192.168.88.196";
 const PROMETHEUS = process.env.PROMETHEUS_URL ?? `http://${TRUENAS_IP}:30104`;
@@ -13,46 +15,21 @@ const POOL_PATH      = process.env.POOL_PATH      ?? "/mnt/Pool";
 // interfaces should NOT count as "real" traffic on the host.
 const NET_EXCLUDE = process.env.NETWORK_DEVICE_EXCLUDE ?? "lo|veth.*|docker.*|br.*";
 
-let metricsCache: { data: unknown; ts: number } | null = null;
 // 9s — matches the new 10s SSE cycle. ~30 PromQL queries per refresh
 // means even Prometheus benefits from the caching when multiple browser
 // tabs are connected.
-const CACHE_TTL = 9_000;
+const metricsCache = createTTLCache<unknown>(9_000);
 
 const FS_EXCLUDE = `fstype!~"tmpfs|devtmpfs|overlay|squashfs|ramfs"`;
 
-async function query(q: string): Promise<number | null> {
-  try {
-    const url = `${PROMETHEUS}/api/v1/query?query=${encodeURIComponent(q)}`;
-    const res = await fetch(url, { next: { revalidate: 0 }, signal: AbortSignal.timeout(5000) });
-    if (!res.ok) return null;
-    const json = await res.json();
-    const result = json?.data?.result?.[0]?.value?.[1];
-    return result != null ? parseFloat(result) : null;
-  } catch {
-    return null;
-  }
-}
-
-async function queryAll(q: string): Promise<{ metric: Record<string, string>; value: number }[]> {
-  try {
-    const url = `${PROMETHEUS}/api/v1/query?query=${encodeURIComponent(q)}`;
-    const res = await fetch(url, { next: { revalidate: 0 }, signal: AbortSignal.timeout(5000) });
-    if (!res.ok) return [];
-    const json = await res.json();
-    return (json?.data?.result ?? []).map((r: { metric: Record<string, string>; value: [number, string] }) => ({
-      metric: r.metric,
-      value: parseFloat(r.value[1]),
-    }));
-  } catch {
-    return [];
-  }
-}
+// Thin wrappers preserve the positional call sites below while delegating the
+// (previously duplicated) Prometheus response parsing to the shared helper.
+const query = (q: string) => promScalar(PROMETHEUS, q);
+const queryAll = (q: string) => promVector(PROMETHEUS, q);
 
 export async function GET() {
-  if (metricsCache && Date.now() - metricsCache.ts < CACHE_TTL) {
-    return NextResponse.json(metricsCache.data);
-  }
+  const cached = metricsCache.get();
+  if (cached) return NextResponse.json(cached);
 
   const [
     cpuIdle,
@@ -232,7 +209,7 @@ export async function GET() {
     sysInfo,
     timestamp: Date.now(),
   };
-  metricsCache = { data: responseData, ts: Date.now() };
+  metricsCache.set(responseData);
 
   // Persist a slim data point for historical charting (fire-and-forget)
   const worstDisk = disks.length > 0 ? Math.max(...disks.map(d => d.usedPct)) : null;

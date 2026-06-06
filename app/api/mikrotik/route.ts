@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { loadConfig } from "@/app/lib/server-config";
+import { fetchWithTimeout } from "@/app/lib/http";
+import { createTTLCache } from "@/app/lib/cache";
 
 function formatMikrotikUptime(uptime: string): string {
   const weeks = uptime.match(/(\d+)w/)?.[1];
@@ -14,15 +16,13 @@ function formatMikrotikUptime(uptime: string): string {
   return parts.join(" ") || uptime;
 }
 
-let mikrotikCache: { data: unknown; ts: number } | null = null;
 // 9s — router stats don't change rapidly and the RouterOS REST API is
 // noticeably slow under any contention. Match the new 10s SSE interval.
-const CACHE_TTL = 9_000;
+const mikrotikCache = createTTLCache<unknown>(9_000);
 
 export async function GET() {
-  if (mikrotikCache && Date.now() - mikrotikCache.ts < CACHE_TTL) {
-    return NextResponse.json(mikrotikCache.data);
-  }
+  const cached = mikrotikCache.get();
+  if (cached) return NextResponse.json(cached);
 
   const cfg = await loadConfig();
   if (!cfg.mikrotik.configured) {
@@ -31,14 +31,12 @@ export async function GET() {
 
   try {
     const auth = Buffer.from(`${cfg.mikrotik.username}:${cfg.mikrotik.password}`, "utf8").toString("base64");
-    const res = await fetch(`${cfg.mikrotik.url}/rest/system/resource`, {
+    const res = await fetchWithTimeout(`${cfg.mikrotik.url}/rest/system/resource`, {
       method: "GET",
       headers: {
         Authorization: "Basic " + auth,
         Accept: "application/json",
       },
-      cache: "no-store",
-      signal: AbortSignal.timeout(5000),
     });
     const text = await res.text();
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -78,7 +76,7 @@ export async function GET() {
       uptime:   str("uptime") ? formatMikrotikUptime(str("uptime")!) : null,
       temp:     num("temperature"),
     };
-    mikrotikCache = { data: responseData, ts: Date.now() };
+    mikrotikCache.set(responseData);
     return NextResponse.json(responseData);
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 502 });

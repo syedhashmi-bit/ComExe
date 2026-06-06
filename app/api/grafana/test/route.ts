@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { fetchWithTimeout } from "@/app/lib/http";
 
 // ── /api/grafana/test ────────────────────────────────────────────────────────
 // Server-side reachability + auth check for a Grafana panel URL. The iframe
@@ -44,14 +45,11 @@ export async function GET(req: Request) {
 
   const apiUrl = `${parsed.baseUrl}/api/dashboards/uid/${parsed.uid}`;
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 4000);
     const headers: Record<string, string> = {};
     if (process.env.GRAFANA_API_TOKEN) {
       headers.Authorization = `Bearer ${process.env.GRAFANA_API_TOKEN}`;
     }
-    const res = await fetch(apiUrl, { signal: controller.signal, headers });
-    clearTimeout(timeout);
+    const res = await fetchWithTimeout(apiUrl, { timeoutMs: 4000, headers });
 
     if (res.status === 401 || res.status === 403) {
       return NextResponse.json<TestResult>({

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { readFile, writeFile, mkdir } from "fs/promises";
 import path from "path";
+import { isNonEmptyString } from "@/app/lib/validate";
 
 export const dynamic = "force-dynamic";
 
@@ -49,7 +50,12 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const { from, to, label } = body;
-    if (!from || !to) return NextResponse.json({ ok: false, message: "from and to required" }, { status: 400 });
+    if (!isNonEmptyString(from, 100) || !isNonEmptyString(to, 100)) {
+      return NextResponse.json({ ok: false, message: "from and to required (non-empty strings ≤100 chars)" }, { status: 400 });
+    }
+    if (label !== undefined && !isNonEmptyString(label, 100)) {
+      return NextResponse.json({ ok: false, message: "label must be a non-empty string ≤100 chars" }, { status: 400 });
+    }
     const deps = await loadDeps();
     if (deps.some(d => d.from === from && d.to === to)) {
       return NextResponse.json({ ok: false, message: "Dependency already exists" }, { status: 409 });

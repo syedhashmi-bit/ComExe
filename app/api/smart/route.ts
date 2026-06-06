@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
+import { promVector } from "@/app/lib/prometheus";
+import { createTTLCache } from "@/app/lib/cache";
 
 const TRUENAS_IP = process.env.TRUENAS_IP || "192.168.88.196";
 const PROMETHEUS = process.env.PROMETHEUS_URL ?? `http://${TRUENAS_IP}:30104`;
 
-let cache: { data: unknown; ts: number } | null = null;
-const CACHE_TTL = 30_000;
+const cache = createTTLCache<unknown>(30_000);
 
 interface SmartDisk {
   device: string;
@@ -18,20 +19,7 @@ interface SmartDisk {
   healthy: boolean;
 }
 
-async function queryAll(q: string): Promise<{ metric: Record<string, string>; value: number }[]> {
-  try {
-    const url = `${PROMETHEUS}/api/v1/query?query=${encodeURIComponent(q)}`;
-    const res = await fetch(url, { next: { revalidate: 0 }, signal: AbortSignal.timeout(5000) });
-    if (!res.ok) return [];
-    const json = await res.json();
-    return (json?.data?.result ?? []).map((r: { metric: Record<string, string>; value: [number, string] }) => ({
-      metric: r.metric,
-      value: parseFloat(r.value[1]),
-    }));
-  } catch {
-    return [];
-  }
-}
+const queryAll = (q: string) => promVector(PROMETHEUS, q);
 
 function buildDiskMap(results: { metric: Record<string, string>; value: number }[]): Map<string, number> {
   const map = new Map<string, number>();
@@ -43,9 +31,8 @@ function buildDiskMap(results: { metric: Record<string, string>; value: number }
 }
 
 export async function GET() {
-  if (cache && Date.now() - cache.ts < CACHE_TTL) {
-    return NextResponse.json(cache.data);
-  }
+  const cached = cache.get();
+  if (cached) return NextResponse.json(cached);
 
   try {
     const [tempResults, powerOnResults, reallocResults, pendingResults, uncorrResults, healthResults, modelResults, serialResults] = await Promise.all([
@@ -105,7 +92,7 @@ export async function GET() {
     }).sort((a, b) => a.device.localeCompare(b.device));
 
     const response = { disks, timestamp: Date.now() };
-    cache = { data: response, ts: Date.now() };
+    cache.set(response);
     return NextResponse.json(response);
   } catch (e) {
     return NextResponse.json({ disks: [], error: (e as Error).message }, { status: 500 });

@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { fetchJson } from "@/app/lib/http";
+import { createTTLCache } from "@/app/lib/cache";
 
 const TRUENAS_IP = process.env.TRUENAS_IP || "192.168.88.196";
 const BASE        = process.env.SPEEDTEST_URL ?? `http://${TRUENAS_IP}:30220`;
@@ -21,13 +23,11 @@ interface HistoryRecord {
 // 60s in-memory cache so even very-overlapping SSE clients only hit
 // SpeedTracker once per minute. Combined with the 10-minute client poll
 // interval, each SpeedTracker instance sees ~6 requests/hour total.
-let cache: { data: unknown; ts: number } | null = null;
-const CACHE_TTL = 60_000;
+const cache = createTTLCache<unknown>(60_000);
 
 export async function GET() {
-  if (cache && Date.now() - cache.ts < CACHE_TTL) {
-    return NextResponse.json(cache.data);
-  }
+  const cached = cache.get();
+  if (cached) return NextResponse.json(cached);
 
   // SpeedTracker is fragile under polling load — earlier versions of this
   // route also hit the legacy /api/speedtest/latest endpoint without auth,
@@ -35,21 +35,15 @@ export async function GET() {
   // loop. That endpoint is redundant: /api/v1/results?take=5 already returns
   // the latest test as data[0]. Single bearer-authed call now.
 
-  let records: HistoryRecord[] = [];
-  let total: number | null = null;
-  try {
-    const res = await fetch(`${BASE}/api/v1/results?take=5`, {
+  const json = await fetchJson<{ data?: HistoryRecord[]; meta?: { total?: number } }>(
+    `${BASE}/api/v1/results?take=5`,
+    {
       headers: BEARER ? { Authorization: `Bearer ${BEARER}`, Accept: "application/json" }
                       : { Accept: "application/json" },
-      next: { revalidate: 0 },
-      signal: AbortSignal.timeout(5000),
-    });
-    if (res.ok) {
-      const json = await res.json() as { data?: HistoryRecord[]; meta?: { total?: number } };
-      records = json.data ?? [];
-      total   = json.meta?.total ?? null;
-    }
-  } catch { /* upstream down — return empty */ }
+    },
+  );
+  const records: HistoryRecord[] = json?.data ?? [];
+  const total: number | null = json?.meta?.total ?? null;
 
   // linuxserver/speedtest-tracker v1 API returns download/upload in BYTES/SEC.
   // The dashboard UI labels these as Mbps and expects Mbps values (the older
@@ -82,6 +76,6 @@ export async function GET() {
     totalTests: total,
     timestamp:  Date.now(),
   };
-  cache = { data, ts: Date.now() };
+  cache.set(data);
   return NextResponse.json(data);
 }
