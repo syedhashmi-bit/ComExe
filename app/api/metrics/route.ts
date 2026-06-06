@@ -178,11 +178,25 @@ export async function GET() {
     })
     .sort((a, b) => a.mountpoint.localeCompare(b.mountpoint));
 
-  // Also grab total pool size from the configured pool root (non-dataset path).
-  const poolEntry = diskSizeResults.find(r => r.metric.mountpoint === POOL_PATH);
-  const poolAvail  = poolEntry ? (availMap.get(POOL_PATH) ?? 0) : null;
-  const poolSize   = poolEntry?.value ?? null;
-  const poolUsed   = poolSize != null && poolAvail != null ? poolSize - poolAvail : null;
+  // Aggregate true pool usage. On ZFS every dataset is its own mount and
+  // reports the pool's shared free space as its "available", so the root
+  // /mnt/Pool dataset on its own holds almost nothing (the data lives in child
+  // datasets). Computing size − avail for just the root therefore yields a
+  // near-zero, misleading number (e.g. "262 KB of 4.4 TB, 0%"). Instead sum
+  // the real used bytes across every dataset under the pool — each dataset is
+  // a separate mount so there's no double-counting — and derive the total from
+  // used + the pool's shared available space.
+  const poolMounts = diskSizeResults.filter(
+    r => r.metric.mountpoint != null &&
+         (r.metric.mountpoint === POOL_PATH || r.metric.mountpoint.startsWith(POOL_PATH + "/")),
+  );
+  const poolAvail = poolMounts.length > 0
+    ? (availMap.get(POOL_PATH) ?? availMap.get(poolMounts[0].metric.mountpoint) ?? 0)
+    : null;
+  const poolUsed = poolMounts.length > 0
+    ? poolMounts.reduce((s, r) => s + Math.max(0, r.value - (availMap.get(r.metric.mountpoint) ?? 0)), 0)
+    : null;
+  const poolSize = poolUsed != null && poolAvail != null ? poolUsed + poolAvail : null;
 
   const netRx = netRxResults.reduce((s, r) => s + (isNaN(r.value) ? 0 : r.value), 0);
   const netTx = netTxResults.reduce((s, r) => s + (isNaN(r.value) ? 0 : r.value), 0);
