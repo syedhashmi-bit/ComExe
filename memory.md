@@ -116,6 +116,11 @@ Resolved the cluster of stuck Dependabot major PRs. Landed in two commits: `next
 - **`middleware.ts` → `proxy.ts`:** Next 16 deprecates the `middleware` file convention. Renamed the file and the exported fn `middleware` → `proxy`. **Proxy runs on the nodejs runtime, not edge** — fine here (we only do lightweight cookie checks; auth logic unchanged). `config.matcher` unchanged.
 - **Auto-migrations Next 16 wrote:** `next-env.d.ts` (reference → import form), `tsconfig.json` (`jsx: preserve` → `react-jsx`, added `.next/dev/types` to includes). Committed as-is.
 - **Gotcha — PR CI doesn't build:** `test.yml` (the PR `unit` gate) runs lint+tsc+test only, **not** `npm run build`. For framework majors, verify `npm run build` locally — `build.yml` only runs the real Docker build on push-to-main. All four (lint, tsc, 53 tests, build) verified green locally before merge.
+- **CI hygiene follow-ups (`1d390a3`):** added `paths-ignore: ["**.md"]` to `build.yml`'s push trigger so docs-only commits stop rebuilding/republishing the GHCR image; bumped `docker/setup-qemu-action@v3 → @v4` (clears the Node-20 deprecation). Other actions already current. Verified green.
+
+### Deployment posture: LAN-only, never internet-exposed (Jun 6 2026)
+
+User confirmed ComExe stays **LAN-only** — no Cloudflare Tunnel, no internet exposure planned. This **retires the auth + key-rotation security items**: `DASHBOARD_PASSWORD` / `AUTH_PROXY_HEADER` stay off (fine for a flat trusted LAN), and the two API keys that leaked into chat earlier (Prowlarr, qBit) don't need rotating since there's no internet attack surface. The auth machinery still exists (`proxy.ts` + login flow) if the posture ever changes — re-flag rotation + enabling auth *before* any future exposure. Roadmap phase-plan Part A item 4 (security hardening) is correspondingly lower priority while LAN-only holds.
 
 ## Known CORS / quirks
 
