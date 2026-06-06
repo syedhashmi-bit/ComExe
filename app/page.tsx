@@ -51,6 +51,8 @@ import { DiskHealthPanel } from "@/app/components/DiskHealthPanel";
 import { NetworkTopology } from "@/app/components/NetworkTopology";
 import { ServerFleetPanel } from "@/app/components/ServerFleetPanel";
 import { DependencyMap } from "@/app/components/DependencyMap";
+import { Clock } from "@/app/components/Clock";
+import { ErrorBoundary } from "@/app/components/ErrorBoundary";
 import { loadCardOrder, saveCardOrder, reorder } from "@/app/lib/card-order";
 import { useEventStream } from "@/app/hooks/useEventStream";
 
@@ -146,8 +148,6 @@ export default function Dashboard() {
   const [speedtestLoading,    setSpeedtestLoading]    = useState(true);
   const [speedtestHistory,    setSpeedtestHistory]    = useState<number[]>([]);
   const [speedtestTotalTests, setSpeedtestTotalTests] = useState<number | null>(null);
-  const [clockDate,        setClockDate]        = useState("");
-  const [clockTime,        setClockTime]        = useState("");
 
   const demoMode = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("demo") === "1";
 
@@ -379,31 +379,8 @@ export default function Dashboard() {
     onMessage: handleSSE,
   });
 
-  // Clock — updates every second, respects timezone setting
-  useEffect(() => {
-    function tick() {
-      const now = new Date();
-      const tz = settings.timezone || undefined;
-      const opts: Intl.DateTimeFormatOptions = tz ? { timeZone: tz } : {};
-      const days   = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
-      const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-      const parts  = new Intl.DateTimeFormat("en-US", { ...opts, weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).formatToParts(now);
-      const get    = (t: string) => parts.find(p => p.type === t)?.value ?? "";
-      if (tz) {
-        setClockDate(`${get("weekday")} · ${get("day")} ${get("month")}`);
-        setClockTime(`${get("hour")}:${get("minute")}:${get("second")}`);
-      } else {
-        const h = String(now.getHours()).padStart(2, "0");
-        const m = String(now.getMinutes()).padStart(2, "0");
-        const s = String(now.getSeconds()).padStart(2, "0");
-        setClockDate(`${days[now.getDay()]} · ${now.getDate()} ${months[now.getMonth()]}`);
-        setClockTime(`${h}:${m}:${s}`);
-      }
-    }
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [settings.timezone]);
+  // Clock lives in its own <Clock> component so its 1Hz tick re-renders only
+  // the header time, not this entire Dashboard tree (see app/components/Clock.tsx).
 
   // Polling effects — only active when SSE is unavailable (fallback mode)
   useEffect(() => { if (demoMode || !usePolling) return; fetchWeather(); const id = setInterval(fetchWeather, 600_000); return () => clearInterval(id); }, [fetchWeather, demoMode, usePolling]);
@@ -727,12 +704,7 @@ export default function Dashboard() {
           {/* Right */}
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <HeaderSparklines cpuHistory={cpuHistory} memHistory={memHistory} rxHistory={rxHistory} />
-            {clockDate && (
-              <div className="flex flex-col items-end leading-tight">
-                <span className="hidden sm:block" style={{ fontSize: 10, color: "var(--text-faint)", fontFamily: "inherit" }}>{clockDate}</span>
-                <span className="font-mono tabular-nums" style={{ fontSize: 12, color: "var(--text)", fontWeight: 600 }}>{clockTime}</span>
-              </div>
-            )}
+            <Clock timezone={settings.timezone} />
             {error && (
               <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 4, background: "rgba(239,68,68,0.1)", color: "var(--critical)", border: "1px solid rgba(239,68,68,0.2)" }}>
                 {error}
@@ -793,7 +765,9 @@ export default function Dashboard() {
         <div className="main-content max-w-5xl mx-auto px-3 sm:px-6 pb-10 flex flex-col gap-4 sm:gap-6" style={{ paddingTop: 72 }}>
 
           <SearchBar inputRef={searchInputRef} engine={settings.searchEngine} />
-          <MikrotikTab mikrotikUrl={clientConfig?.mikrotikUrl ?? "http://192.168.88.1"} refreshSec={settings.refreshOverrides?.mikrotik} />
+          <ErrorBoundary name="MikroTik">
+            <MikrotikTab mikrotikUrl={clientConfig?.mikrotikUrl ?? "http://192.168.88.1"} refreshSec={settings.refreshOverrides?.mikrotik} />
+          </ErrorBoundary>
           {offline && (
             <div className="flex items-center gap-2" style={{
               background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.3)",
@@ -1312,12 +1286,14 @@ export default function Dashboard() {
                   </Card>
                 )}
                 {isVisible("grafana") && (
-                  <GrafanaCard
-                    baseUrl={clientConfig?.grafana.baseUrl ?? `http://${clientConfig?.truenasIp ?? "localhost"}:30037`}
-                    panelUrl={clientConfig?.grafana.panelUrl ?? null}
-                    panels={clientConfig?.grafana.panels}
-                    tokenSet={clientConfig?.grafanaTokenSet}
-                  />
+                  <ErrorBoundary name="Grafana panel">
+                    <GrafanaCard
+                      baseUrl={clientConfig?.grafana.baseUrl ?? `http://${clientConfig?.truenasIp ?? "localhost"}:30037`}
+                      panelUrl={clientConfig?.grafana.panelUrl ?? null}
+                      panels={clientConfig?.grafana.panels}
+                      tokenSet={clientConfig?.grafanaTokenSet}
+                    />
+                  </ErrorBoundary>
                 )}
               </div>
             )}
@@ -1326,12 +1302,16 @@ export default function Dashboard() {
           {/* ── Disk health (SMART) ── */}
           {isVisible("system") && (
             <div style={{ background: "var(--card)", border: "1px solid var(--border-subtle)", borderRadius: 14, padding: "14px 18px" }}>
-              <DiskHealthPanel />
+              <ErrorBoundary name="Disk health">
+                <DiskHealthPanel />
+              </ErrorBoundary>
             </div>
           )}
 
           {/* ── Custom cards (user-defined PromQL) ── */}
-          <CustomCardsGrid refreshInterval={settings.refreshInterval} />
+          <ErrorBoundary name="Custom cards">
+            <CustomCardsGrid refreshInterval={settings.refreshInterval} />
+          </ErrorBoundary>
 
           {/* ── NOW PLAYING banner ── */}
           {(() => {
@@ -1381,23 +1361,27 @@ export default function Dashboard() {
 
           {/* ── activity feed ── */}
           {isVisible("activity") && (
-            <ActivityFeed events={activityEvents} loading={activityLoading} />
+            <ErrorBoundary name="Activity feed">
+              <ActivityFeed events={activityEvents} loading={activityLoading} />
+            </ErrorBoundary>
           )}
 
           {/* ── services ── */}
           {isVisible("services") && (
-            <ServicesPanel
-              services={services}
-              servicesLoading={servicesLoading}
-              servicesUpdatedAt={servicesUpdatedAt}
-              serviceFilter={serviceFilter}
-              setServiceFilter={setServiceFilter}
-              serviceFilterRef={serviceFilterRef}
-              clientConfig={clientConfig}
-              setLogsContainer={setLogsContainer}
-              restartingSvc={restartingSvc}
-              restartService={restartService}
-            />
+            <ErrorBoundary name="Services">
+              <ServicesPanel
+                services={services}
+                servicesLoading={servicesLoading}
+                servicesUpdatedAt={servicesUpdatedAt}
+                serviceFilter={serviceFilter}
+                setServiceFilter={setServiceFilter}
+                serviceFilterRef={serviceFilterRef}
+                clientConfig={clientConfig}
+                setLogsContainer={setLogsContainer}
+                restartingSvc={restartingSvc}
+                restartService={restartService}
+              />
+            </ErrorBoundary>
           )}
 
           {/* ── bookmarks ── */}
@@ -1445,18 +1429,24 @@ export default function Dashboard() {
       )}
 
       {showTopology && (
-        <NetworkTopology onClose={() => setShowTopology(false)} />
+        <ErrorBoundary name="Network topology">
+          <NetworkTopology onClose={() => setShowTopology(false)} />
+        </ErrorBoundary>
       )}
 
       {showServerFleet && (
-        <ServerFleetPanel onClose={() => setShowServerFleet(false)} />
+        <ErrorBoundary name="Server fleet">
+          <ServerFleetPanel onClose={() => setShowServerFleet(false)} />
+        </ErrorBoundary>
       )}
 
       {showDependencyMap && (
-        <DependencyMap
-          onClose={() => setShowDependencyMap(false)}
-          services={services?.map(s => ({ name: s.name, up: s.up, configured: s.configured !== false })) ?? []}
-        />
+        <ErrorBoundary name="Dependency map">
+          <DependencyMap
+            onClose={() => setShowDependencyMap(false)}
+            services={services?.map(s => ({ name: s.name, up: s.up, configured: s.configured !== false })) ?? []}
+          />
+        </ErrorBoundary>
       )}
 
       {logsContainer && (
