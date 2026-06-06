@@ -55,6 +55,16 @@ export async function GET(req: NextRequest) {
   const stream = new ReadableStream({
     start(controller) {
       const timers: ReturnType<typeof setInterval>[] = [];
+      let cleanedUp = false;
+
+      function cleanup() {
+        if (cleanedUp) return;
+        cleanedUp = true;
+        alive = false;
+        for (const t of timers) clearInterval(t);
+        req.signal.removeEventListener("abort", cleanup);
+        try { controller.close(); } catch { /* already closed/cancelled */ }
+      }
 
       function send(event: string, data: unknown) {
         if (!alive) return;
@@ -90,13 +100,17 @@ export async function GET(req: NextRequest) {
       }, 30000);
       timers.push(heartbeat);
 
-      (controller as unknown as { _cleanup: () => void })._cleanup = () => {
-        alive = false;
-        for (const t of timers) clearInterval(t);
-      };
+      // Belt-and-suspenders: an abrupt client disconnect may not always
+      // trigger the stream's cancel() callback, which previously left the
+      // per-endpoint intervals running forever — they piled up across
+      // reconnects and kept hammering upstream services. The request's abort
+      // signal fires reliably on disconnect, so wire cleanup to both paths.
+      if (req.signal.aborted) { cleanup(); return; }
+      req.signal.addEventListener("abort", cleanup);
+
+      (controller as unknown as { _cleanup: () => void })._cleanup = cleanup;
     },
     cancel(controller) {
-      alive = false;
       const ctrl = controller as unknown as { _cleanup?: () => void };
       ctrl._cleanup?.();
     },

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -19,7 +19,13 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "ComExe · live",
   description: "ComExe — homelab metrics dashboard",
-  viewport: "width=device-width, initial-scale=1, maximum-scale=1",
+};
+
+// Next.js 15 requires viewport to be its own export, not a metadata field.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
 };
 
 // Inline script that applies the saved theme class before React hydrates,

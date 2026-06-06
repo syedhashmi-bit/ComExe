@@ -102,29 +102,36 @@ export function CustomCardsGrid({ refreshInterval }: { refreshInterval: number }
   useEffect(() => {
     if (cards.length === 0) return;
     const poll = async () => {
-      const next: Record<string, CardState> = { ...states };
-      await Promise.all(cards.map(async (card) => {
+      // Fetch every card first (no state read here), then apply the results
+      // via a functional update. The previous version closed over `states`
+      // captured when the interval was created, so each tick rebuilt history
+      // from a stale (effectively empty) snapshot and the charts never grew
+      // past a single sample.
+      const results = await Promise.all(cards.map(async (card) => {
         try {
           const res = await fetch(`/api/custom-cards/query?q=${encodeURIComponent(card.query)}`);
           const data = await res.json();
-          if (data.error) {
-            next[card.id] = { ...next[card.id], value: null, history: next[card.id]?.history ?? [], error: data.error };
-          } else {
-            const prev = next[card.id]?.history ?? [];
-            const history = [...prev, data.value ?? 0].slice(-60);
-            next[card.id] = { value: data.value, history, error: undefined };
-          }
+          if (data.error) return { id: card.id, value: null as number | null, error: data.error as string };
+          return { id: card.id, value: (data.value ?? 0) as number | null, error: undefined as string | undefined };
         } catch (e) {
-          next[card.id] = { ...next[card.id], value: null, history: next[card.id]?.history ?? [], error: (e as Error).message };
+          return { id: card.id, value: null as number | null, error: (e as Error).message };
         }
       }));
-      setStates({ ...next });
+      setStates(prev => {
+        const next: Record<string, CardState> = { ...prev };
+        for (const r of results) {
+          const prevHist = next[r.id]?.history ?? [];
+          next[r.id] = r.error
+            ? { value: null, history: prevHist, error: r.error }
+            : { value: r.value, history: [...prevHist, r.value ?? 0].slice(-60), error: undefined };
+        }
+        return next;
+      });
     };
 
     poll();
     pollRef.current = setInterval(poll, refreshInterval * 1000);
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cards, refreshInterval]);
 
   if (cards.length === 0) return null;
