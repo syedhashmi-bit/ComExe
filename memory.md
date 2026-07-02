@@ -196,6 +196,14 @@ After 5 wrong-password attempts, qBit bans the source IP for 1 hour. Fix is `doc
 
 Tried 3 endpoint shapes; settled on `/api/v1/results?take=N` with Bearer auth. v1 API has `download_bits` (raw) and `download` (varies in unit) — see "Speedtest TrendDelta" above.
 
+### Speedtest "auto-tested 323d ago" — results came back oldest-first (`0a05ef2`, Jul 2026)
+
+Two param bugs in the same request (verified against speedtest-tracker's `ResultsController` source):
+- `/api/v1/results` has **no default sort** — records return oldest-first, so `data[0]` was the *first test ever recorded*, and the card's timestamp/sparkline were pinned to ~1-year-old data forever.
+- `?take=5` was **silently ignored** — pagination is spatie json-api style `page[size]`, so the route was actually getting the default page (~25 records).
+
+Fix: request `sort=-created_at&page%5Bsize%5D=5`, plus a defensive newest-first re-sort + `.slice(0, 5)` client-side for older SpeedTracker versions. Rule of thumb: never assume `data[0]` is newest from a Laravel/spatie QueryBuilder API — check `allowedSorts` and sort explicitly.
+
 ### Caching + reliability (`15485b8`)
 
 - 10s in-memory cache (module-level `Map`) on `services`, `metrics`, `mikrotik` routes
