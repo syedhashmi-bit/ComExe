@@ -41,7 +41,9 @@ function hashToken(token: string): string {
 // In-memory session store. Tokens survive within a single process lifetime,
 // which is fine for a homelab dashboard — a container restart just means
 // re-entering the password once.
-const sessions = new Map<string, { hashedToken: string; createdAt: number }>();
+// Keyed by hashed token — the key IS the credential, so the value only needs
+// the expiry timestamp.
+const sessions = new Map<string, { createdAt: number }>();
 
 function pruneExpired(): void {
   const cutoff = Date.now() - SESSION_MAX_AGE * 1000;
@@ -53,7 +55,7 @@ function pruneExpired(): void {
 export function createSession(): string {
   pruneExpired();
   const token = randomBytes(32).toString("hex");
-  sessions.set(hashToken(token), { hashedToken: hashToken(token), createdAt: Date.now() });
+  sessions.set(hashToken(token), { createdAt: Date.now() });
   return token;
 }
 

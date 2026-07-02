@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { fetchWithTimeout } from "@/app/lib/http";
 import { loadConfig, type ServiceCreds } from "@/app/lib/server-config";
 
 // ── Activity feed ─────────────────────────────────────────────────────────────
@@ -45,11 +46,13 @@ async function memoSource(key: string, fn: () => Promise<ActivityEvent[]>): Prom
   }
 }
 
+// Thin wrapper over the shared helper: history callers rely on throw-on-failure
+// (memoSource catches and falls back to []), so keep that instead of fetchJson's
+// null-on-failure.
 async function jsonFetch(url: string, headers?: Record<string, string>): Promise<unknown> {
-  const res = await fetch(url, {
+  const res = await fetchWithTimeout(url, {
+    timeoutMs: 8000,
     headers: { Accept: "application/json", ...headers },
-    signal: AbortSignal.timeout(8000),
-    next: { revalidate: 0 },
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();

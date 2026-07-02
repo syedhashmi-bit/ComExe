@@ -47,8 +47,13 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  let body: { from?: unknown; to?: unknown; label?: unknown };
   try {
-    const body = await req.json();
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ ok: false, message: "Invalid JSON body" }, { status: 400 });
+  }
+  try {
     const { from, to, label } = body;
     if (!isNonEmptyString(from, 100) || !isNonEmptyString(to, 100)) {
       return NextResponse.json({ ok: false, message: "from and to required (non-empty strings ≤100 chars)" }, { status: 400 });
@@ -64,7 +69,7 @@ export async function POST(req: Request) {
     await saveDeps(deps);
     return NextResponse.json({ ok: true });
   } catch (e) {
-    return NextResponse.json({ ok: false, message: (e as Error).message }, { status: 500 });
+    return NextResponse.json({ ok: false, message: (e as Error)?.message ?? "unknown error" }, { status: 500 });
   }
 }
 
@@ -79,6 +84,6 @@ export async function DELETE(req: Request) {
     await saveDeps(filtered);
     return NextResponse.json({ ok: true });
   } catch (e) {
-    return NextResponse.json({ ok: false, message: (e as Error).message }, { status: 500 });
+    return NextResponse.json({ ok: false, message: (e as Error)?.message ?? "unknown error" }, { status: 500 });
   }
 }

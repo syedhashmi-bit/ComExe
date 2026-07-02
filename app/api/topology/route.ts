@@ -72,7 +72,7 @@ export async function GET() {
       const hostname = dhcpMap.get(mac) ?? "";
       const isServer = hostname.toLowerCase().includes("truenas") ||
                        hostname.toLowerCase().includes("server") ||
-                       ip === (process.env.TRUENAS_IP || "192.168.88.196");
+                       ip === cfg.truenasIp;
 
       devices.push({
         ip,

@@ -111,6 +111,7 @@ export async function GET() {
 
     return NextResponse.json({ temp, condition, code, forecast, timestamp: Date.now() });
   } catch (e) {
-    return NextResponse.json({ error: String(e) }, { status: 503 });
+    // `{ ok:false, message }` — same error shape as the other write/query routes.
+    return NextResponse.json({ ok: false, message: String(e) }, { status: 503 });
   }
 }

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import os from "node:os";
+import { fetchWithTimeout } from "@/app/lib/http";
 import {
   evaluateAlerts, inQuietHours, buildWebhookPayload,
   type AlertFire, type WebhookFormat,
@@ -84,15 +85,12 @@ async function saveState(state: AlertState): Promise<boolean> {
 async function dispatchWebhook(url: string, format: WebhookFormat, fires: AlertFire[]): Promise<{ ok: boolean; status?: number; error?: string }> {
   try {
     const payload = buildWebhookPayload(format, fires, os.hostname());
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5_000);
-    const res = await fetch(url, {
-      method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify(payload),
-      signal:  controller.signal,
+    const res = await fetchWithTimeout(url, {
+      method:    "POST",
+      timeoutMs: 5_000,
+      headers:   { "Content-Type": "application/json" },
+      body:      JSON.stringify(payload),
     });
-    clearTimeout(timeout);
     return { ok: res.ok, status: res.status };
   } catch (e) {
     return { ok: false, error: (e as Error).message };

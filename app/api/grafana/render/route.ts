@@ -19,6 +19,7 @@
 // busting query string.
 
 import { NextResponse } from "next/server";
+import { fetchWithTimeout } from "@/app/lib/http";
 
 function rewriteToRender(url: string, width: number, height: number): string {
   const u = new URL(url);
@@ -47,14 +48,11 @@ export async function GET(req: Request) {
   catch { return NextResponse.json({ error: "Invalid Grafana URL" }, { status: 400 }); }
 
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 20_000);
-    const res = await fetch(renderUrl, {
+    // 20s — headless panel rendering is by far the slowest upstream we call.
+    const res = await fetchWithTimeout(renderUrl, {
+      timeoutMs: 20_000,
       headers: { Authorization: `Bearer ${token}`, Accept: "image/png" },
-      signal:  controller.signal,
-      cache:   "no-store",
     });
-    clearTimeout(timeout);
 
     if (!res.ok) {
       // Grafana returns 401 when the token is wrong, 404 when /render isn't
