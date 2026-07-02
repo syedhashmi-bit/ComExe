@@ -36,8 +36,17 @@ function buildSvcUrls(ip: string): Record<string, string> {
   );
 }
 
+// Display names with official brand casing — without an entry the card falls
+// back to the raw lowercase route name.
 const SVC_LABELS: Record<string, string> = {
+  radarr:      "Radarr",
+  sonarr:      "Sonarr",
+  bazarr:      "Bazarr",
+  tautulli:    "Tautulli",
   qbittorrent: "qBittorrent",
+  overseerr:   "Overseerr",
+  prowlarr:    "Prowlarr",
+  pihole:      "Pi-hole",
   nginx:       "Nginx Proxy",
   uptimekuma:  "Uptime Kuma",
 };

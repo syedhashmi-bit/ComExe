@@ -9,8 +9,17 @@ import { CustomCardEditor } from "@/app/components/CustomCardEditor";
 
 export const CARD_KEYS = ["cpu", "memory", "filesystems", "network", "gpu", "speedtest", "system", "grafana", "services", "activity"] as const;
 
+// Display names with official brand casing — keep in sync with the map in
+// ServicesPanel.tsx. Without an entry the row falls back to the raw route name.
 const SVC_LABELS: Record<string, string> = {
+  radarr:      "Radarr",
+  sonarr:      "Sonarr",
+  bazarr:      "Bazarr",
+  tautulli:    "Tautulli",
   qbittorrent: "qBittorrent",
+  overseerr:   "Overseerr",
+  prowlarr:    "Prowlarr",
+  pihole:      "Pi-hole",
   nginx:       "Nginx Proxy",
   uptimekuma:  "Uptime Kuma",
 };
