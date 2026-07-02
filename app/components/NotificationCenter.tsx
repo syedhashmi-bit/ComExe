@@ -21,6 +21,10 @@ function relativeTime(ts: number): string {
 export function NotificationCenter({ onClose }: { onClose: () => void }) {
   const [events, setEvents] = useState<AlertEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  // Distinguish "fetch failed" from "genuinely no alerts" — otherwise a flaky
+  // network renders the reassuring "all clear" state, which is a lie.
+  const [error, setError] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     fetch("/api/alerts")
@@ -29,9 +33,9 @@ export function NotificationCenter({ onClose }: { onClose: () => void }) {
         const history: AlertEvent[] = Array.isArray(data.history) ? data.history : [];
         setEvents(history.sort((a, b) => b.ts - a.ts).slice(0, 50));
       })
-      .catch(() => {})
+      .catch(() => setError(true))
       .finally(() => setLoading(false));
-  }, []);
+  }, [attempt]);
 
   return (
     <>
@@ -56,6 +60,19 @@ export function NotificationCenter({ onClose }: { onClose: () => void }) {
           {loading ? (
             <div className="flex items-center justify-center py-12" style={{ color: "var(--text-ghost)", fontSize: 11 }}>
               Loading...
+            </div>
+          ) : error ? (
+            <div className="flex flex-col items-center justify-center py-16 gap-2" style={{ color: "var(--text-ghost)" }}>
+              <span style={{ fontSize: 24 }}>&#x26a0;&#xfe0f;</span>
+              <span style={{ fontSize: 11 }}>Couldn&apos;t load alerts</span>
+              <button onClick={() => { setError(false); setLoading(true); setAttempt(a => a + 1); }}
+                style={{
+                  fontSize: 10, fontWeight: 600, color: "var(--text-dim)", cursor: "pointer",
+                  background: "var(--card-alt)", border: "1px solid var(--border-mid)",
+                  borderRadius: 6, padding: "4px 12px", marginTop: 4,
+                }}>
+                Retry
+              </button>
             </div>
           ) : events.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 gap-2" style={{ color: "var(--text-ghost)" }}>

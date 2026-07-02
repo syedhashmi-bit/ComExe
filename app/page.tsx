@@ -298,7 +298,7 @@ export default function Dashboard() {
       const res = await fetch("/api/weather");
       if (!res.ok) return;
       const data = await res.json();
-      if (!data.error) setWeather({ temp: data.temp, condition: data.condition, forecast: data.forecast ?? [] });
+      if (data.ok !== false && !data.error) setWeather({ temp: data.temp, condition: data.condition, forecast: data.forecast ?? [] });
     } catch { /* weather is non-critical */ }
   }, []);
 
@@ -344,8 +344,8 @@ export default function Dashboard() {
         break;
       }
       case "weather": {
-        const d = data as { error?: boolean; temp?: number; condition?: string; forecast?: ForecastDay[] };
-        if (!d.error) setWeather({ temp: d.temp ?? null, condition: d.condition ?? null, forecast: d.forecast ?? [] });
+        const d = data as { ok?: boolean; error?: boolean; temp?: number; condition?: string; forecast?: ForecastDay[] };
+        if (d.ok !== false && !d.error) setWeather({ temp: d.temp ?? null, condition: d.condition ?? null, forecast: d.forecast ?? [] });
         break;
       }
     }
@@ -409,15 +409,20 @@ export default function Dashboard() {
       .catch(() => {});
   }, []);
 
-  // Check for new image release once on mount + every 30 min. Dismissable per
-  // session via the X — comes back on next page reload (not localStorage)
-  // since we want a nudge per session, not forever.
+  // Check for new image release once on mount + every 30 min. Dismissal is
+  // stored per-SHA in localStorage: dismissing hides the banner for THAT
+  // release only, so it stays gone across reloads but re-appears when a newer
+  // image lands.
   useEffect(() => {
     let cancelled = false;
     function check() {
       fetch("/api/version")
         .then(r => r.json())
-        .then(d => { if (!cancelled) setVersionInfo({ current: d.current, latest: d.latest, hasUpdate: !!d.hasUpdate, repoUrl: d.repoUrl }); })
+        .then(d => {
+          if (cancelled) return;
+          setVersionInfo({ current: d.current, latest: d.latest, hasUpdate: !!d.hasUpdate, repoUrl: d.repoUrl });
+          setUpdateDismissed(!!d.latest && localStorage.getItem("comexe:update-dismissed") === d.latest);
+        })
         .catch(() => {});
     }
     check();
@@ -610,7 +615,10 @@ export default function Dashboard() {
               {versionInfo.latest?.slice(0, 7)}
             </a>. Run <code style={{ fontFamily: "monospace" }}>update-dashboard.sh</code> to pull.
           </span>
-          <button onClick={() => setUpdateDismissed(true)}
+          <button onClick={() => {
+            setUpdateDismissed(true);
+            if (versionInfo.latest) try { localStorage.setItem("comexe:update-dismissed", versionInfo.latest); } catch {}
+          }}
             style={{ background: "transparent", border: "none", color: "#0a0c12", fontSize: 14, cursor: "pointer", padding: "0 6px", lineHeight: 1, fontWeight: 700 }}
             aria-label="Dismiss">×</button>
         </div>
@@ -719,6 +727,7 @@ export default function Dashboard() {
             {alertsEnabled && alertCount > 0 && (
               <button
                 title={`${alertCount} alert${alertCount === 1 ? "" : "s"} this session — open notifications`}
+                aria-label={`Open notifications (${alertCount} alert${alertCount === 1 ? "" : "s"})`}
                 onClick={() => { setShowNotifications(true); setAlertCount(0); }}
                 style={{
                   display: "flex", alignItems: "center", gap: 4,
@@ -732,19 +741,22 @@ export default function Dashboard() {
                 }}
               >🔔 {alertCount}</button>
             )}
-            <Link href="/analytics" title="Analytics"
+            <Link href="/analytics" title="Analytics" aria-label="Open analytics"
               style={{ color: "var(--text-ghost)", textDecoration: "none", fontSize: 11, fontWeight: 500, padding: "2px 6px", borderRadius: 4, transition: "color 0.2s" }}
               onMouseEnter={e => (e.currentTarget.style.color = "var(--brand)")}
               onMouseLeave={e => (e.currentTarget.style.color = "var(--text-ghost)")}
             >&#x1f4ca;</Link>
             <button
               title="Open TrueNAS"
+              aria-label="Open TrueNAS web UI"
               onClick={() => window.open(`http://${clientConfig?.truenasIp ?? "192.168.88.196"}`, "_blank")}
               style={{ color: "var(--text-ghost)", background: "none", border: "none", cursor: "pointer", padding: 2, transition: "color 0.2s" }}
               onMouseEnter={e => (e.currentTarget.style.color = "#06b6d4")}
               onMouseLeave={e => (e.currentTarget.style.color = "rgba(255,255,255,0.2)")}
             ><IconTrueNAS /></button>
             <button
+              title="Settings"
+              aria-label="Toggle settings panel"
               onClick={() => setShowSettings(v => !v)}
               style={{ color: showSettings ? "rgba(255,255,255,0.6)" : "rgba(255,255,255,0.2)", background: "none", border: "none", cursor: "pointer", padding: 2, transition: "color 0.2s" }}
             ><IconGear /></button>
@@ -1399,7 +1411,7 @@ export default function Dashboard() {
               <span style={{ fontSize: 11, color: "var(--text-ghost)" }}>built with claude code</span>
             </div>
             <span style={{ fontSize: 11, color: "var(--text-ghost)" }}>
-              tracking {services?.length ?? 0} services · G search · R refresh · H bookmarks · ? shortcuts
+              tracking {services?.length ?? 0} services · G search · R refresh · H bookmarks · Ctrl+K palette · ? shortcuts
             </span>
             <a href={`http://${clientConfig?.truenasIp ?? "192.168.88.196"}:${SVC_PORTS.prometheus}`} target="_blank" rel="noopener noreferrer"
               style={{ fontSize: 11, color: "var(--text-ghost)", textDecoration: "none", transition: "color 0.15s" }}

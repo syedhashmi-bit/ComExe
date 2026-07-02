@@ -361,6 +361,9 @@ export default function SetupWizard() {
   return (
     <div style={{ maxWidth: 1100, margin: "0 auto", padding: "32px 24px 80px" }}>
       <header style={{ marginBottom: 32 }}>
+        <Link href="/" style={{ fontSize: 11, color: "var(--text-ghost)", textDecoration: "none", display: "inline-block", marginBottom: 12 }}>
+          &larr; Dashboard
+        </Link>
         <h1 style={{ fontSize: 28, fontWeight: 700, color: "var(--text)", marginBottom: 8 }}>Setup</h1>
         <p style={{ fontSize: 13, color: "var(--text-muted)", lineHeight: 1.6, maxWidth: 720 }}>
           Fill in the URL + credentials for each service you want to monitor, click <b style={{ color: "var(--brand)" }}>Test</b> to confirm

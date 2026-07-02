@@ -70,7 +70,7 @@ export function BookmarksPanel({ clientConfig, setClientConfig }: BookmarksPanel
               <button onClick={addColumn} style={{ fontSize: 9, color: "var(--brand)", background: "none", border: "1px solid var(--border)", borderRadius: 5, padding: "3px 8px", cursor: "pointer" }}>+ Section</button>
               <button onClick={cancelEdit} style={{ fontSize: 9, color: "var(--text-dim)", background: "none", border: "1px solid var(--border)", borderRadius: 5, padding: "3px 8px", cursor: "pointer" }}>Cancel</button>
               <button onClick={saveBookmarks} disabled={bookmarkSaving || readonly} title={readonly ? "Mount /app/data to enable saves" : undefined} style={{ fontSize: 9, color: "#0a0c12", background: readonly ? "var(--text-ghost)" : "var(--brand)", border: "none", borderRadius: 5, padding: "3px 10px", cursor: (bookmarkSaving || readonly) ? "not-allowed" : "pointer", fontWeight: 600, opacity: readonly ? 0.6 : 1 }}>
-                {bookmarkSaving ? "Saving..." : "Save"}
+                {bookmarkSaving ? "Saving..." : readonly ? "Read-only" : "Save"}
               </button>
             </>
           ) : (

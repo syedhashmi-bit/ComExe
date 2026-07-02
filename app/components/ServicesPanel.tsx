@@ -379,6 +379,14 @@ export function ServicesPanel({
               </div>
             );
           })}
+          {/* Every category returns null when the filter matches nothing — say
+              so instead of collapsing to an empty section. */}
+          {serviceFilter.trim() !== "" &&
+            !services.some(s => s.configured !== false && s.name.toLowerCase().includes(serviceFilter.trim().toLowerCase())) && (
+            <span style={{ fontSize: 11, color: "var(--text-ghost)", padding: "8px 2px" }}>
+              No services match &ldquo;{serviceFilter.trim()}&rdquo; — Esc to clear
+            </span>
+          )}
         </div>
       )}
 
