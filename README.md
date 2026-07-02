@@ -8,7 +8,7 @@
   Real-time single-page dashboard for a TrueNAS Scale homelab.
 </p>
 
-Aggregates Prometheus metrics, service-health checks, speedtest history, weather, and an embedded Grafana panel into a dark, minimal UI. No database, no auth, no external state library.
+Aggregates Prometheus metrics, service-health checks, speedtest history, weather, and an embedded Grafana panel into a dark, minimal UI. No database, no external state library, no required auth (optional password / auth-proxy support for exposed deployments).
 
 Configure everything via the built-in `/setup` wizard — fill in your service URLs and API keys in a web form with live "Test connection" buttons, click **Save & apply**, and the dashboard picks up the new config within ~3 seconds. No env-var editing, no compose-file fiddling, no redeploys.
 
@@ -58,10 +58,20 @@ Live status pills for **Radarr · Sonarr · Bazarr · Tautulli · qBittorrent ·
 - **Weather** — temperature + condition pill in the header (open-meteo, no API key)
 - **Search** — Google search bar; `G` to focus, opens results in a new tab
 - **Bookmarks** — quick-links section, color-coded by category, toggle with `H`. Edit via mounted `bookmarks.json`.
-- **Settings** — per-card visibility, refresh interval (3/5/10/30 s), °C/°F, decimal/binary units, per-service Connections view
+- **Settings** — per-card visibility, refresh interval (10/15/30/60 s), °C/°F, decimal/binary units, per-service Connections view
 - **Trend deltas** — small `↑X` / `↓X` next to hero numbers when a metric changes meaningfully (CPU %, memory pressure, GPU temp). Sanity guard suppresses output when the delta-to-current ratio is wildly large (catches unit-mismatch bugs).
 - **Alert system** — 2 px cyan healthy line → 36 px amber warning bar → 48 px red critical bar across the top of the page
-- **Keyboard shortcuts** — `G` focus search · `R` force-refresh · `H` toggle bookmarks · `Esc` blur input / close panels
+- **Keyboard shortcuts** — `G` focus search · `R` force-refresh · `H` toggle bookmarks · `/` filter services · `Ctrl+K` command palette · `?` shortcuts overlay · `Esc` blur input / close panels
+
+### And more (all shipped)
+
+Five themes (Midnight / Forge / Forest / Plum / Paper) · command palette (`Ctrl+K`) ·
+`/analytics`, `/forecast`, and `/logs` pages · alerts with webhooks (Discord / ntfy / Slack /
+Gotify) + quiet hours · Docker container actions (restart / logs / pull-and-restart, opt-in) ·
+SMART disk health · network topology map · MikroTik device list + Wake-on-LAN · multi-server
+fleet view · custom PromQL cards · drag-to-rearrange layout + presets · config backup/restore ·
+SSE live updates · PWA install + offline shell · historical persistence with anomaly detection
+and SLA reports.
 
 ---
 
@@ -74,7 +84,7 @@ Live status pills for **Radarr · Sonarr · Bazarr · Tautulli · qBittorrent ·
 | Styling | Tailwind CSS 3 + inline `style` for dynamic colours |
 | Charts | Canvas API + inline SVG, **zero chart libraries** |
 | Runtime | Node 20 |
-| Container | Single-stage Docker image, runtime-only |
+| Container | Multi-stage Docker image (deps → builder → runner) |
 
 ---
 
@@ -90,19 +100,25 @@ browser
   └── /api/mikrotik   →  MikroTik REST           (Basic auth)
 ```
 
-Five **server-side proxy routes**. The browser never calls internal IPs directly — all credentials stay on the server, all CORS is sidestepped. Every route has a 10 s in-memory cache and per-fetch `AbortSignal.timeout`.
+Those are the core proxies — in total there are **30+ server-side routes** (health, history, alerts, Docker actions, SMART, topology, custom cards, backup, SSE stream, …). The browser never calls internal IPs directly — all credentials stay on the server, all CORS is sidestepped. Routes carry in-memory caches and per-fetch timeouts tuned per upstream.
 
-The entire frontend is one file: **`app/page.tsx`** (~2 200 lines). All primitives, feature components, and the `Dashboard` orchestrator live there.
+The frontend is **`app/page.tsx`** (~1 200 lines — the `Dashboard` orchestrator and primitives) plus feature components in `app/components/`.
 
 ### Polling
 
 | Route | Interval |
 |---|---|
 | `/api/metrics` | 10 s (configurable) |
-| `/api/services` | 10 s |
-| `/api/mikrotik` | 30 s |
-| `/api/speedtest` | 300 s |
+| `/api/services` | 30 s |
+| `/api/mikrotik` | 15 s |
+| `/api/activity` | 120 s |
+| `/api/speedtest` | 600 s |
 | `/api/weather` | 600 s |
+
+Deliberately slow — server-side cache TTLs match the intervals, per-endpoint memoization
+spares the upstream services, and hard interval floors stop user overrides from flooding
+the homelab. A single SSE connection (`/api/stream`) replaces the independent pollers
+when available.
 
 ---
 
@@ -194,7 +210,10 @@ Memory uses `MemTotal − MemAvailable − SReclaimable` so ZFS ARC (which is re
 | `G` | Focus the Google search bar |
 | `R` | Force-refresh all metrics immediately |
 | `H` | Toggle the Bookmarks section |
-| `Esc` | Blur search input / close Settings panel |
+| `/` | Focus the service filter |
+| `Ctrl+K` | Open the command palette |
+| `?` | Show the shortcuts overlay |
+| `Esc` | Blur search input / close panels |
 
 ---
 
@@ -222,15 +241,23 @@ Memory uses `MemTotal − MemAvailable − SReclaimable` so ZFS ARC (which is re
 │   │   ├── services/route.ts         10-service health checks
 │   │   ├── speedtest/route.ts        SpeedTracker history
 │   │   ├── test-connection/route.ts  Setup-wizard helper — validates upstream creds live
-│   │   └── weather/route.ts          open-meteo proxy
+│   │   ├── weather/route.ts          open-meteo proxy
+│   │   └── …                         +20 more: alerts, auth, backup, docker, grafana,
+│   │                                 health, history, insights, smart, stream, topology…
+│   ├── components/                   Feature components (ServicesPanel, BookmarksPanel,
+│   │                                 CommandPalette, NetworkTopology, DependencyMap, …)
+│   ├── hooks/useEventStream.ts       SSE client with polling fallback
 │   ├── lib/
 │   │   └── server-config.ts          Single-source loadConfig() — file > env > defaults
+│   ├── analytics/ · forecast/ · logs/  Secondary pages
 │   ├── setup/page.tsx                /setup wizard — tested form + Save & apply button
-│   ├── globals.css                   Keyframes, font imports
+│   ├── welcome/page.tsx              First-run 4-step wizard
+│   ├── globals.css                   Keyframes, themes, font imports
 │   ├── icon.svg                      ComExe favicon (Next.js auto-serves)
 │   ├── layout.tsx                    Root layout
-│   └── page.tsx                      Entire dashboard UI (~2 300 lines)
-├── .github/workflows/build.yml   CI: build image and push to GHCR
+│   └── page.tsx                      Dashboard orchestrator + primitives (~1 200 lines)
+├── proxy.ts                       Route guard (auth) — Next 16 rename of middleware.ts
+├── .github/workflows/build.yml   CI: quality gate, build image, push to GHCR
 ├── .env.local.example            Env var template (full inventory)
 ├── bookmarks.example.json        Schema for the bookmarks file
 ├── docker-compose.example.yml    Reference compose config

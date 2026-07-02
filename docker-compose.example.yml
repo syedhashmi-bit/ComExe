@@ -84,3 +84,16 @@ services:
       # ── Weather coordinates ───────────────────────────────────────────
       # WEATHER_LAT: -41.4419
       # WEATHER_LON: 147.1450
+
+      # ── Preferences (optional — seed defaults for new browsers) ───────
+      # SEARCH_ENGINE: google          # google | bing | duckduckgo | kagi
+      # TIMEZONE:      Australia/Hobart
+      # THEME:         midnight        # midnight | forge | forest | plum | paper
+
+      # ── Grafana /render proxy (optional) ──────────────────────────────
+      # Service-account token (Viewer role) — Grafana card without anon access.
+      # GRAFANA_API_TOKEN: your-grafana-sa-token
+
+      # ── Authentication (optional — off by default, fine for LAN-only) ─
+      # DASHBOARD_PASSWORD: your-shared-password
+      # AUTH_PROXY_HEADER:  X-Authenticated-User

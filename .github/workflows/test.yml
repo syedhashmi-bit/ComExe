@@ -5,6 +5,10 @@ on:
     branches: [main]
   push:
     branches: [main]
+    # Docs-only pushes skip the redundant run (build.yml skips them too).
+    # PR trigger stays unfiltered so PR checks always report.
+    paths-ignore:
+      - "**.md"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -16,7 +20,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 20
           cache: npm
