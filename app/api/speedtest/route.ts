@@ -32,17 +32,26 @@ export async function GET() {
   // SpeedTracker is fragile under polling load — earlier versions of this
   // route also hit the legacy /api/speedtest/latest endpoint without auth,
   // which appeared to be triggering the speedtest container into a crash
-  // loop. That endpoint is redundant: /api/v1/results?take=5 already returns
-  // the latest test as data[0]. Single bearer-authed call now.
-
+  // loop. Single bearer-authed call now.
+  //
+  // Param gotchas (verified against speedtest-tracker's ResultsController):
+  //   - Results have NO default sort → they come back oldest-first, so without
+  //     `sort=-created_at` data[0] is the first test ever recorded (this was
+  //     the "auto-tested 323d ago" bug).
+  //   - Pagination is spatie json-api style `page[size]` — the previously-used
+  //     `?take=5` was silently ignored.
   const json = await fetchJson<{ data?: HistoryRecord[]; meta?: { total?: number } }>(
-    `${BASE}/api/v1/results?take=5`,
+    `${BASE}/api/v1/results?sort=-created_at&page%5Bsize%5D=5`,
     {
       headers: BEARER ? { Authorization: `Bearer ${BEARER}`, Accept: "application/json" }
                       : { Accept: "application/json" },
     },
   );
-  const records: HistoryRecord[] = json?.data ?? [];
+  // Defensive: sort newest-first ourselves too, in case an older SpeedTracker
+  // ignores the sort param the way it ignored `take`.
+  const records: HistoryRecord[] = (json?.data ?? []).slice().sort((a, b) =>
+    new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime()
+  ).slice(0, 5);
   const total: number | null = json?.meta?.total ?? null;
 
   // linuxserver/speedtest-tracker v1 API returns download/upload in BYTES/SEC.
