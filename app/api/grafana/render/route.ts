@@ -36,16 +36,16 @@ export async function GET(req: Request) {
   const url    = new URL(req.url).searchParams.get("url");
   const width  = Math.min(2000, Math.max(200, parseInt(new URL(req.url).searchParams.get("width")  ?? "800", 10)));
   const height = Math.min(2000, Math.max(150, parseInt(new URL(req.url).searchParams.get("height") ?? "300", 10)));
-  if (!url) return NextResponse.json({ error: "Missing ?url=" }, { status: 400 });
+  if (!url) return NextResponse.json({ ok: false, message: "Missing ?url=" }, { status: 400 });
 
   const token = process.env.GRAFANA_API_TOKEN?.trim();
   if (!token) {
-    return NextResponse.json({ error: "GRAFANA_API_TOKEN not set. See INSTALL.md for service-account token setup." }, { status: 503 });
+    return NextResponse.json({ ok: false, message: "GRAFANA_API_TOKEN not set. See INSTALL.md for service-account token setup." }, { status: 503 });
   }
 
   let renderUrl: string;
   try { renderUrl = rewriteToRender(url, width, height); }
-  catch { return NextResponse.json({ error: "Invalid Grafana URL" }, { status: 400 }); }
+  catch { return NextResponse.json({ ok: false, message: "Invalid Grafana URL" }, { status: 400 }); }
 
   try {
     // 20s — headless panel rendering is by far the slowest upstream we call.
@@ -62,7 +62,7 @@ export async function GET(req: Request) {
       const reason = isRendererMissing
         ? "Grafana's image-renderer plugin is not installed. Install it with: docker exec grafana grafana-cli plugins install grafana-image-renderer && docker restart grafana"
         : `Grafana returned HTTP ${res.status}${text ? `: ${text.slice(0, 200)}` : ""}`;
-      return NextResponse.json({ error: reason }, { status: 502 });
+      return NextResponse.json({ ok: false, message: reason }, { status: 502 });
     }
 
     const buf = Buffer.from(await res.arrayBuffer());
@@ -74,6 +74,6 @@ export async function GET(req: Request) {
       },
     });
   } catch (e) {
-    return NextResponse.json({ error: `Render fetch failed: ${(e as Error).message}` }, { status: 502 });
+    return NextResponse.json({ ok: false, message: `Render fetch failed: ${(e as Error).message}` }, { status: 502 });
   }
 }

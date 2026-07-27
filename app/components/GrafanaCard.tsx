@@ -125,7 +125,9 @@ function RefreshingImg({ url, width, height, onLoaded, onError }: {
           const r = await fetch(src);
           if (!r.ok) {
             const body = await r.json().catch(() => null);
-            onError(body?.error ?? `Render proxy returned HTTP ${r.status}`);
+            // Accept both shapes: `message` is the standard used across the
+            // API routes, `error` is kept for older cached clients.
+            onError(body?.message ?? body?.error ?? `Render proxy returned HTTP ${r.status}`);
           }
         } catch (e) {
           onError((e as Error).message);

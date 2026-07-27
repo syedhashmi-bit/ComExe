@@ -1,15 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import { DATA_DIR, DATA_BOOKMARKS, invalidateBookmarksCache } from "@/app/lib/bookmarks";
 
 export const dynamic = "force-dynamic";
 
-const DATA_DIR = process.env.DATA_DIR ?? path.join(process.cwd(), "data");
+// DATA_DIR comes from the shared module. This route used to honour a
+// `process.env.DATA_DIR` override that no other module read — set it and the
+// backup would quietly read and write a different directory than the one
+// everything else persists to.
 
 const BACKUP_FILES = [
   "config.json",
   "custom-cards.json",
   "alerts.json",
+  // Both are real user data written by their own routes and were simply
+  // missing here, so fleet entries and the dependency graph were silently
+  // absent from every export.
+  "servers.json",
+  "dependencies.json",
 ];
 
 export async function GET() {
@@ -30,12 +39,15 @@ export async function GET() {
     }
   }
 
+  // Export whatever loadBookmarks() would actually serve. Reading
+  // BOOKMARKS_PATH / cwd directly skipped data/bookmarks.json — the file the
+  // UI writes and the one loadBookmarks() prefers — so any bookmark edited in
+  // the app was missing from the backup, which exported the stale mounted copy.
   try {
-    const bookmarksPath = process.env.BOOKMARKS_PATH ?? path.join(process.cwd(), "bookmarks.json");
-    const content = await fs.readFile(bookmarksPath, "utf-8");
-    bundle.bookmarks = JSON.parse(content);
+    const { loadBookmarks } = await import("@/app/lib/bookmarks");
+    bundle.bookmarks = await loadBookmarks();
   } catch {
-    // no bookmarks file
+    // no bookmarks available
   }
 
   try {
@@ -73,9 +85,13 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Restore into data/bookmarks.json — the writable location loadBookmarks()
+    // reads first. The old code wrote to the BOOKMARKS_PATH mount, which is
+    // mounted `:ro` in the documented docker run (so the write failed), and
+    // even on success would have been shadowed by data/bookmarks.json.
     if (body.bookmarks && Array.isArray(body.bookmarks)) {
-      const bookmarksPath = process.env.BOOKMARKS_PATH ?? path.join(process.cwd(), "bookmarks.json");
-      await fs.writeFile(bookmarksPath, JSON.stringify(body.bookmarks, null, 2), "utf-8");
+      await fs.writeFile(DATA_BOOKMARKS, JSON.stringify(body.bookmarks, null, 2), "utf-8");
+      invalidateBookmarksCache();
       restored.push("bookmarks.json");
     }
 

@@ -104,7 +104,9 @@ function predictTrend(points: HistoryPoint[], metric: keyof Omit<HistoryPoint, "
     currentValue: current,
     trend,
     ratePerDay: Math.round(slopePerDay * 100) / 100,
-    daysUntilFull: daysUntilFull ? Math.round(daysUntilFull * 10) / 10 : null,
+    // `!= null`, not truthiness: a legitimate 0 means "full right now", which
+    // is the single most urgent case and used to be reported as null.
+    daysUntilFull: daysUntilFull != null ? Math.round(daysUntilFull * 10) / 10 : null,
     warning,
   };
 }
@@ -186,6 +188,6 @@ export async function GET(req: Request) {
       timestamp: Date.now(),
     });
   } catch (e) {
-    return NextResponse.json({ error: (e as Error).message }, { status: 500 });
+    return NextResponse.json({ ok: false, message: (e as Error)?.message ?? "unknown error" }, { status: 500 });
   }
 }
