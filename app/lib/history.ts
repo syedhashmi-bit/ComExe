@@ -27,6 +27,14 @@ export interface HistoryPoint {
 }
 
 // Append a single data point. Creates the file + dir on first write.
+//
+// Rotation is triggered from here rather than from the POST /api/history route
+// where it used to live: the real write path is the metrics route calling this
+// function directly, and nothing ever POSTs, so rotation never ran at all and
+// the file grew without bound.
+let writesSinceRotate = 0;
+const ROTATE_EVERY_WRITES = 500; // ~85 min at a 10s poll interval
+
 export async function appendHistory(point: HistoryPoint): Promise<void> {
   try {
     await fs.mkdir(DATA_DIR, { recursive: true });
@@ -34,6 +42,12 @@ export async function appendHistory(point: HistoryPoint): Promise<void> {
     await fs.appendFile(HISTORY_PATH, line, "utf8");
   } catch {
     // Non-fatal — history is best-effort
+    return;
+  }
+
+  if (++writesSinceRotate >= ROTATE_EVERY_WRITES) {
+    writesSinceRotate = 0;
+    rotateHistory().catch(() => {});
   }
 }
 
@@ -52,20 +66,30 @@ export async function readHistory(opts?: {
 
   const cutoff = opts?.rangeMs ? Date.now() - opts.rangeMs : 0;
   const lines = raw.trim().split("\n");
-  const points: HistoryPoint[] = [];
 
-  for (const line of lines) {
+  // Walk backwards from the newest line. Points are appended in timestamp
+  // order, so the first line older than the cutoff means everything before it
+  // is older too — we can stop there instead of parsing the whole file. Asking
+  // for one hour out of seven days used to cost a full-file parse on every
+  // /api/history and /api/insights request.
+  const limit = opts?.limit;
+  const collected: HistoryPoint[] = [];
+
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i];
     if (!line) continue;
+    let p: HistoryPoint;
     try {
-      const p = JSON.parse(line) as HistoryPoint;
-      if (p.ts >= cutoff) points.push(p);
-    } catch { /* skip corrupt lines */ }
+      p = JSON.parse(line) as HistoryPoint;
+    } catch {
+      continue; // skip corrupt lines
+    }
+    if (p.ts < cutoff) break;
+    collected.push(p);
+    if (limit && collected.length >= limit) break;
   }
 
-  if (opts?.limit && points.length > opts.limit) {
-    return points.slice(-opts.limit);
-  }
-  return points;
+  return collected.reverse(); // restore oldest → newest
 }
 
 // Downsample points for charting — average into buckets of `bucketMs` width.
@@ -110,12 +134,11 @@ export async function rotateHistory(): Promise<void> {
   try {
     const stat = await fs.stat(HISTORY_PATH);
     const sizeMB = stat.size / (1024 * 1024);
-    if (sizeMB < MAX_SIZE_MB * 0.8) return; // only rotate near the limit
 
     const cutoff = Date.now() - MAX_AGE_DAYS * 86_400_000;
     const raw = await fs.readFile(HISTORY_PATH, "utf8");
     const lines = raw.trim().split("\n");
-    const kept: string[] = [];
+    let kept: string[] = [];
 
     for (const line of lines) {
       try {
@@ -124,7 +147,19 @@ export async function rotateHistory(): Promise<void> {
       } catch { /* drop corrupt */ }
     }
 
-    await fs.writeFile(HISTORY_PATH, kept.join("\n") + "\n", "utf8");
+    // Size is the backstop for the age rule: if a week of data still exceeds
+    // the cap (very fast polling), keep the newest lines that fit. Previously
+    // this whole function bailed out unless the file was already near 50MB,
+    // which made the "7 days OR 50MB, whichever comes first" contract false —
+    // age-based rotation could never fire on its own.
+    if (sizeMB >= MAX_SIZE_MB) {
+      const avgLineBytes = Math.max(1, stat.size / Math.max(1, lines.length));
+      const maxLines = Math.floor((MAX_SIZE_MB * 1024 * 1024) / avgLineBytes);
+      if (kept.length > maxLines) kept = kept.slice(-maxLines);
+    }
+
+    if (kept.length === lines.length) return; // nothing to drop — skip the write
+    await fs.writeFile(HISTORY_PATH, kept.length ? kept.join("\n") + "\n" : "", "utf8");
   } catch {
     // Non-fatal
   }

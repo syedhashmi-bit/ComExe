@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { readHistory, appendHistory, downsample, rotateHistory, type HistoryPoint } from "@/app/lib/history";
+import { readHistory, appendHistory, downsample, type HistoryPoint } from "@/app/lib/history";
 
 // ── GET /api/history ────────────────────────────────────────────────────────
 // Query params:
@@ -58,12 +58,9 @@ export async function POST(req: Request) {
     disk_pct: body.disk_pct ?? null,
   };
 
+  // appendHistory() owns rotation now — it's the single write path shared with
+  // the metrics route, so rotation runs no matter who records the point.
   await appendHistory(point);
-
-  // Rotate every ~100 writes (probabilistic to avoid checking every call)
-  if (Math.random() < 0.01) {
-    rotateHistory().catch(() => {});
-  }
 
   return NextResponse.json({ ok: true });
 }
