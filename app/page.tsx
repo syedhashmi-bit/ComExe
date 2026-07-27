@@ -778,7 +778,7 @@ export default function Dashboard() {
 
           <SearchBar inputRef={searchInputRef} engine={settings.searchEngine} />
           <ErrorBoundary name="MikroTik">
-            <MikrotikTab mikrotikUrl={clientConfig?.mikrotikUrl ?? "http://192.168.88.1"} refreshSec={settings.refreshOverrides?.mikrotik} />
+            <MikrotikTab mikrotikUrl={clientConfig?.mikrotikUrl ?? "http://192.168.88.1"} refreshSec={settings.refreshOverrides?.mikrotik} demoMode={demoMode} />
           </ErrorBoundary>
           {offline && (
             <div className="flex items-center gap-2" style={{

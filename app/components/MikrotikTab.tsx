@@ -15,12 +15,28 @@ interface MtData {
   temp: number | null;
 }
 
-export function MikrotikTab({ mikrotikUrl, refreshSec = 5 }: { mikrotikUrl: string; refreshSec?: number }) {
+// Default matches the documented MikroTik interval (15s). It used to default
+// to 5s, and since `settings.refreshOverrides.mikrotik` is undefined unless the
+// user explicitly sets it, that 5s was what everyone actually got — 3× the
+// documented rate, and below the 10s floor /api/stream enforces.
+const MIKROTIK_DEFAULT_SEC = 15;
+const MIKROTIK_MIN_SEC     = 10;
+
+export function MikrotikTab({ mikrotikUrl, refreshSec, demoMode = false }: {
+  mikrotikUrl: string;
+  refreshSec?: number;
+  demoMode?: boolean;
+}) {
   const [data, setData] = useState<MtData | null>(null);
   const [corsBlocked, setCorsBlocked] = useState(false);
   const mikrotikHost = mikrotikUrl.replace(/^https?:\/\//, "").replace(/\/$/, "");
 
   useEffect(() => {
+    // Demo mode is documented as bypassing all API polling. This component was
+    // the one holdout, so `?demo=1` still hit the real router every few
+    // seconds during demos and screenshots.
+    if (demoMode) return;
+
     async function load() {
       try {
         const res = await fetch("/api/mikrotik", { cache: "no-store" });
@@ -45,9 +61,10 @@ export function MikrotikTab({ mikrotikUrl, refreshSec = 5 }: { mikrotikUrl: stri
       }
     }
     load();
-    const id = setInterval(load, Math.max(1, refreshSec) * 1000);
+    const everySec = Math.max(MIKROTIK_MIN_SEC, refreshSec || MIKROTIK_DEFAULT_SEC);
+    const id = setInterval(load, everySec * 1000);
     return () => clearInterval(id);
-  }, [refreshSec]);
+  }, [refreshSec, demoMode]);
 
   const pill = (label: string, value: string, pctVal?: number, tempVal?: number | null) => {
     const tempColor = tempVal == null ? null : tempVal > 80 ? "var(--critical)" : tempVal > 60 ? "var(--warn)" : "var(--ok)";
