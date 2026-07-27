@@ -13,10 +13,12 @@
 // IMPORTANT: server-only. Never import from "use client" modules.
 
 import { cookies } from "next/headers";
-import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
-
-const SESSION_COOKIE  = "comexe_session";
-const SESSION_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
+import { timingSafeEqual } from "node:crypto";
+import {
+  SESSION_COOKIE, SESSION_MAX_AGE,
+  createSessionToken, validateSessionToken, revokeSessionToken,
+  getSessionFromCookie,
+} from "@/app/lib/session-token";
 
 function getPassword(): string {
   return (process.env.DASHBOARD_PASSWORD ?? "").trim();
@@ -34,40 +36,19 @@ export function isProxyMode(): boolean {
   return getProxyHeader().length > 0;
 }
 
-function hashToken(token: string): string {
-  return createHash("sha256").update(token).digest("hex");
-}
-
-// In-memory session store. Tokens survive within a single process lifetime,
-// which is fine for a homelab dashboard — a container restart just means
-// re-entering the password once.
-// Keyed by hashed token — the key IS the credential, so the value only needs
-// the expiry timestamp.
-const sessions = new Map<string, { createdAt: number }>();
-
-function pruneExpired(): void {
-  const cutoff = Date.now() - SESSION_MAX_AGE * 1000;
-  for (const [key, val] of sessions) {
-    if (val.createdAt < cutoff) sessions.delete(key);
-  }
-}
-
+// Session handling lives in `session-token.ts` (HMAC-signed, stateless) so the
+// proxy can verify tokens too — it can't import this module because of the
+// `next/headers` dependency below.
 export function createSession(): string {
-  pruneExpired();
-  const token = randomBytes(32).toString("hex");
-  sessions.set(hashToken(token), { createdAt: Date.now() });
-  return token;
+  return createSessionToken();
 }
 
 export function validateSession(token: string): boolean {
-  if (!token) return false;
-  pruneExpired();
-  const hashed = hashToken(token);
-  return sessions.has(hashed);
+  return validateSessionToken(token);
 }
 
 export function destroySession(token: string): void {
-  if (token) sessions.delete(hashToken(token));
+  revokeSessionToken(token);
 }
 
 export function verifyPassword(input: string): boolean {
@@ -86,8 +67,15 @@ const RATE_LIMIT  = 10;     // attempts per window
 
 export function checkRateLimit(ip: string): boolean {
   const now = Date.now();
+
+  // Drop windows that have already expired — otherwise the map grows one entry
+  // per distinct source IP for the lifetime of the process.
+  for (const [key, val] of loginAttempts) {
+    if (now - val.windowStart > RATE_WINDOW) loginAttempts.delete(key);
+  }
+
   const entry = loginAttempts.get(ip);
-  if (!entry || now - entry.windowStart > RATE_WINDOW) {
+  if (!entry) {
     loginAttempts.set(ip, { count: 1, windowStart: now });
     return true;
   }
@@ -113,12 +101,4 @@ export async function isAuthenticated(request: Request): Promise<boolean> {
   return validateSession(sessionToken);
 }
 
-// Read the session cookie value from a raw Cookie header (for middleware,
-// which can't use next/headers cookies()).
-export function getSessionFromCookie(cookieHeader: string | null): string | null {
-  if (!cookieHeader) return null;
-  const match = cookieHeader.match(new RegExp(`(?:^|;\\s*)${SESSION_COOKIE}=([^;]+)`));
-  return match ? match[1] : null;
-}
-
-export { SESSION_COOKIE, SESSION_MAX_AGE };
+export { SESSION_COOKIE, SESSION_MAX_AGE, getSessionFromCookie };

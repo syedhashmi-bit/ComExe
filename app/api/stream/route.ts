@@ -50,7 +50,9 @@ export async function GET(req: NextRequest) {
   }
 
   const encoder = new TextEncoder();
+  const incomingCookie = req.headers.get("cookie");
   let alive = true;
+  let streamCleanup: (() => void) | null = null;
 
   const stream = new ReadableStream({
     start(controller) {
@@ -80,6 +82,13 @@ export async function GET(req: NextRequest) {
         try {
           const res = await fetch(`${origin}${ENDPOINTS[key]}`, {
             cache: "no-store",
+            // These are self-fetches back through our own HTTP surface, so the
+            // auth proxy applies to them too. Without forwarding the caller's
+            // cookie every one 401s the moment DASHBOARD_PASSWORD is set — and
+            // because the SSE connection itself still succeeds, the client's
+            // fallback-to-polling never triggers and the dashboard just sits
+            // there permanently empty.
+            headers: incomingCookie ? { cookie: incomingCookie } : undefined,
             signal: AbortSignal.timeout(10000),
           });
           if (!res.ok) return;
@@ -100,19 +109,21 @@ export async function GET(req: NextRequest) {
       }, 30000);
       timers.push(heartbeat);
 
-      // Belt-and-suspenders: an abrupt client disconnect may not always
-      // trigger the stream's cancel() callback, which previously left the
-      // per-endpoint intervals running forever — they piled up across
-      // reconnects and kept hammering upstream services. The request's abort
-      // signal fires reliably on disconnect, so wire cleanup to both paths.
+      // Two independent cleanup paths, because either can fire first: the
+      // request's abort signal on disconnect, and the stream's own cancel().
+      // Both funnel into the same idempotent cleanup() so the per-endpoint
+      // intervals can't be left running (they used to pile up across
+      // reconnects and keep hammering upstream services).
       if (req.signal.aborted) { cleanup(); return; }
       req.signal.addEventListener("abort", cleanup);
-
-      (controller as unknown as { _cleanup: () => void })._cleanup = cleanup;
+      streamCleanup = cleanup;
     },
-    cancel(controller) {
-      const ctrl = controller as unknown as { _cleanup?: () => void };
-      ctrl._cleanup?.();
+    // NOTE: the Streams API passes the cancellation REASON here, not the
+    // controller. This previously read `cancel(controller)` and reached for a
+    // `_cleanup` property stashed on it, which was always undefined — so this
+    // path silently did nothing and only the abort listener above ever ran.
+    cancel() {
+      streamCleanup?.();
     },
   });
 

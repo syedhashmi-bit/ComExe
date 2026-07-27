@@ -1,12 +1,17 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { SESSION_COOKIE, validateSessionToken } from "@/app/lib/session-token";
 
 // Renamed from middleware.ts for Next 16 (the `middleware` convention is
-// deprecated in favour of `proxy`, which runs on the nodejs runtime). We keep
-// the same lightweight cookie check here and let the API routes do the heavy
-// crypto validation, so this stays fast and runtime-agnostic.
-
-const SESSION_COOKIE = "comexe_session";
+// deprecated in favour of `proxy`, which runs on the nodejs runtime).
+//
+// This used to check only that the session cookie EXISTED, with a comment
+// claiming the routes did the real validation — they never did, so any value
+// at all (`comexe_session=x`) was a full bypass. The token is now HMAC-signed,
+// which is cheap to verify statelessly right here. Per Next's own guidance the
+// proxy still shouldn't be the *only* boundary for anything sensitive, but for
+// a single-password homelab dashboard verifying the signature at the one choke
+// point every request passes through is the correct fix.
 
 const PUBLIC_PATHS = [
   "/login",
@@ -42,9 +47,9 @@ export function proxy(request: NextRequest) {
     return new NextResponse("Unauthorized — proxy header missing", { status: 401 });
   }
 
-  // Native auth: check session cookie exists (full validation happens in routes)
+  // Native auth: verify the cookie's signature and expiry, not just presence.
   const session = request.cookies.get(SESSION_COOKIE)?.value;
-  if (session) return NextResponse.next();
+  if (session && validateSessionToken(session)) return NextResponse.next();
 
   // No session — redirect browser requests to /login, return 401 for API calls
   if (pathname.startsWith("/api/")) {

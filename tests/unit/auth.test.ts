@@ -44,9 +44,54 @@ describe("auth", () => {
     process.env.DASHBOARD_PASSWORD = "test";
     const { createSession, validateSession } = await import("@/app/lib/auth");
     const token = createSession();
-    expect(token).toHaveLength(64); // 32 bytes hex
+    // <nonce>.<issuedAt>.<hmac>
+    expect(token.split(".")).toHaveLength(3);
     expect(validateSession(token)).toBe(true);
     expect(validateSession("bogus")).toBe(false);
+  });
+
+  it("rejects an unsigned or tampered session token", async () => {
+    process.env.DASHBOARD_PASSWORD = "test";
+    const { createSession, validateSession } = await import("@/app/lib/auth");
+
+    // Regression: the proxy used to accept ANY non-empty cookie value, so a
+    // made-up token was a full auth bypass.
+    expect(validateSession("anything")).toBe(false);
+    expect(validateSession("a.b.c")).toBe(false);
+
+    const token = createSession();
+    const [nonce, issuedAt, sig] = token.split(".");
+    // Flip the signature — must fail.
+    expect(validateSession(`${nonce}.${issuedAt}.${"0".repeat(sig.length)}`)).toBe(false);
+    // Re-date the token to extend its life — signature no longer matches.
+    expect(validateSession(`${nonce}.${Number(issuedAt) + 60_000}.${sig}`)).toBe(false);
+  });
+
+  it("rejects expired session tokens", async () => {
+    process.env.DASHBOARD_PASSWORD = "test";
+    const { validateSession } = await import("@/app/lib/auth");
+    const { SESSION_MAX_AGE } = await import("@/app/lib/session-token");
+    const { createHash, createHmac } = await import("node:crypto");
+
+    // Forge a correctly-signed token dated past the max age.
+    const key = createHash("sha256").update("comexe-session-v1:test").digest("hex");
+    const staleAt = Date.now() - (SESSION_MAX_AGE * 1000 + 60_000);
+    const payload = `deadbeef.${staleAt}`;
+    const sig = createHmac("sha256", key).update(payload).digest("hex");
+    expect(validateSession(`${payload}.${sig}`)).toBe(false);
+  });
+
+  it("rejects sessions when no password is configured", async () => {
+    process.env.DASHBOARD_PASSWORD = "test";
+    const mod = await import("@/app/lib/auth");
+    const token = mod.createSession();
+    expect(mod.validateSession(token)).toBe(true);
+
+    // Same token must not validate once native auth is turned off.
+    vi.resetModules();
+    delete process.env.DASHBOARD_PASSWORD;
+    const fresh = await import("@/app/lib/auth");
+    expect(fresh.validateSession(token)).toBe(false);
   });
 
   it("destroys sessions", async () => {
