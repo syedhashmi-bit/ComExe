@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
-import { readFile, writeFile, mkdir } from "fs/promises";
-import path from "path";
 import { promScalar } from "@/app/lib/prometheus";
 import { isNonEmptyString, isHttpUrl } from "@/app/lib/validate";
+import { createJsonStore } from "@/app/lib/json-store";
 
 export const dynamic = "force-dynamic";
 
@@ -21,21 +20,9 @@ interface ServerStatus extends ServerEntry {
   lastChecked: number;
 }
 
-const SERVERS_PATH = path.join(process.cwd(), "data", "servers.json");
-
-async function loadServers(): Promise<ServerEntry[]> {
-  try {
-    const raw = await readFile(SERVERS_PATH, "utf-8");
-    return JSON.parse(raw);
-  } catch {
-    return [];
-  }
-}
-
-async function saveServers(servers: ServerEntry[]): Promise<void> {
-  await mkdir(path.dirname(SERVERS_PATH), { recursive: true });
-  await writeFile(SERVERS_PATH, JSON.stringify(servers, null, 2), "utf-8");
-}
+const store = createJsonStore<ServerEntry[]>("servers.json", () => []);
+const loadServers = () => store.read();
+const saveServers = (servers: ServerEntry[]) => store.write(servers);
 
 async function checkServer(server: ServerEntry): Promise<ServerStatus> {
   if (!server.enabled) {

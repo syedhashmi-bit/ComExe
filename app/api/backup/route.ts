@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { DATA_DIR, DATA_BOOKMARKS, invalidateBookmarksCache } from "@/app/lib/bookmarks";
+import { DATA_BOOKMARKS, invalidateBookmarksCache } from "@/app/lib/bookmarks";
+import { DATA_DIR } from "@/app/lib/json-store";
 
 export const dynamic = "force-dynamic";
 

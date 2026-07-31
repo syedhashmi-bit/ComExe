@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { readFile, writeFile, mkdir } from "fs/promises";
-import path from "path";
 import { isNonEmptyString } from "@/app/lib/validate";
+import { createJsonStore } from "@/app/lib/json-store";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +10,7 @@ interface DependencyEdge {
   label?: string;
 }
 
-const DEPS_PATH = path.join(process.cwd(), "data", "dependencies.json");
+// Falls back to the default *arr graph when the file is absent.
 
 // Default dependency graph for a typical *arr + media stack
 const DEFAULT_DEPS: DependencyEdge[] = [
@@ -27,19 +26,9 @@ const DEFAULT_DEPS: DependencyEdge[] = [
   { from: "nginx",       to: "overseerr",    label: "proxy" },
 ];
 
-async function loadDeps(): Promise<DependencyEdge[]> {
-  try {
-    const raw = await readFile(DEPS_PATH, "utf-8");
-    return JSON.parse(raw);
-  } catch {
-    return DEFAULT_DEPS;
-  }
-}
-
-async function saveDeps(deps: DependencyEdge[]): Promise<void> {
-  await mkdir(path.dirname(DEPS_PATH), { recursive: true });
-  await writeFile(DEPS_PATH, JSON.stringify(deps, null, 2), "utf-8");
-}
+const store = createJsonStore<DependencyEdge[]>("dependencies.json", () => DEFAULT_DEPS);
+const loadDeps = () => store.read();
+const saveDeps = (deps: DependencyEdge[]) => store.write(deps);
 
 export async function GET() {
   const deps = await loadDeps();
