@@ -78,17 +78,18 @@ describe("history store", () => {
   it("rotates out points older than the retention window regardless of file size", async () => {
     // Regression: rotateHistory() used to bail out unless the file was already
     // ~40MB, so age-based rotation could never fire on a small file.
+    // Retention defaults to 30 days (so /forecast's 30d range has data).
     const { rotateHistory } = await import("@/app/lib/history");
     const { promises: fs } = await import("node:fs");
     const path = await import("node:path");
     const p = path.join(process.cwd(), "data", "history.jsonl");
     const now = Date.now();
-    await fs.writeFile(p, [line(now - 30 * DAY, 1), line(now - 8 * DAY, 2), line(now - 1000, 3)].join(""), "utf8");
+    await fs.writeFile(p, [line(now - 40 * DAY, 1), line(now - 8 * DAY, 2), line(now - 1000, 3)].join(""), "utf8");
 
     await rotateHistory();
 
     const remaining = files.get(historyPath())!.trim().split("\n").map(l => JSON.parse(l).cpu);
-    expect(remaining).toEqual([3]); // 30-day and 8-day points dropped, 7-day window kept
+    expect(remaining).toEqual([2, 3]); // 40-day point dropped; 8-day point now inside the window
   });
 
   it("triggers rotation from the append path", async () => {
@@ -100,8 +101,9 @@ describe("history store", () => {
     const p = path.join(process.cwd(), "data", "history.jsonl");
     const now = Date.now();
 
-    // Seed one very old point, then append enough times to cross the trigger.
-    await fs.writeFile(p, line(now - 30 * DAY, 99), "utf8");
+    // Seed one point well outside the retention window, then append enough
+    // times to cross the rotation trigger.
+    await fs.writeFile(p, line(now - 40 * DAY, 99), "utf8");
     for (let i = 0; i < 500; i++) {
       await appendHistory({ ts: now + i, cpu: 1, mem: null, net_rx: null, net_tx: null, gpu: null, disk_pct: null });
     }

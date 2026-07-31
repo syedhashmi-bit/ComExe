@@ -13,8 +13,13 @@ import path from "node:path";
 
 const DATA_DIR      = path.join(process.cwd(), "data");
 const HISTORY_PATH  = path.join(DATA_DIR, "history.jsonl");
-const MAX_SIZE_MB   = 50;
-const MAX_AGE_DAYS  = 7;
+const MAX_SIZE_MB   = Number(process.env.HISTORY_MAX_SIZE_MB) || 50;
+
+// 30 days, because /forecast offers a "30 days" range and /api/insights
+// accepts range=30d — a 7-day retention silently capped that view at a week.
+// Costs ~800KB/day at a 10s poll (~93 bytes/point), so 30 days ≈ 24MB, well
+// inside the size cap below.
+const MAX_AGE_DAYS  = Number(process.env.HISTORY_RETENTION_DAYS) || 30;
 
 export interface HistoryPoint {
   ts:       number;   // epoch ms
