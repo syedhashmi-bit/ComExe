@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { promVector } from "@/app/lib/prometheus";
 import { createTTLCache } from "@/app/lib/cache";
+import { loadConfig } from "@/app/lib/server-config";
 
-const TRUENAS_IP = process.env.TRUENAS_IP || "192.168.88.196";
-const PROMETHEUS = process.env.PROMETHEUS_URL ?? `http://${TRUENAS_IP}:30104`;
+// Resolved per request via loadConfig() so a Prometheus URL set through the
+// /setup wizard actually applies — reading process.env at module scope made
+// wizard-written config invisible here.
 
 const cache = createTTLCache<unknown>(30_000);
 
@@ -19,7 +21,7 @@ interface SmartDisk {
   healthy: boolean;
 }
 
-const queryAll = (q: string) => promVector(PROMETHEUS, q);
+const makeQueryAll = (base: string) => (q: string) => promVector(base, q);
 
 function buildDiskMap(results: { metric: Record<string, string>; value: number }[]): Map<string, number> {
   const map = new Map<string, number>();
@@ -33,6 +35,9 @@ function buildDiskMap(results: { metric: Record<string, string>; value: number }
 export async function GET() {
   const cached = cache.get();
   if (cached) return NextResponse.json(cached);
+
+  const cfg = await loadConfig();
+  const queryAll = makeQueryAll(cfg.prometheusUrl);
 
   try {
     const [tempResults, powerOnResults, reallocResults, pendingResults, uncorrResults, healthResults, modelResults, serialResults] = await Promise.all([

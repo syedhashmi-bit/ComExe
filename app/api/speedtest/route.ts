@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
 import { fetchJson } from "@/app/lib/http";
 import { createTTLCache } from "@/app/lib/cache";
+import { loadConfig } from "@/app/lib/server-config";
 
-const TRUENAS_IP = process.env.TRUENAS_IP || "192.168.88.196";
-const BASE        = process.env.SPEEDTEST_URL ?? `http://${TRUENAS_IP}:30220`;
-const BEARER      = process.env.SPEEDTEST_API_KEY ?? "";
+// URL + bearer come from loadConfig() per request, NOT process.env. Reading
+// process.env at module scope meant anything saved through the /setup wizard
+// (which writes data/config.json) was invisible here: the wizard's Test button
+// hits /api/test-connection and reported "Connected", while this route kept
+// sending no Authorization header and the card stayed empty forever.
 
 interface HistoryRecord {
   id?:         number;
@@ -28,6 +31,10 @@ const cache = createTTLCache<unknown>(60_000);
 export async function GET() {
   const cached = cache.get();
   if (cached) return NextResponse.json(cached);
+
+  const cfg = await loadConfig();
+  const BASE   = cfg.services.speedtest.url;
+  const BEARER = cfg.services.speedtest.apiKey ?? "";
 
   // SpeedTracker is fragile under polling load — earlier versions of this
   // route also hit the legacy /api/speedtest/latest endpoint without auth,

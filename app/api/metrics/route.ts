@@ -2,9 +2,11 @@ import { NextResponse } from "next/server";
 import { appendHistory } from "@/app/lib/history";
 import { promScalar, promVector } from "@/app/lib/prometheus";
 import { createTTLCache } from "@/app/lib/cache";
+import { loadConfig } from "@/app/lib/server-config";
 
-const TRUENAS_IP = process.env.TRUENAS_IP || "192.168.88.196";
-const PROMETHEUS = process.env.PROMETHEUS_URL ?? `http://${TRUENAS_IP}:30104`;
+// Prometheus is resolved per request via loadConfig() so a URL set through the
+// /setup wizard actually applies. Reading process.env at module scope meant
+// wizard-written config was invisible to this route.
 
 // Per-deployment paths and filters. Defaults match the original homelab setup;
 // override at deploy time for a different ZFS pool or non-standard mountpoints.
@@ -24,12 +26,16 @@ const FS_EXCLUDE = `fstype!~"tmpfs|devtmpfs|overlay|squashfs|ramfs"`;
 
 // Thin wrappers preserve the positional call sites below while delegating the
 // (previously duplicated) Prometheus response parsing to the shared helper.
-const query = (q: string) => promScalar(PROMETHEUS, q);
-const queryAll = (q: string) => promVector(PROMETHEUS, q);
+const makeQuery    = (base: string) => (q: string) => promScalar(base, q);
+const makeQueryAll = (base: string) => (q: string) => promVector(base, q);
 
 export async function GET() {
   const cached = metricsCache.get();
   if (cached) return NextResponse.json(cached);
+
+  const cfg = await loadConfig();
+  const query    = makeQuery(cfg.prometheusUrl);
+  const queryAll = makeQueryAll(cfg.prometheusUrl);
 
   const [
     cpuIdle,
