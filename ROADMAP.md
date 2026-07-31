@@ -476,9 +476,18 @@ Accessible via command palette → "Dependency map".
 
 ---
 
-## Tier 10 — platform & ecosystem (planned)
+## Tier 10 — platform & ecosystem (mostly dropped)
 
-### Plugin system
+> **Scope decision (Jul 31 2026):** ComExe is deployed to exactly one LAN, by
+> one user, and will never be exposed to the internet. Most of this tier builds
+> platform surface for users who don't exist. **Dropped:** plugin system +
+> marketplace, mobile companion app, multi-user & RBAC (moot on a single-user
+> LAN), webhook integrations marketplace. **Kept:** container orchestration
+> dashboard and the Prometheus recording-rules generator, both of which pay off
+> for a single operator. The dropped items stay written down below so the
+> reasoning survives if the deployment model ever changes.
+
+### ~~Plugin system~~ — dropped
 Extension API for third-party dashboard cards. Plugins are single `.js`
 bundles loaded from `data/plugins/` at runtime. Each plugin exports a React
 component + a manifest (`name`, `icon`, `defaultSize`, `refreshInterval`,
@@ -486,7 +495,7 @@ component + a manifest (`name`, `icon`, `defaultSize`, `refreshInterval`,
 (fetched from a GitHub repo index). Sandboxed via iframe with postMessage
 bridge for metric access.
 
-### Mobile companion app (React Native)
+### ~~Mobile companion app (React Native)~~ — dropped
 Lightweight mobile app that connects to the ComExe instance via its API.
 Push notifications via Firebase/APNs (replaces browser notifications for
 mobile). Glanceable widget showing CPU/MEM/GPU at-a-glance. Biometric
@@ -499,14 +508,14 @@ queries. One-click export as a `rules.yml` snippet the user can drop into
 their Prometheus config. Reduces query latency and Prometheus CPU load for
 heavy dashboards.
 
-### Multi-user with roles
+### ~~Multi-user with roles~~ — dropped (single-user LAN deployment)
 Upgrade from single shared password to per-user accounts. Roles: **admin**
 (full access, settings, Docker control), **operator** (view + restart
 services, acknowledge alerts), **viewer** (read-only dashboard). User
 management page in settings. Backed by `data/users.json` with bcrypt-hashed
 passwords. Session tokens in signed cookies.
 
-### Webhook integrations marketplace
+### ~~Webhook integrations marketplace~~ — dropped (Discord/ntfy/Slack/Gotify already ship)
 Pre-built webhook templates beyond Discord/Slack/ntfy: PagerDuty, Opsgenie,
 Telegram, Pushover, Email (SMTP), Microsoft Teams, Gotify, Matrix.
 Each template has a config form (API key, channel, priority mapping) and
@@ -569,7 +578,17 @@ fully solved yet:
 
 Ordered P0 → P2. P0 items directly prevent the crash-the-homelab failure mode.
 
-### Circuit breaker per upstream (P0)
+### ✅ Circuit breaker per upstream (P0) — shipped
+
+Shipped in `app/lib/circuit-breaker.ts`, wired into `fetchWithTimeout` so every
+upstream call is covered at one choke point. 5 consecutive failures open the
+circuit; calls then fail immediately for a cooldown (30s, doubling to a 5min
+cap) instead of touching the network. One half-open probe is allowed after the
+cooldown — success closes, failure re-opens with a longer backoff. 5xx trips the
+breaker; 4xx does not (the service is answering, the request is just wrong).
+State is exposed via `/api/diagnostics`. Original text below.
+
+
 A per-origin breaker in `services/route.ts` (and the custom-card + metrics
 paths). After N consecutive failures/timeouts to a given service, **open** the
 circuit: stop fetching it for a cooldown window and serve last-known-good (the
@@ -605,7 +624,22 @@ backstop behind all the per-feature throttling. Add ±10% interval jitter so the
 batched pollers don't re-align into a synchronized thundering herd after a
 restart.
 
-### Health-gated zero-downtime deploy (P0)
+### ✅ Health-gated deploy (P0) — shipped
+
+Shipped as `scripts/update-dashboard.sh` (copy to `/root/` on TrueNAS). Pulls,
+starts the new image as a candidate on port 3001, waits for its HEALTHCHECK,
+and only promotes once healthy — a bad image leaves the running container
+untouched and exits non-zero. Retags the previous image `:rollback` before every
+pull and auto-rolls-back if the promoted container doesn't answer. Env vars and
+bind mounts are inherited from the running container via `docker inspect`, so
+secrets stay in one place.
+
+Note: `--network host` means two containers can't share port 3000, so promotion
+is a brief stop/start rather than a true zero-downtime cutover. Removing that
+last gap needs a reverse proxy in front — deliberately not done. Original text
+below.
+
+
 Rework `update-dashboard.sh` (the script on TrueNAS, bash) into a blue-green swap:
 pull the new image → start it as `comexe-next` on a temp port → poll
 `docker inspect --format '{{.State.Health.Status}}'` until `healthy` (or time out)
@@ -672,12 +706,13 @@ the next.
      plugins support 10.
    - ⏸ **Tailwind v4 (#7)** — held: needs a deliberate migration
      (`@tailwindcss/postcss` + visual-regression check), not a blind bump.
-2. **Upstream protection (Tier 12 P0s).** Circuit breaker + adaptive backoff +
-   single-flight + per-origin rate budget. The literal "stop crashing the
-   *arr/PiHole containers" work — highest-value reliability change in the roadmap.
-3. **Zero-downtime deploy (Tier 12 P0s).** Health-gated blue-green
-   `update-dashboard.sh`, graceful SIGTERM, readiness/liveness split,
-   `output: "standalone"` slim image. Seamless, reversible deploys.
+2. **Upstream protection (Tier 12 P0s).** ⏳ *circuit breaker shipped.*
+   Remaining: adaptive backoff, single-flight across SSE clients, per-origin
+   rate budget. The breaker is the big one — a failing upstream is no longer
+   polled at full rate forever.
+3. **Zero-downtime deploy (Tier 12 P0s).** ⏳ *health-gated deploy + rollback
+   shipped* (`scripts/update-dashboard.sh`). Remaining: graceful SIGTERM,
+   readiness/liveness split, `output: "standalone"` slim image.
 4. **Security hardening.** Rotate the previously-exposed Prowlarr + qBit keys,
    allowlist/validate upstream URLs on the SSRF-prone write routes
    (`/api/servers`, `/api/dependencies`, custom-cards), add CSP + security
@@ -693,10 +728,13 @@ the next.
 6. **`page.tsx` decomposition round 2 + state architecture.** Extract remaining
    feature blocks, split context to cut whole-tree re-renders, formalize the data
    layer around `useEventStream`.
-7. **Self-observability.** The dashboard watches everything except itself.
-   Surface internal metrics — per-upstream call count/latency, circuit-breaker
-   states, SSE connection count, cache hit rates — in a diagnostics panel.
-   Validates phases 2–3 in production.
+7. **Self-observability.** ⏳ *first slice shipped.* `/api/diagnostics` reports
+   per-upstream circuit state, consecutive failures, last success/failure and
+   last error, plus Prometheus scrape-target health; the dashboard shows a
+   banner when Prometheus is up but its exporters aren't (the failure that
+   silently empties the whole metric grid). Remaining: SSE connection count,
+   cache hit rates, per-upstream latency, and a full in-app panel rather than
+   just the endpoint + banner.
 8. **Performance & bundle budget.** Code-split heavy routes (analytics, logs,
    forecast), lazy-load panels, virtualize the logs viewer, set a
    Lighthouse/First-Load-JS budget in CI so it can't regress.
