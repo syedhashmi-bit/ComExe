@@ -53,6 +53,11 @@ export interface Metrics {
     load15: number | null;
     tcpEstab: number | null;
   };
+  // Prometheus scrape-target health. `scrapeDegraded` means Prometheus itself
+  // answered but one or more exporters aren't reporting — the state that
+  // empties the metric grid with no other visible explanation.
+  scrapeTargets?: { job: string; instance: string; up: boolean }[];
+  scrapeDegraded?: boolean;
   timestamp: number;
 }
 

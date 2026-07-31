@@ -789,6 +789,31 @@ export default function Dashboard() {
               <span>You are offline — showing cached data. Updates will resume when connectivity returns.</span>
             </div>
           )}
+          {/* Prometheus is answering but one or more exporters aren't. Without
+              this the whole metric grid just renders "—" and the only way to
+              find out why is to query Prometheus by hand. */}
+          {!demoMode && metrics?.scrapeDegraded && (
+            <div className="flex items-start gap-2" style={{
+              background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.3)",
+              borderRadius: 8, padding: "8px 14px", fontSize: 11, color: "#f59e0b",
+            }}>
+              <span style={{ fontSize: 14, lineHeight: 1.2 }}>&#9888;</span>
+              <span>
+                <strong>
+                  {metrics.scrapeTargets!.filter(t => !t.up).length} of {metrics.scrapeTargets!.length} Prometheus
+                  {" "}scrape target{metrics.scrapeTargets!.length === 1 ? "" : "s"} down
+                </strong>
+                {" — "}
+                {metrics.scrapeTargets!.filter(t => !t.up).map(t => t.job).join(", ")}
+                {". Cards fed by "}
+                {metrics.scrapeTargets!.filter(t => !t.up).length === 1 ? "that exporter" : "those exporters"}
+                {" stay blank until "}
+                {metrics.scrapeTargets!.filter(t => !t.up).length === 1 ? "it is" : "they are"}
+                {" back — try "}
+                <code style={{ fontFamily: "monospace" }}>docker start &lt;exporter&gt;</code> on the host.
+              </span>
+            </div>
+          )}
           {!loading && showHealth && health.status !== "healthy" && (
             <StatusBanner result={health} visible={mounted} />
           )}

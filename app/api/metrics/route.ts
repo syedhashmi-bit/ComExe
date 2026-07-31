@@ -64,6 +64,7 @@ export async function GET() {
     gpuEncRatio,
     gpuDecRatio,
     cpuInfoResults,
+    scrapeTargetResults,
   ] = await Promise.all([
     query(`avg(rate(node_cpu_seconds_total{mode="idle"}[2m])) * 100`),
     query(`node_memory_MemTotal_bytes`),
@@ -97,7 +98,18 @@ export async function GET() {
     query(`nvidia_smi_utilization_encoder_ratio`),
     query(`nvidia_smi_utilization_decoder_ratio`),
     queryAll(`node_cpu_info{cpu="0"}`),
+    // Scrape-target health. Prometheus can be perfectly healthy while its
+    // exporters are down, which empties every card with no explanation — the
+    // dashboard monitored everything except its own data pipeline.
+    queryAll(`up`),
   ]);
+
+  const scrapeTargets = scrapeTargetResults.map(r => ({
+    job:      r.metric?.job ?? "unknown",
+    instance: r.metric?.instance ?? "unknown",
+    up:       r.value === 1,
+  }));
+  const targetsDown = scrapeTargets.filter(t => !t.up);
 
   const cpuUsed = cpuIdle != null ? 100 - cpuIdle : null;
   const memUsed = memTotal != null && memAvailable != null ? memTotal - memAvailable : null;
@@ -207,6 +219,10 @@ export async function GET() {
       decUtil:     gpuDecRatio != null ? Math.round(gpuDecRatio * 100) : null,
     },
     sysInfo,
+    scrapeTargets,
+    // Prometheus answered but some exporters aren't reporting — the specific
+    // state that makes every card render "—" for no visible reason.
+    scrapeDegraded: scrapeTargets.length > 0 && targetsDown.length > 0,
     timestamp: Date.now(),
   };
   metricsCache.set(responseData);
