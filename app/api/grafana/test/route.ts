@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { fetchWithTimeout } from "@/app/lib/http";
+import { loadConfig } from "@/app/lib/server-config";
+import { isHttpUrl, isSameOrigin } from "@/app/lib/validate";
 
 // ── /api/grafana/test ────────────────────────────────────────────────────────
 // Server-side reachability + auth check for a Grafana panel URL. The iframe
@@ -36,6 +38,18 @@ export async function GET(req: Request) {
   const url = new URL(req.url).searchParams.get("url");
   if (!url) {
     return NextResponse.json<TestResult>({ ok: false, status: 0, reason: "bad_url", hint: "Missing ?url=" }, { status: 400 });
+  }
+
+  // Same exposure as /api/grafana/render: baseUrl below is rebuilt from the
+  // caller's URL and GRAFANA_API_TOKEN is attached to it. `http://evil/d/x`
+  // satisfies extractDashboardUid trivially, so the UID regex is not a
+  // security check. Pin to the configured Grafana origin first.
+  const cfg = await loadConfig();
+  if (!isHttpUrl(url) || !isSameOrigin(url, cfg.grafana.baseUrl)) {
+    return NextResponse.json<TestResult>({
+      ok: false, status: 0, reason: "bad_url",
+      hint: "url must be an http(s) URL on the configured Grafana origin.",
+    }, { status: 400 });
   }
 
   const parsed = extractDashboardUid(url);

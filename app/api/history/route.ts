@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isJsonContentType } from "@/app/lib/validate";
 import { readHistory, appendHistory, downsample, type HistoryPoint } from "@/app/lib/history";
 
 // ── GET /api/history ────────────────────────────────────────────────────────
@@ -44,6 +45,9 @@ export async function GET(req: Request) {
 // Body: HistoryPoint (or the essential fields; ts is auto-set if missing).
 
 export async function POST(req: Request) {
+  if (!isJsonContentType(req)) {
+    return NextResponse.json({ ok: false, message: "Content-Type must be application/json" }, { status: 415 });
+  }
   let body: Partial<HistoryPoint>;
   try { body = await req.json(); }
   catch { return NextResponse.json({ ok: false }, { status: 400 }); }

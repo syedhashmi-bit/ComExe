@@ -3,6 +3,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { fetchWithTimeout } from "@/app/lib/http";
+import { isHttpUrl, isJsonContentType } from "@/app/lib/validate";
 import {
   evaluateAlerts, inQuietHours, buildWebhookPayload,
   type AlertFire, type WebhookFormat,
@@ -114,6 +115,9 @@ export async function GET() {
 // Returns { fires } so the browser can decide whether to push notifications.
 
 export async function POST(req: Request) {
+  if (!isJsonContentType(req)) {
+    return NextResponse.json({ ok: false, message: "Content-Type must be application/json" }, { status: 415 });
+  }
   let body: { metrics?: Metrics | null; services?: ServiceResult[] | null };
   try { body = await req.json(); }
   catch { return NextResponse.json({ ok: false, message: "Invalid JSON" }, { status: 400 }); }
@@ -156,6 +160,9 @@ export async function POST(req: Request) {
 // Partial config update from the Settings panel.
 
 export async function PATCH(req: Request) {
+  if (!isJsonContentType(req)) {
+    return NextResponse.json({ ok: false, message: "Content-Type must be application/json" }, { status: 415 });
+  }
   let body: Partial<AlertConfig>;
   try { body = await req.json(); }
   catch { return NextResponse.json({ ok: false, message: "Invalid JSON" }, { status: 400 }); }
@@ -163,7 +170,10 @@ export async function PATCH(req: Request) {
   // Whitelist + shape-check
   const incoming: Partial<AlertConfig> = {};
   if (typeof body.enabled              === "boolean") incoming.enabled = body.enabled;
-  if (typeof body.webhookUrl           === "string")  incoming.webhookUrl = body.webhookUrl;
+  // Every other field here is range- or enum-checked; this one was `typeof ===
+  // "string"` only, and it is the one field we later POST alert payloads to
+  // (including os.hostname()). "" is allowed so the user can clear it.
+  if (body.webhookUrl === "" || isHttpUrl(body.webhookUrl)) incoming.webhookUrl = body.webhookUrl as string;
   if (typeof body.webhookFormat        === "string" && ["generic","discord","slack","ntfy"].includes(body.webhookFormat)) incoming.webhookFormat = body.webhookFormat as WebhookFormat;
   if (typeof body.throttleMs           === "number" && body.throttleMs >= 1000) incoming.throttleMs = body.throttleMs;
   if (typeof body.browserNotifications === "boolean") incoming.browserNotifications = body.browserNotifications;

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isJsonContentType } from "@/app/lib/validate";
 import { isDockerEnabled, restartContainer } from "@/app/lib/docker";
 
 // ── /api/docker/restart ──────────────────────────────────────────────────────
@@ -28,6 +29,9 @@ function isAllowed(name: string): boolean {
 }
 
 export async function POST(req: Request) {
+  if (!isJsonContentType(req)) {
+    return NextResponse.json({ ok: false, message: "Content-Type must be application/json" }, { status: 415 });
+  }
   if (!isDockerEnabled()) {
     return NextResponse.json({ ok: false, message: "Docker control disabled. Set COMEXE_DOCKER_ENABLED=1 to enable." }, { status: 403 });
   }

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isJsonContentType } from "@/app/lib/validate";
 import { loadConfig, writeConfigFile, probeWritable, invalidateConfigCache, type PartialFileConfig } from "@/app/lib/server-config";
 import { loadBookmarks } from "@/app/lib/bookmarks";
 import type { BookmarkColumn } from "@/app/lib/types";
@@ -187,6 +188,9 @@ function validateBody(b: unknown): { ok: true; cfg: PartialFileConfig } | { ok: 
 }
 
 export async function POST(req: Request) {
+  if (!isJsonContentType(req)) {
+    return NextResponse.json({ ok: false, message: "Content-Type must be application/json" }, { status: 415 });
+  }
   let body: unknown;
   try { body = await req.json(); }
   catch { return NextResponse.json({ ok: false, message: "Invalid JSON body" }, { status: 400 }); }

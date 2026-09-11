@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isNonEmptyString } from "@/app/lib/validate";
+import { isJsonContentType, isNonEmptyString } from "@/app/lib/validate";
 import { createJsonStore } from "@/app/lib/json-store";
 
 export const dynamic = "force-dynamic";
@@ -36,6 +36,9 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  if (!isJsonContentType(req)) {
+    return NextResponse.json({ ok: false, message: "Content-Type must be application/json" }, { status: 415 });
+  }
   let body: { from?: unknown; to?: unknown; label?: unknown };
   try {
     body = await req.json();

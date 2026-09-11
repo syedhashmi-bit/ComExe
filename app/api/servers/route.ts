@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { promScalar } from "@/app/lib/prometheus";
-import { isNonEmptyString, isHttpUrl } from "@/app/lib/validate";
+import { isHttpUrl, isJsonContentType, isNonEmptyString } from "@/app/lib/validate";
 import { createJsonStore } from "@/app/lib/json-store";
 
 export const dynamic = "force-dynamic";
@@ -61,6 +61,9 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  if (!isJsonContentType(req)) {
+    return NextResponse.json({ ok: false, message: "Content-Type must be application/json" }, { status: 415 });
+  }
   try {
     const body = await req.json();
     const { name, prometheusUrl } = body;
@@ -97,6 +100,9 @@ export async function DELETE(req: Request) {
 }
 
 export async function PATCH(req: Request) {
+  if (!isJsonContentType(req)) {
+    return NextResponse.json({ ok: false, message: "Content-Type must be application/json" }, { status: 415 });
+  }
   try {
     const body = await req.json();
     const { id, name, prometheusUrl, enabled } = body;

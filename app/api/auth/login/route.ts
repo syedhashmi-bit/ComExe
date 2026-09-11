@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
+import { isJsonContentType } from "@/app/lib/validate";
 import {
   isAuthEnabled, verifyPassword, createSession, checkRateLimit,
   SESSION_COOKIE, SESSION_MAX_AGE,
 } from "@/app/lib/auth";
 
 export async function POST(req: Request) {
+  if (!isJsonContentType(req)) {
+    return NextResponse.json({ ok: false, message: "Content-Type must be application/json" }, { status: 415 });
+  }
   if (!isAuthEnabled()) {
     return NextResponse.json({ ok: true, message: "Auth not enabled" });
   }

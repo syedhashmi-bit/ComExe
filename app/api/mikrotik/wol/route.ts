@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isJsonContentType } from "@/app/lib/validate";
 import { loadConfig } from "@/app/lib/server-config";
 import dgram from "node:dgram";
 
@@ -73,6 +74,9 @@ async function sendViaMikrotik(mac: string, iface?: string): Promise<{ ok: boole
 }
 
 export async function POST(req: Request) {
+  if (!isJsonContentType(req)) {
+    return NextResponse.json({ ok: false, message: "Content-Type must be application/json" }, { status: 415 });
+  }
   let body: WolBody;
   try { body = await req.json(); }
   catch { return NextResponse.json({ ok: false, message: "Invalid JSON" }, { status: 400 }); }

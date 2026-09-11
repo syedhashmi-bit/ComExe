@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isJsonContentType } from "@/app/lib/validate";
 import { loadCustomCards, saveCustomCards, type CustomCardDef } from "@/app/lib/custom-cards";
 
 // ── GET /api/custom-cards ───────────────────────────────────────────────────
@@ -11,6 +12,9 @@ export async function GET() {
 // Body: full array of CustomCardDef[]. The client sends the complete list
 // (add/edit/remove happen client-side, then save the whole set).
 export async function POST(req: Request) {
+  if (!isJsonContentType(req)) {
+    return NextResponse.json({ ok: false, message: "Content-Type must be application/json" }, { status: 415 });
+  }
   let body: { cards?: unknown };
   try { body = await req.json(); }
   catch { return NextResponse.json({ ok: false, message: "Invalid JSON" }, { status: 400 }); }

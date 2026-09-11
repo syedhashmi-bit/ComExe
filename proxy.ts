@@ -18,10 +18,21 @@ const PUBLIC_PATHS = [
   "/api/auth/login",
   "/api/auth/logout",
   "/api/auth/status",
+  // The container HEALTHCHECK (Dockerfile) probes this with no cookie. Gating it
+  // behind auth made the container report unhealthy ~90s after you set
+  // DASHBOARD_PASSWORD — which in turn made scripts/update-dashboard.sh never
+  // promote a candidate and roll back every deploy. The route is local-only and
+  // returns nothing but {ok:true}, so it is safe to leave open.
+  "/api/health",
   "/_next",
   "/favicon.ico",
-  "/icon-192.png",
-  "/icon-512.png",
+  // app/icon.svg (Next file convention) — referenced by app/manifest.ts. The
+  // previous entries here were /icon-192.png and /icon-512.png, which have never
+  // existed in this repo.
+  "/icon.svg",
+  // Registered by app/page.tsx. Without this it redirects to /login once auth is
+  // on and service-worker registration silently fails.
+  "/sw.js",
   "/manifest.webmanifest",
 ];
 
@@ -63,6 +74,6 @@ export function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|icon-192.png|icon-512.png|manifest.webmanifest).*)",
+    "/((?!_next/static|_next/image|favicon.ico|icon.svg|sw.js|manifest.webmanifest).*)",
   ],
 };

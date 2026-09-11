@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isJsonContentType } from "@/app/lib/validate";
 
 // ── /api/test-connection ──────────────────────────────────────────────────────
 // Setup-wizard helper. POST a service spec, returns whether the credentials
@@ -244,6 +245,9 @@ async function testSpeedtest(url: string, key: string): Promise<TestResult> {
 }
 
 export async function POST(req: Request) {
+  if (!isJsonContentType(req)) {
+    return NextResponse.json({ ok: false, message: "Content-Type must be application/json" }, { status: 415 });
+  }
   let body: TestRequest;
   try {
     body = await req.json() as TestRequest;

@@ -20,6 +20,8 @@
 
 import { NextResponse } from "next/server";
 import { fetchWithTimeout } from "@/app/lib/http";
+import { loadConfig } from "@/app/lib/server-config";
+import { isHttpUrl, isSameOrigin } from "@/app/lib/validate";
 
 function rewriteToRender(url: string, width: number, height: number): string {
   const u = new URL(url);
@@ -37,6 +39,18 @@ export async function GET(req: Request) {
   const width  = Math.min(2000, Math.max(200, parseInt(new URL(req.url).searchParams.get("width")  ?? "800", 10)));
   const height = Math.min(2000, Math.max(150, parseInt(new URL(req.url).searchParams.get("height") ?? "300", 10)));
   if (!url) return NextResponse.json({ ok: false, message: "Missing ?url=" }, { status: 400 });
+
+  // Only ever render from the configured Grafana. Without this check the
+  // Bearer token below is sent to whatever host the caller names — and since
+  // this is a GET with no CSRF protection, any page the user visits can
+  // trigger it. See isSameOrigin in lib/validate.ts.
+  const cfg = await loadConfig();
+  if (!isHttpUrl(url) || !isSameOrigin(url, cfg.grafana.baseUrl)) {
+    return NextResponse.json(
+      { ok: false, message: "url must be an http(s) URL on the configured Grafana origin" },
+      { status: 400 },
+    );
+  }
 
   const token = process.env.GRAFANA_API_TOKEN?.trim();
   if (!token) {
