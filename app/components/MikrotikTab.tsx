@@ -60,10 +60,25 @@ export function MikrotikTab({ mikrotikUrl, refreshSec, demoMode = false }: {
         setCorsBlocked(true);
       }
     }
-    load();
     const everySec = Math.max(MIKROTIK_MIN_SEC, refreshSec || MIKROTIK_DEFAULT_SEC);
-    const id = setInterval(load, everySec * 1000);
-    return () => clearInterval(id);
+
+    load();
+    let id: ReturnType<typeof setInterval> | null = setInterval(load, everySec * 1000);
+
+    // Don't poll the router while the tab is backgrounded.
+    const onVis = () => {
+      if (document.hidden) {
+        if (id) { clearInterval(id); id = null; }
+      } else if (!id) {
+        load();
+        id = setInterval(load, everySec * 1000);
+      }
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      if (id) clearInterval(id);
+      document.removeEventListener("visibilitychange", onVis);
+    };
   }, [refreshSec, demoMode]);
 
   const pill = (label: string, value: string, pctVal?: number, tempVal?: number | null) => {

@@ -43,3 +43,20 @@ export function buildDemoServices(): ServiceResult[] {
     { name: "uptimekuma",  up: true, configured: true, lines: ["24 monitors", "All up"], downCount: 0 },
   ] as ServiceResult[];
 }
+
+// Single source of truth for "are we in demo mode?".
+//
+// page.tsx computed this inline from window.location.search, but the six panels
+// that fetch on their own — DiskHealthPanel, CustomCards, NotificationCenter,
+// ServerFleetPanel, NetworkTopology, DependencyMap — had no demo check at all.
+// DiskHealthPanel and CustomCards render on the main dashboard, so `?demo=1`
+// still hit /api/smart (which queries Prometheus) and /api/custom-cards. Demo
+// mode is supposed to mean zero upstream calls so the dashboard is presentable
+// on a machine with no homelab reachable.
+//
+// Returns false during SSR; callers use it inside effects, which only run on
+// the client.
+export function isDemoMode(): boolean {
+  return typeof window !== "undefined"
+    && new URLSearchParams(window.location.search).get("demo") === "1";
+}

@@ -55,6 +55,7 @@ import { Clock } from "@/app/components/Clock";
 import { ErrorBoundary } from "@/app/components/ErrorBoundary";
 import { loadCardOrder, saveCardOrder, reorder } from "@/app/lib/card-order";
 import { useEventStream } from "@/app/hooks/useEventStream";
+import { usePollingInterval } from "@/app/hooks/usePolling";
 
 // ── module constants ─────────────────────────────────────────────────────────
 
@@ -382,23 +383,14 @@ export default function Dashboard() {
   // Clock lives in its own <Clock> component so its 1Hz tick re-renders only
   // the header time, not this entire Dashboard tree (see app/components/Clock.tsx).
 
-  // Polling effects — only active when SSE is unavailable (fallback mode)
-  useEffect(() => { if (demoMode || !usePolling) return; fetchWeather(); const id = setInterval(fetchWeather, 600_000); return () => clearInterval(id); }, [fetchWeather, demoMode, usePolling]);
-  useEffect(() => {
-    if (demoMode || !usePolling) return;
-    const sec = settings.refreshOverrides?.services || 30;
-    fetchServices();
-    const id = setInterval(fetchServices, sec * 1000);
-    return () => clearInterval(id);
-  }, [fetchServices, demoMode, settings.refreshOverrides?.services, usePolling]);
-  useEffect(() => { if (demoMode || !usePolling) return; fetchSpeedtest(); const id = setInterval(fetchSpeedtest, 300_000); return () => clearInterval(id); }, [fetchSpeedtest, demoMode, usePolling]);
-  useEffect(() => {
-    if (demoMode || !usePolling) return;
-    const sec = settings.refreshOverrides?.activity || 60;
-    fetchActivity();
-    const id = setInterval(fetchActivity, sec * 1000);
-    return () => clearInterval(id);
-  }, [fetchActivity, demoMode, settings.refreshOverrides?.activity, usePolling]);
+  // Polling effects — only active when SSE is unavailable (fallback mode).
+  // usePollingInterval also suspends these whenever the tab is hidden and
+  // fires once on return; see app/hooks/usePolling.ts.
+  const pollActive = !demoMode && usePolling;
+  usePollingInterval(fetchWeather,   600_000,                                                  { enabled: pollActive });
+  usePollingInterval(fetchServices,  (settings.refreshOverrides?.services || 30)  * 1000,       { enabled: pollActive });
+  usePollingInterval(fetchSpeedtest, 300_000,                                                  { enabled: pollActive });
+  usePollingInterval(fetchActivity,  (settings.refreshOverrides?.activity || 60)  * 1000,       { enabled: pollActive });
 
   // Load alert config on mount so we know whether to dispatch (server is the
   // source of truth — POST /api/alerts is a cheap no-op if disabled).
@@ -498,14 +490,11 @@ export default function Dashboard() {
     }
   }, [services, servicesLoading, demoMode]);
 
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  useEffect(() => {
-    if (demoMode || !usePolling) return;
-    const sec = settings.refreshOverrides?.metrics || settings.refreshInterval;
-    fetchMetrics();
-    intervalRef.current = setInterval(() => { fetchMetrics(); }, sec * 1000);
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, [fetchMetrics, settings.refreshInterval, settings.refreshOverrides?.metrics, demoMode, usePolling]);
+  usePollingInterval(
+    fetchMetrics,
+    (settings.refreshOverrides?.metrics || settings.refreshInterval) * 1000,
+    { enabled: pollActive },
+  );
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {

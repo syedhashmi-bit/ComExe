@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { IconGrafana } from "@/app/components/icons";
+import { usePollingInterval } from "@/app/hooks/usePolling";
 
 interface ProbeResult {
   ok:     boolean;
@@ -106,10 +107,11 @@ function RefreshingImg({ url, width, height, onLoaded, onError }: {
   onLoaded: () => void; onError: (msg: string) => void;
 }) {
   const [tick, setTick] = useState(0);
-  useEffect(() => {
-    const id = setInterval(() => setTick(t => t + 1), 60_000);
-    return () => clearInterval(id);
-  }, []);
+  // Each tick re-requests /api/grafana/render, which drives a HEADLESS PANEL
+  // RENDER on the Grafana host — by a wide margin the heaviest upstream call
+  // this app makes (20s timeout). Leaving a tab open used to fire it every
+  // 60s forever. skipImmediate: the <img> already loads once on mount.
+  usePollingInterval(() => setTick(t => t + 1), 60_000, { skipImmediate: true });
 
   const src = `/api/grafana/render?url=${encodeURIComponent(url)}&width=${width}&height=${height}&t=${tick}`;
   return (

@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { usePollingInterval } from "@/app/hooks/usePolling";
+import { isDemoMode } from "@/app/lib/demo-data";
 
 interface ServerStatus {
   id: string;
@@ -55,11 +57,7 @@ export function ServerFleetPanel({ onClose }: { onClose: () => void }) {
     finally { setLoading(false); }
   }, []);
 
-  useEffect(() => {
-    fetchServers();
-    const id = setInterval(fetchServers, 30_000);
-    return () => clearInterval(id);
-  }, [fetchServers]);
+  usePollingInterval(fetchServers, 30_000, { enabled: !isDemoMode() });
 
   async function addServer() {
     if (!newName.trim() || !newUrl.trim()) return;

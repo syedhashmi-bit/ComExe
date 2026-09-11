@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Sparkline, GaugeBar, BigValue } from "@/app/components/primitives";
+import { isDemoMode } from "@/app/lib/demo-data";
 
 interface CustomCardDef {
   id:       string;
@@ -129,9 +130,23 @@ export function CustomCardsGrid({ refreshInterval }: { refreshInterval: number }
       });
     };
 
+    if (isDemoMode()) return;
+
     poll();
     pollRef.current = setInterval(poll, refreshInterval * 1000);
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+    const onVis = () => {
+      if (document.hidden) {
+        if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+      } else if (!pollRef.current) {
+        poll();
+        pollRef.current = setInterval(poll, refreshInterval * 1000);
+      }
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+      document.removeEventListener("visibilitychange", onVis);
+    };
   }, [cards, refreshInterval]);
 
   if (cards.length === 0) return null;

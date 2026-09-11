@@ -85,9 +85,52 @@ export function useEventStream({ enabled, intervals, onMessage }: UseEventStream
 
     connect();
 
+    // ── Suspend the stream while the tab is backgrounded ────────────────────
+    // This is the half of visibility-gating that actually matters. SSE is the
+    // PRIMARY transport, and an open EventSource keeps the *server* fanning out
+    // to all six upstreams on its own timers (metrics 10s, services 30s,
+    // mikrotik 15s, …) for as long as the connection lives — regardless of
+    // whether anyone is looking at the tab. Gating only the client-side polling
+    // fallback would have left the common path untouched: a laptop left open
+    // overnight would still poll the *arr stack all night, which is the shape
+    // of the incident that motivated the throttling work in the first place.
+    //
+    // Disconnect only after a grace period. Closing on every tab switch would
+    // be counterproductive — each reconnect makes the server fan out
+    // immediately, so rapid alt-tabbing would generate MORE load than it saves.
+    const HIDDEN_GRACE_MS = 60_000;
+    let hiddenTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const closeStream = () => {
+      if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+      if (esRef.current) {
+        // es.close() does not fire onerror, so this cannot trip the retry
+        // counter or flip us into polling fallback.
+        esRef.current.close();
+        esRef.current = null;
+      }
+      setConnected(false);
+    };
+
+    const onVisibilityChange = () => {
+      if (document.hidden) {
+        hiddenTimer = setTimeout(closeStream, HIDDEN_GRACE_MS);
+      } else {
+        if (hiddenTimer) { clearTimeout(hiddenTimer); hiddenTimer = null; }
+        if (!esRef.current && !cancelled) {
+          // Back in view with no stream — reconnect and get fresh data at once.
+          retriesRef.current = 0;
+          connect();
+        }
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
     return () => {
       cancelled = true;
       if (reconnectTimer) clearTimeout(reconnectTimer);
+      if (hiddenTimer) clearTimeout(hiddenTimer);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
       if (esRef.current) {
         esRef.current.close();
         esRef.current = null;

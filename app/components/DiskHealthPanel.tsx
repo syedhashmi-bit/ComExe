@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { usePollingInterval } from "@/app/hooks/usePolling";
+import { isDemoMode } from "@/app/lib/demo-data";
 
 interface SmartDisk {
   device: string;
@@ -46,11 +48,10 @@ export function DiskHealthPanel() {
     }
   }, []);
 
-  useEffect(() => {
-    fetch_();
-    const id = setInterval(fetch_, 60_000);
-    return () => clearInterval(id);
-  }, [fetch_]);
+  // /api/smart queries Prometheus, so this must not run in demo mode — this
+  // panel renders on the main dashboard and was the reason `?demo=1` still
+  // produced upstream traffic.
+  usePollingInterval(fetch_, 60_000, { enabled: !isDemoMode() });
 
   if (loading) {
     return (
