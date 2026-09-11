@@ -41,3 +41,13 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# runtime state — NEVER commit. data/config.json holds plaintext API keys and
+# passwords for every upstream service (written by the /setup wizard, mode 0600).
+# Also: history.jsonl, bookmarks.json, custom-cards.json, alerts.json,
+# servers.json, dependencies.json. All created on demand at runtime — the
+# Dockerfile and json-store.ts both mkdir -p this directory themselves.
+data/
+
+# playwright-mcp session artifacts (screenshots, console logs, a11y snapshots)
+.playwright-mcp/

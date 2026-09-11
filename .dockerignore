@@ -23,3 +23,10 @@ docker-compose*.yml
 .claude
 Read-Prompt.txt
 gh
+
+# runtime state — must never be baked into the image. A local dev
+# data/config.json would ship real credentials inside the published layer,
+# and would also shadow the mounted volume at /app/data. The Dockerfile
+# creates an empty /app/data owned by uid 1001 instead.
+data
+.playwright-mcp
