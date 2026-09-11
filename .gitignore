@@ -51,3 +51,7 @@ data/
 
 # playwright-mcp session artifacts (screenshots, console logs, a11y snapshots)
 .playwright-mcp/
+
+# playwright run output
+test-results/
+playwright-report/
