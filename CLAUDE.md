@@ -505,8 +505,14 @@ PiHole `:20720`, Bazarr `:30046`, qBittorrent `:30024` (all via
 `.claude/skills/Hashmi-homelab/SKILL.md` — workflow + style conventions
 (PC = PowerShell, TrueNAS = bash, concise direct prose, secrets via `-e` flags
 only). Apply on any task touching this repo, Docker on TrueNAS, MikroTik, or
-related services. Note that `.claude/` is gitignored, so this file does not
-survive a fresh clone.
+related services.
+
+`.gitignore` lists `.claude/`, but **this one file is tracked** and does survive
+a fresh clone — it was committed before the ignore rule existed, and an ignore
+rule has no effect on an already-tracked path. Everything else under `.claude/`
+(settings, launch config, worktrees) is genuinely ignored. Keep the skill file in
+sync when conventions change here; it is the only part of `.claude/` that other
+clones see.
 
 ## Supplementary files
 

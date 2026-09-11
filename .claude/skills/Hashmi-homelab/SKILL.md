@@ -63,7 +63,7 @@ Use these exact metric names in PromQL — do not invent variations.
 - **Always TypeScript.** Never plain JavaScript unless the user explicitly asks.
 - **Sensitive credentials → server-side Next.js API routes** (`app/api/.../route.ts`). Never put API keys, tokens, or service URLs with auth in client components or `NEXT_PUBLIC_*` env vars.
 - **Comments in code blocks** should be brief and explain *why*, not *what*.
-- **Node 20**, **npm** (not pnpm/yarn/bun).
+- **Node 22**, **npm** (not pnpm/yarn/bun).
 - **Next.js 15 App Router** patterns — server components by default, `'use client'` only when needed.
 
 ## Terminal Command Conventions
