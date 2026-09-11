@@ -94,13 +94,25 @@ describe("auth", () => {
     expect(fresh.validateSession(token)).toBe(false);
   });
 
-  it("destroys sessions", async () => {
-    process.env.DASHBOARD_PASSWORD = "test";
-    const { createSession, validateSession, destroySession } = await import("@/app/lib/auth");
-    const token = createSession();
-    expect(validateSession(token)).toBe(true);
-    destroySession(token);
-    expect(validateSession(token)).toBe(false);
+  // There used to be a "destroys sessions" test here asserting that
+  // destroySession(token) made validateSession(token) false. It passed — but
+  // only because both calls hit the same module instance. proxy.ts, the only
+  // place auth is actually enforced, is bundled separately and held its own
+  // permanently-empty copy of that Map, so the property never held where it
+  // mattered. The test gave false confidence in a control that did not exist.
+  //
+  // The revocation mechanism that genuinely works is rotating the password,
+  // since the HMAC signing key is derived from it. That is what this pins.
+  it("invalidates every outstanding token when the password changes", async () => {
+    process.env.DASHBOARD_PASSWORD = "original";
+    const before = await import("@/app/lib/auth");
+    const token = before.createSession();
+    expect(before.validateSession(token)).toBe(true);
+
+    vi.resetModules();
+    process.env.DASHBOARD_PASSWORD = "rotated";
+    const after = await import("@/app/lib/auth");
+    expect(after.validateSession(token)).toBe(false);
   });
 
   it("rate limits login attempts", async () => {

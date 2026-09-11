@@ -16,7 +16,7 @@ import { cookies } from "next/headers";
 import { timingSafeEqual } from "node:crypto";
 import {
   SESSION_COOKIE, SESSION_MAX_AGE,
-  createSessionToken, validateSessionToken, revokeSessionToken,
+  createSessionToken, validateSessionToken,
   getSessionFromCookie,
 } from "@/app/lib/session-token";
 
@@ -45,10 +45,6 @@ export function createSession(): string {
 
 export function validateSession(token: string): boolean {
   return validateSessionToken(token);
-}
-
-export function destroySession(token: string): void {
-  revokeSessionToken(token);
 }
 
 export function verifyPassword(input: string): boolean {
