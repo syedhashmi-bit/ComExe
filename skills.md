@@ -4,7 +4,7 @@ Reusable coding patterns for this repo. **`CLAUDE.md` is authoritative** — whe
 
 ## Tech Stack
 
-- Next.js 15 (App Router) · TypeScript · Tailwind CSS · Node 20 · npm
+- Next.js 15 (App Router) · TypeScript · Tailwind CSS · Node 22 · npm
 - No external chart libraries — Canvas or inline SVG only
 - No DB, no auth, no state library
 

@@ -666,7 +666,7 @@ liveness route.
 Switch `next.config.ts` to `output: "standalone"` and copy only the standalone
 bundle in the runner stage instead of a full `npm ci --omit=dev` (~150 MB of prod
 node_modules). Smaller image = faster pull + faster boot = the healthcheck goes
-green sooner = shorter swap window. Pin the `node:20-slim` base by digest for
+green sooner = shorter swap window. Pin the `node:22-slim` base by digest for
 reproducible CI builds. No behavior change, pure deploy ergonomics.
 
 ### Self-update safety (P2)

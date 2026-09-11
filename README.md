@@ -83,7 +83,7 @@ and SLA reports.
 | Language | TypeScript 5 |
 | Styling | Tailwind CSS 3 + inline `style` for dynamic colours |
 | Charts | Canvas API + inline SVG, **zero chart libraries** |
-| Runtime | Node 20 |
+| Runtime | Node 22 |
 | Container | Multi-stage Docker image (deps → builder → runner) |
 
 ---
