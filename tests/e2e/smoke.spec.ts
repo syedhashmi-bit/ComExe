@@ -1,19 +1,23 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("Dashboard smoke tests", () => {
+  // ?demo=1 short-circuits the first-run redirect in page.tsx ("if (demoMode)
+  // return" before the configured===0 check) and feeds the page fake data, so
+  // this asserts against the real dashboard on a machine with no homelab
+  // reachable. Without it the test lands on /welcome and proves nothing.
   test("loads the main dashboard page", async ({ page }) => {
-    await page.goto("/");
-    // Should see the ComExe header or be redirected to /welcome
-    const url = page.url();
-    const onDashboard = !url.includes("/welcome") && !url.includes("/login");
-    if (onDashboard) {
-      await expect(page.locator("main")).toBeVisible();
-    }
+    await page.goto("/?demo=1");
+    await expect(page).toHaveURL(/demo=1/);
+    await expect(page.locator("main")).toBeVisible({ timeout: 10_000 });
   });
 
   test("setup wizard loads", async ({ page }) => {
     await page.goto("/setup");
-    await expect(page.locator("form, main, [data-testid]")).toBeVisible({ timeout: 10_000 });
+    // The wizard renders a plain <div> tree — no <form>, no <main>, no
+    // data-testid anywhere. The previous selector ("form, main, [data-testid]")
+    // could never match, so this test failed on every run.
+    await expect(page.getByRole("heading", { name: "Setup", level: 1 })).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator("input").first()).toBeVisible();
   });
 
   test("welcome flow loads", async ({ page }) => {
@@ -23,13 +27,19 @@ test.describe("Dashboard smoke tests", () => {
     expect(body).toBeTruthy();
   });
 
-  test("login page loads when auth not enabled", async ({ page }) => {
+  test("login page resolves to either a form or a redirect", async ({ page }) => {
     await page.goto("/login");
-    // Should either show login form or redirect to dashboard (if auth disabled)
-    const url = page.url();
-    const hasForm = await page.locator("form").count();
-    const redirected = !url.includes("/login");
-    expect(hasForm > 0 || redirected).toBe(true);
+    // /login fetches /api/auth/status on mount and only then decides: render
+    // the form (auth on) or router.replace to "/" (auth off). Sampling url +
+    // form count immediately, as this test used to, reads the intermediate
+    // "checking" state where neither is true yet — a guaranteed flake that
+    // failed whenever the fetch hadn't resolved. Poll until it settles.
+    await expect
+      .poll(async () => {
+        if (!page.url().includes("/login")) return "redirected";
+        return (await page.locator("form").count()) > 0 ? "form" : "checking";
+      }, { timeout: 10_000 })
+      .not.toBe("checking");
   });
 
   test("API config endpoint returns JSON", async ({ request }) => {
@@ -60,17 +70,22 @@ test.describe("Dashboard smoke tests", () => {
 
 test.describe("Theme switching", () => {
   test("applies theme class to html element", async ({ page }) => {
-    await page.goto("/");
-    // Set theme to forge via localStorage and reload
-    await page.evaluate(() => {
-      const settings = JSON.parse(localStorage.getItem("comexe:settings") || "{}");
-      settings.theme = "forge";
-      localStorage.setItem("comexe:settings", JSON.stringify(settings));
+    // Must stay in demo mode. On an unconfigured machine "/" redirects to
+    // /welcome, whose own theme-preview effect writes its selected theme
+    // (default midnight) onto <html> — clobbering theme-forge and failing
+    // this test for a reason that has nothing to do with theming.
+    // Seed BEFORE navigating. Writing localStorage after goto() is racy:
+    // goto resolves on `load`, which can precede hydration, and page.tsx has a
+    // `useEffect(..., [settings])` that persists the still-default settings on
+    // its first commit — clobbering whatever the test just wrote. addInitScript
+    // runs before any page script, so the value is already there for the
+    // pre-hydration theme script in layout.tsx to read.
+    await page.addInitScript(() => {
+      localStorage.setItem("comexe:settings", JSON.stringify({ theme: "forge" }));
     });
-    await page.reload();
-    const hasThemeClass = await page.evaluate(() =>
-      document.documentElement.classList.contains("theme-forge")
-    );
-    expect(hasThemeClass).toBe(true);
+    await page.goto("/?demo=1");
+    // layout.tsx applies the class in a pre-hydration inline script, so it is
+    // present before React mounts.
+    await expect(page.locator("html")).toHaveClass(/theme-forge/, { timeout: 10_000 });
   });
 });
