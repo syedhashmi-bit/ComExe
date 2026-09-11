@@ -714,10 +714,26 @@ the next.
    shipped* (`scripts/update-dashboard.sh`). Remaining: graceful SIGTERM,
    readiness/liveness split, `output: "standalone"` slim image.
 4. **Security hardening.** Rotate the previously-exposed Prowlarr + qBit keys,
-   allowlist/validate upstream URLs on the SSRF-prone write routes
-   (`/api/servers`, `/api/dependencies`, custom-cards), add CSP + security
-   headers, rate-limit write endpoints, document auth-on as the default before
-   any Cloudflare Tunnel exposure.
+   add CSP + security headers, rate-limit write endpoints, document auth-on as
+   the default before any Cloudflare Tunnel exposure.
+
+   **Corrected Sep 2026 — this item named the wrong routes.** `/api/servers` and
+   `/api/dependencies` now both validate via `lib/validate.ts`, and
+   `/api/dependencies` was never an SSRF surface at all (`from`/`to` are graph
+   node names, never fetched). The routes that actually attach a **secret** to a
+   client-controlled destination are:
+   - `/api/grafana/render` and `/api/grafana/test` — take `?url=` verbatim and
+     send `GRAFANA_API_TOKEN` to it. No host check. Both are GET, so any page the
+     user visits can trigger them. **Highest severity.**
+   - `/api/alerts` PATCH — `webhookUrl` checked only with `typeof === "string"`,
+     then POSTed alert payloads including `os.hostname()`.
+   - `/api/backup` POST — overwrites `data/config.json` (every credential) with
+     unvalidated client JSON, gated only on `_meta.app === "comexe"`.
+   - `/api/config` POST and `/api/test-connection` — accept URLs that are later
+     fetched server-side with credentials attached.
+
+   Remaining validation gap on `/api/servers`: shape is checked but there is no
+   host allowlist, so it doubles as a LAN reachability oracle re-probed every 30 s.
 
 ### Part B — Harden & maintain
 

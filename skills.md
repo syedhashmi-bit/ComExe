@@ -4,30 +4,50 @@ Reusable coding patterns for this repo. **`CLAUDE.md` is authoritative** — whe
 
 ## Tech Stack
 
-- Next.js 15 (App Router) · TypeScript · Tailwind CSS · Node 22 · npm
+- Next.js 16 (App Router) · TypeScript 6 · Tailwind CSS 3 · Node 22 · npm
 - No external chart libraries — Canvas or inline SVG only
-- No DB, no auth, no state library
+- No DB, no state library
+- **Auth exists** and is optional: `DASHBOARD_PASSWORD` (HMAC-signed cookie sessions) or
+  `AUTH_PROXY_HEADER`. Enforced in `proxy.ts`. See `app/lib/auth.ts` + `session-token.ts`.
+
+## Shared lib modules — reach for these before hand-rolling
+
+`app/lib/` holds 21 modules. The six that matter most, because each exists to replace a
+pattern that had been copy-pasted across many routes:
+
+| Module | Use for |
+|--------|---------|
+| `http.ts` | All outbound HTTP — `fetchWithTimeout` / `fetchJson`. Applies the socket cap and circuit breaker. |
+| `cache.ts` | `createTTLCache` / `createKeyedTTLCache` instead of a local `{data, ts}`. |
+| `json-store.ts` | Anything under `data/` — atomic temp-file + rename. |
+| `prometheus.ts` | `promScalar` / `promVector` instead of re-parsing `data.result[0].value[1]`. |
+| `validate.ts` | `isNonEmptyString` / `isHttpUrl` on every write route. |
+| `formatters.ts` | `fmtBytes`, `fmtEtaShort`, `fmtSmoothAgo`, `WEATHER_CODES`, … all pure. |
 
 ## Architecture pattern: server-side proxy routes
 
 Data fetching is **server-side** in Next.js API routes. The browser only talks to our own routes (`/api/*`); routes proxy to Prometheus / homelab services. Avoids CORS and keeps creds server-side.
 
-Five active routes:
+33 API routes. The six core data proxies:
 
 | Route | Purpose |
 |-------|---------|
-| `app/api/metrics/route.ts` | Prometheus PromQL (~20 queries via `Promise.all`) |
+| `app/api/metrics/route.ts` | Prometheus PromQL (~30 queries via `Promise.all`) |
 | `app/api/services/route.ts` | Homelab service health (Radarr, Sonarr, Bazarr, …) |
 | `app/api/speedtest/route.ts` | SpeedTracker history (read-only, never trigger) |
 | `app/api/weather/route.ts` | Open-Meteo |
-| `app/api/mikrotik/route.ts` | MikroTik proxy (client component falls back to hardcoded values on CORS) |
+| `app/api/mikrotik/route.ts` | MikroTik proxy (Basic auth) |
+| `app/api/activity/route.ts` | Sonarr + Radarr history + Tautulli watches |
+
+Plus ~27 more: auth, alerts, backup, config, diagnostics, docker/*, grafana/*, health,
+history, insights, servers, smart, stream (SSE), test-connection, topology, version.
 
 ### API route conventions
 
-- **In-memory cache, 10s TTL** — every route caches its response in a module-level `Map<string, {data, ts}>`.
+- **In-memory cache via `lib/cache.ts`** — TTLs are per-route and range from 5 s to 30 min, matched to how fast the upstream actually changes. Don't assume 10 s.
 - **`Promise.allSettled`** for fan-out fetches across services so one failure doesn't tank the response.
 - **Try/catch around every external fetch** — return `"—"` placeholders on failure, never crash.
-- **`AbortSignal.timeout(3000)`** on every fetch.
+- **Timeouts come from `lib/http.ts`** (`DEFAULT_TIMEOUT_MS` = 5 s); override per call with `timeoutMs`.
 - **Positional destructuring in `metrics/route.ts`** must stay in sync with the queries array. Add a query → add a destructure slot in the same index.
 
 ### Client polling pattern
@@ -53,11 +73,17 @@ Poll intervals (managed in `Dashboard` component):
 
 | Endpoint | Interval |
 |----------|----------|
-| `/api/metrics` | `settings.refreshInterval`s (default 10s) |
-| `/api/services` | 10s |
-| `/api/speedtest` | 300s |
-| `/api/weather` | 600s |
-| Clock | 1s |
+| `/api/metrics` | `settings.refreshInterval` (default 10 s) |
+| `/api/services` | 30 s |
+| `/api/mikrotik` | 15 s |
+| `/api/activity` | 120 s |
+| `/api/speedtest` | 600 s |
+| `/api/weather` | 600 s |
+| Clock | 1 s (owns its own interval in `Clock.tsx`) |
+
+**SSE is the primary transport now.** `/api/stream` fans out to these six server-side and
+pushes named events; the per-endpoint polling above is the fallback after 3 failed SSE
+reconnects. Hard interval floors live in `app/api/stream/route.ts` — never remove them.
 
 ## MikroTik via server-side route
 
@@ -95,7 +121,7 @@ real_used    = MemTotal - MemAvailable - SReclaimable
 real_percent = real_used / MemTotal * 100
 ```
 
-Thresholds: `>85%` warning, `>95%` critical. Donut chart shows total-with-cache; banner uses `real_percent` only.
+Thresholds: `>93%` warning, `>97%` critical (`app/lib/alerts.ts` is authoritative). Donut chart shows total-with-cache; banner uses `real_percent` only.
 
 ## Filesystem filter
 
@@ -104,15 +130,22 @@ Only mountpoints under `/mnt/Pool/Media/` rendered. Excluded fstypes (filtered a
 ## Speedtest data shapes
 
 ```
-GET http://192.168.88.196:30220/api/v1/results?take=20
+GET {SPEEDTEST_URL}/api/v1/results?sort=-created_at&page[size]=5
 ```
 
-`extractArray()` handles all observed envelopes: `{data:[]}`, `{results:[]}`, `{data:{results:[]}}`, single-item.
-`normalizeMbps()` — `>1_000_000` ⇒ bps→Mbps; `>1_000` ⇒ kbps→Mbps; else passthrough.
+Two verified gotchas, both of which caused real bugs (see `app/api/speedtest/route.ts:44`):
 
-## UI primitives (all live in `app/page.tsx`)
+- **`?take=N` is silently ignored.** Pagination is spatie json-api style — use `page[size]`.
+- **Results have no default sort and come back oldest-first.** Without `sort=-created_at`,
+  `data[0]` is the first test ever recorded. The route also re-sorts defensively.
+- **v1 returns download/upload in BYTES/SEC**, not Mbps. Convert: `bps * 8 / 1e6`.
 
-`GaugeBar`, `Sparkline`, `MiniBarChart`, `DonutChart`, `ThreeSegmentDonut`, `BigValue`, `LabeledBar`, `SubRow`, `StatRow`, `Card`, `StatusBanner`, `SettingsPanel`, `SpeedtestDualChart` (SVG), `SpeedtestBarChart` (Canvas + DPR + ResizeObserver), `GoogleSearch`, `MikrotikTab`, `ServiceIcon`, `BookmarkItem`.
+## UI primitives (in `app/components/primitives.tsx`)
+
+`Card`, `StatusBanner`, `GaugeBar`, `Sparkline`, `RadialGauge`, `ThreeSegmentDonut`, `LabeledBar`, `BigValue`, `StatRow`, `Skeleton`, `AnimatedNumber`, `TrendDelta`, `HeroStat`, `animatedLine()`, `CARD_INFO`.
+
+`SettingsPanel`, `MikrotikTab`, `SearchBar` (was `GoogleSearch`) and `AreaChart` are their own
+files in `app/components/`.
 
 ### Canvas chart pattern (`SpeedtestBarChart`)
 

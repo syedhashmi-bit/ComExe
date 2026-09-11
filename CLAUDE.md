@@ -132,7 +132,9 @@ prevent that, and every one of them matters:
    failures opens the circuit; cooldown backs off 30s → 5min. One probe is let
    through (half-open); success closes, failure re-opens longer. Trips on 5xx
    and network errors but **deliberately not on 4xx** — a bad API key means the
-   upstream is healthy and answering.
+   upstream is healthy and answering. ⚠️ **Reaches only the 8 routes that import
+   `lib/http.ts`** — notably *not* `services/route.ts`, so the *arr stack is
+   currently unprotected by it. See the hard rule below.
 3. **Per-endpoint memoization** in `services/route.ts` — heavy library calls
    (`radarr/movies`, `sonarr/series`) cached 5min, enrichment 3–5min. Only
    genuinely real-time data (queue items, active streams, qBit speeds) is
@@ -417,8 +419,18 @@ iframe cookie problems entirely).
 
 - Never trigger speedtests — SpeedTracker schedules them.
 - No external chart libraries. Canvas or inline SVG only.
-- All outbound HTTP goes through `lib/http.ts`. Never bare `fetch` to an
-  upstream — that bypasses the circuit breaker and the socket cap.
+- All **new** outbound HTTP goes through `lib/http.ts`. Never add a bare `fetch`
+  to an upstream — that bypasses the circuit breaker.
+
+  > **Current reality:** only **8 of 33** routes actually import `lib/http.ts`.
+  > `services/route.ts` (10 bare `fetch` calls), `test-connection` (13),
+  > `mikrotik/devices`, `mikrotik/wol`, `topology` and `weather` do not, so the
+  > breaker does **not** cover the *arr stack — the very services whose crashes
+  > motivated it — and `/api/diagnostics` under-reports because those origins
+  > never register. The socket cap still applies everywhere (`fetch-agent.ts`
+  > installs globally on import). Migrating the stragglers is planned work; treat
+  > the rule above as binding for new code and don't read it as a description of
+  > the current state.
 - Wrap external fetches so failure renders `"—"`. Never crash the page.
 - Resolve credentials via `loadConfig()` inside the handler, never
   `process.env` at module scope.

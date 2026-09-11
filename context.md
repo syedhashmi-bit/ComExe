@@ -10,7 +10,7 @@ Infrastructure inventory. **Env var names only — no plaintext secrets.** Real 
 - `.claude/skills/Hashmi-homelab/SKILL.md` — workflow + style conventions
 
 ## What this is
-Custom homelab monitoring dashboard. Next.js 15 App Router. Renders real-time metrics from TrueNAS via Prometheus + per-service API proxies. Single-page UI in `app/page.tsx`.
+Custom homelab monitoring dashboard. Next.js 16 App Router. Renders real-time metrics from TrueNAS via Prometheus + per-service API proxies. 7 route-segment pages (`/`, `/setup`, `/welcome`, `/login`, `/analytics`, `/forecast`, `/logs`); the dashboard orchestrator is `app/page.tsx` with 26 components in `app/components/` and 21 shared modules in `app/lib/`.
 
 ## Hosts
 

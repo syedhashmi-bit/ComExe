@@ -13,7 +13,7 @@ Aggregates Prometheus metrics, service-health checks, speedtest history, weather
 Configure everything via the built-in `/setup` wizard — fill in your service URLs and API keys in a web form with live "Test connection" buttons, click **Save & apply**, and the dashboard picks up the new config within ~3 seconds. No env-var editing, no compose-file fiddling, no redeploys.
 
 ![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)
-![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?logo=typescript)
+![TypeScript](https://img.shields.io/badge/TypeScript-6-blue?logo=typescript)
 ![Tailwind](https://img.shields.io/badge/Tailwind-3-38bdf8?logo=tailwindcss)
 ![Docker](https://img.shields.io/badge/Docker-ready-2496ed?logo=docker)
 
@@ -79,8 +79,8 @@ and SLA reports.
 
 | Layer | Choice |
 |---|---|
-| Framework | Next.js 16 (App Router, single `"use client"` SPA) |
-| Language | TypeScript 5 |
+| Framework | Next.js 16 (App Router — 7 route-segment pages, 26 components) |
+| Language | TypeScript 6 |
 | Styling | Tailwind CSS 3 + inline `style` for dynamic colours |
 | Charts | Canvas API + inline SVG, **zero chart libraries** |
 | Runtime | Node 22 |
@@ -102,7 +102,7 @@ browser
 
 Those are the core proxies — in total there are **30+ server-side routes** (health, history, alerts, Docker actions, SMART, topology, custom cards, backup, SSE stream, …). The browser never calls internal IPs directly — all credentials stay on the server, all CORS is sidestepped. Routes carry in-memory caches and per-fetch timeouts tuned per upstream.
 
-The frontend is **`app/page.tsx`** (~1 200 lines — the `Dashboard` orchestrator and primitives) plus feature components in `app/components/`.
+The frontend is **`app/page.tsx`** (~1,500 lines — the `Dashboard` orchestrator; state, data wiring and the metric grid) plus 26 feature components in `app/components/`. Reusable primitives live in `app/components/primitives.tsx`, not in `page.tsx`.
 
 ### Polling
 
@@ -166,10 +166,16 @@ If you want to hack on the code rather than just run the published image:
 # PC (PowerShell)
 npm install
 cp .env.local.example .env.local       # edit with your real values
-npm run dev      # localhost:3000
-npm run build    # production build
+npm run dev        # localhost:3000
+npm run build      # production build
 npm run lint
+npm test           # vitest — 77 unit tests
+npm run test:e2e   # playwright smoke suite
+npm run storybook  # primitives sandbox on :6006
 ```
+
+CI gates every image publish on `npm run lint`, `npx tsc --noEmit` and `npm test`, and runs
+`npm run test:e2e` as a separate job — run them locally before pushing.
 
 Push to `main` triggers a fresh GHCR image build via GitHub Actions (`.github/workflows/build.yml`). Pin to a specific version via `:v1.2.3` or `:sha-abc1234` for stability.
 
@@ -193,11 +199,16 @@ Push to `main` triggers a fresh GHCR image build via GitHub Actions (`.github/wo
 
 | Metric | Warning | Critical |
 |---|---|---|
-| CPU usage | > 70 % | > 90 % |
-| Memory usage (real) | > 85 % | > 95 % |
-| Filesystem usage | > 70 % | > 85 % |
+| CPU usage | > 80 % | > 95 % |
+| Memory usage (real) | > 93 % | > 97 % |
+| Filesystem usage | > 85 % | > 95 % |
 | GPU temperature | > 80 °C | > 90 °C |
-| Service down count | ≥ 1 | ≥ 3 |
+| Service unreachable | — | any single service |
+| Service health errors | ≥ 1 warning | ≥ 1 error |
+
+Thresholds live in [`app/lib/alerts.ts`](app/lib/alerts.ts) and the service rules in
+[`app/lib/alert-events.ts`](app/lib/alert-events.ts) — those files are authoritative, not this
+table. There is no "down count" threshold: a single unreachable configured service is critical.
 
 Memory uses `MemTotal − MemAvailable − SReclaimable` so ZFS ARC (which is reclaimable under pressure) doesn't trigger false alarms.
 
@@ -247,15 +258,22 @@ Memory uses `MemTotal − MemAvailable − SReclaimable` so ZFS ARC (which is re
 │   ├── components/                   Feature components (ServicesPanel, BookmarksPanel,
 │   │                                 CommandPalette, NetworkTopology, DependencyMap, …)
 │   ├── hooks/useEventStream.ts       SSE client with polling fallback
-│   ├── lib/
-│   │   └── server-config.ts          Single-source loadConfig() — file > env > defaults
+│   ├── lib/                          21 shared modules — USE THESE, don't re-roll them:
+│   │   ├── server-config.ts          Single-source loadConfig() — file > env > defaults
+│   │   ├── http.ts                   Outbound fetch + timeout + circuit breaker
+│   │   ├── cache.ts                  TTL / keyed-TTL caches
+│   │   ├── json-store.ts             Atomic read/write for everything in data/
+│   │   ├── prometheus.ts             promScalar / promVector
+│   │   ├── validate.ts               Input guards for write routes
+│   │   └── …                         formatters, alerts, alert-events, history,
+│   │                                 circuit-breaker, session-token, docker, types…
 │   ├── analytics/ · forecast/ · logs/  Secondary pages
 │   ├── setup/page.tsx                /setup wizard — tested form + Save & apply button
 │   ├── welcome/page.tsx              First-run 4-step wizard
 │   ├── globals.css                   Keyframes, themes, font imports
 │   ├── icon.svg                      ComExe favicon (Next.js auto-serves)
 │   ├── layout.tsx                    Root layout
-│   └── page.tsx                      Dashboard orchestrator + primitives (~1 200 lines)
+│   └── page.tsx                      Dashboard orchestrator (~1,500 lines)
 ├── proxy.ts                       Route guard (auth) — Next 16 rename of middleware.ts
 ├── .github/workflows/build.yml   CI: quality gate, build image, push to GHCR
 ├── .env.local.example            Env var template (full inventory)

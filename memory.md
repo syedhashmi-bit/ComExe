@@ -7,9 +7,9 @@ Past decisions and bug fixes. **`CLAUDE.md` is authoritative** — when this fil
 ### Server-side API routes (current)
 
 **Decision:** Use Next.js App Router API routes (`app/api/*/route.ts`) as server-side proxies for all external service calls.
-**Why:** Avoids CORS, keeps creds off the client, allows `Promise.all` fan-out and 10s in-memory caching.
+**Why:** Avoids CORS, keeps creds off the client, allows `Promise.all` fan-out and in-memory caching (per-route TTLs, 5 s–30 min — see `app/lib/cache.ts`).
 
-### Five active routes
+### Core data routes (33 total)
 
 - `app/api/metrics/route.ts` — Prometheus, `Promise.all` of ~30 PromQL queries. **Positional destructure must stay in sync with the queries array** — new queries get appended at end.
 - `app/api/services/route.ts` — 10 services via `Promise.allSettled`. `checkReachable()` fallback so failed-auth services still show "up" with `"—"`.
@@ -74,7 +74,9 @@ Old commit SHAs are dead. Force-pushed to `main`. Anyone who pulled before the r
 
 **Why:** Before this, the `/setup` wizard could TEST credentials but had no way to APPLY them — it generated a docker-compose snippet for the user to copy and redeploy. That's friction the project doesn't need on first install. With the file layer, "Save & apply" writes to a mounted volume and the next request to any service route picks up the change within ~3 seconds. No restart, no redeploy.
 
-**Where it lives:** `app/lib/server-config.ts`. The `services/route.ts`, `mikrotik/route.ts`, and `activity/route.ts` handlers were refactored to take resolved `ServiceCreds` as a parameter from a single `loadConfig()` call at the top of `GET()`. `metrics/route.ts` and `weather/route.ts` still read env vars directly — they don't have user-facing config the wizard touches.
+**Where it lives:** `app/lib/server-config.ts`. The `services/route.ts`, `mikrotik/route.ts`, and `activity/route.ts` handlers were refactored to take resolved `ServiceCreds` as a parameter from a single `loadConfig()` call at the top of `GET()`.
+
+**Update (Sep 2026):** `metrics/route.ts` and `weather/route.ts` now call `loadConfig()` too — the note that they "still read env vars directly" is obsolete. One residue remains: `metrics/route.ts:13-18` still reads `FS_PATH_PREFIX`, `POOL_PATH` and `NETWORK_DEVICE_EXCLUDE` from `process.env` at **module scope**, so wizard-written values for those three are invisible to it — and `server-config.ts` resolves `poolPath`/`netExclude` that nothing reads. Same bug class as the speedtest/Prometheus fixes.
 
 **Security:** The POST `/api/config` endpoint has no auth. Anyone with browser access to the dashboard can write config. That's an acceptable LAN homelab assumption; flagged in INSTALL.md and the wizard's security note. Don't expose the dashboard publicly without a reverse proxy doing auth.
 
