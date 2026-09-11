@@ -1,291 +1,512 @@
 # CLAUDE.md
 
-Guidance for Claude Code working in this repo. **`memory.md`** has past decisions and bug fixes; **`skills.md`** has reusable patterns; **`context.md`** has env-var/infra inventory.
+Guidance for Claude Code working in this repo.
 
-> **Branding:** The product name is **ComExe** end-to-end. GitHub repo: `syedhashmi-bit/ComExe`. GHCR image: `ghcr.io/syedhashmi-bit/comexe:latest` (lowercase — GHCR requirement). Container/app name: `comexe`. The old `homelab-dashboard` repo URL still redirects via GitHub, but the GHCR image at the old path is frozen — every new build goes to the new path.
+> **Doc precedence:** This file is the map. `memory.md` records past bug fixes and
+> decisions, `skills.md` has reusable code patterns, `context.md` is the infra
+> inventory (ports, hardware, env names), `ROADMAP.md` is effectively a changelog
+> of shipped tiers plus a short open-work list at the very bottom. When any of
+> them conflicts with the actual source, **the source wins** — verify before you
+> rely on a doc claim. When they conflict with each other, prefer this file.
+
+> **Branding:** The product name is **ComExe** end-to-end. GitHub repo:
+> `syedhashmi-bit/ComExe`. GHCR image: `ghcr.io/syedhashmi-bit/comexe:latest`
+> (lowercase — GHCR requirement). Container/app name: `comexe`. The old
+> `homelab-dashboard` repo URL still redirects, but the GHCR image at the old
+> path is frozen — every new build goes to the new path.
+
+---
+
+## What this is
+
+A single-user, LAN-only homelab dashboard for a TrueNAS Scale host. Next.js 16
+(App Router) + React 19 + Tailwind 3. No database, no ORM, no state library, no
+chart library. Every upstream service is reached through a server-side route so
+credentials never enter the browser bundle.
+
+**Scale:** ~15k lines of TS/TSX under `app/` — 33 API routes, 26 components,
+21 lib modules, 7 pages.
+
+**Deployment posture:** one LAN, one user, never exposed to the internet. That
+decision is why auth is optional, why RBAC/multi-user was dropped, and why the
+Docker-socket routes are env-gated rather than fully sandboxed. If the
+deployment model ever changes, that reasoning has to be revisited first.
+
+---
 
 ## Build & deploy workflow
 
-The production image is built by **GitHub Actions on push to `main`** and published to **`ghcr.io/syedhashmi-bit/comexe:latest`**. TrueNAS deploys via `docker pull`, never builds locally — that historically SIGSEGV'd on this host (see `memory.md` → "Build moved off Docker"). CI builds on Ubuntu runners, which don't hit it.
+The production image is built by **GitHub Actions on push to `main`** and
+published to **`ghcr.io/syedhashmi-bit/comexe:latest`**. TrueNAS deploys via
+`docker pull`, never builds locally — that historically SIGSEGV'd on this host
+(`memory.md` → "Build moved off Docker"). CI builds on Ubuntu runners, which
+don't hit it.
 
 ### Dev (PC)
 
 ```powershell
-# PC (PowerShell) — npm is not on PATH by default
 $env:PATH = "C:\Program Files\nodejs;" + $env:PATH
-npm run dev      # localhost:3000 (falls back to :3001)
-npm run build    # local sanity check; CI does the real build
-npm run lint     # optional
+npm run dev        # localhost:3000
+npm run build      # local sanity check; CI does the real build
+npm run lint
+npm test           # vitest, 77 unit tests
+npm run test:e2e   # playwright
+npm run storybook  # primitives sandbox on :6006
 ```
+
+Append `?demo=1` to any dashboard URL for realistic fake data with zero upstream
+calls — see `app/lib/demo-data.ts`. Useful for UI work without a live homelab.
 
 ### Deploy
 
 ```powershell
-# PC (PowerShell) — just push, CI does the rest
 git add app/<your-changes>
 git commit -m "..."
 git push
 ```
 
 ```bash
-# TrueNAS (bash) — pulls the latest GHCR image and restarts the container
 /root/update-dashboard.sh
 ```
 
-`update-dashboard.sh` (current shape) does `docker pull ghcr.io/...:latest` + `docker stop` + `docker rm` + `docker run` with all required `-e` env vars and a `-v bookmarks.json:/app/bookmarks.json:ro` mount. **No git pull, no docker build** on TrueNAS.
+`scripts/update-dashboard.sh` is the canonical version of that script — copy it
+to `/root/` on TrueNAS. It is **health-gated**: pulls the new image, starts it
+as a candidate container on a spare port, waits for the Docker `HEALTHCHECK` to
+report healthy, and only then promotes it. A failed candidate leaves the running
+container untouched and exits non-zero. The previous image is retagged
+`:rollback` before every pull. With `--network host` the promotion is a brief
+stop/start, not a true zero-downtime cutover — the win is that a broken image
+never replaces a working one.
 
-`.next/` is gitignored — built fresh inside the image during CI (multi-stage Dockerfile).
+**CI gates:** `build.yml` runs lint + `tsc --noEmit` + tests as a `quality` job
+and only publishes the image if all three pass. Multi-arch (amd64 + arm64).
+`paths-ignore: ["**.md"]` means docs-only commits never republish — `/api/version`
+knows about this and won't show a phantom "update available".
+
+`.next/` is gitignored — built fresh inside the image during CI.
+
+---
 
 ## Architecture
 
-Single-page Next.js 15 App Router dashboard. No DB, no auth, no state library. Entire UI is one `"use client"` component in `app/page.tsx` (~2100 lines).
+### Data transport — SSE first, polling as fallback
 
-### API routes (server-side proxies)
+**`/api/stream` (SSE) is the primary transport.** The browser opens one
+EventSource; the server fans out to the six data endpoints on independent
+timers and pushes named events (`metrics`, `services`, `mikrotik`, `activity`,
+`speedtest`, `weather`, plus `connected`/`heartbeat`).
 
-Five routes — all proxy from the browser to internal services to avoid CORS and keep credentials server-side. **All credentials read from `process.env.*` — none hardcoded.**
+`app/hooks/useEventStream.ts` manages it. On error it reconnects with backoff —
+10s, then 20s — and on the **third** error sets `fallback: true`, at which point
+`page.tsx` switches to per-endpoint `setInterval` polling. Both paths must keep
+working; don't optimize one away. (The backoff formula has a 60s cap that is
+unreachable in practice, since the retry counter never gets past 2 before
+fallback trips. Harmless, but don't read the cap as the real ceiling.)
 
-| File | Purpose | Backend |
-|------|---------|---------|
-| `app/api/metrics/route.ts` | Prometheus metrics | `${PROMETHEUS_URL}` (default `${TRUENAS_IP}:30104`) |
-| `app/api/services/route.ts` | Homelab service health (10 services) | each service has its own `*_URL` env var; defaults to `${TRUENAS_IP}:<port>` |
-| `app/api/speedtest/route.ts` | Speedtest history | `${TRUENAS_IP}:30220` |
-| `app/api/weather/route.ts` | Weather (open-meteo) | api.open-meteo.com — coords from `WEATHER_LAT`/`LON` |
-| `app/api/mikrotik/route.ts` | Router stats | `${MIKROTIK_URL}` |
-| `app/api/activity/route.ts` | Recent grabs / streams (Sonarr + Radarr + Tautulli history) | `${SONARR_URL}` / `${RADARR_URL}` / `${TAUTULLI_URL}` |
-| `app/api/config/route.ts` | Runtime client-side config (bookmarks, service URLs, Grafana embed UID) | env vars + optional `bookmarks.json` mount |
-| `app/api/test-connection/route.ts` | Setup wizard helper — POST a service spec, returns `{ ok, message }` | upstream services (live auth check) |
+Interval defaults and **hard floors** live in `app/api/stream/route.ts`:
 
-`metrics/route.ts` runs ~30 PromQL queries via `Promise.all`. **Destructuring order must stay in sync with the queries array** — positional. New queries get appended at the end to preserve order.
+| Endpoint | SSE default | Floor |
+|----------|-------------|-------|
+| metrics | 10s | 5s |
+| services | 30s | 20s |
+| mikrotik | 15s | 10s |
+| activity | 120s | 60s |
+| speedtest | 600s | 120s |
+| weather | 600s | 60s |
 
-`services/route.ts` does `Promise.allSettled` over 10 service functions (radarr, sonarr, bazarr, tautulli, qbittorrent, overseerr, pihole, prowlarr, nginx, uptimekuma). Each function has a single primary fetch that must succeed, plus optional enrichment fetches (`apiFetchOpt` returns `null` instead of throwing) that fail individually without sinking the card. On any primary fetch failure the card falls back to `["—"]` via `checkReachable()`. 10s in-memory cache.
+The floors exist because user overrides used to be able to flood the homelab.
+Never remove them. (Note: the polling-fallback path in `page.tsx` uses slightly
+tighter defaults for speedtest (300s) and activity (60s) than the SSE path —
+harmless drift, but don't widen it.)
 
-`ServiceResult` shape: `name, up, configured, envVar?, url?, lines[], pct?, downCount?, queueItem?, queueItems?, streams?, health?, weekly?`.
-- `configured: false` — required env var(s) missing. The route returns immediately without hitting the upstream. Use the `unconfigured(name, ["VAR_NAME"])` helper at the top of each service function for this. The frontend filters cards with `configured === false` out of the visible grid; they appear in Settings → Connections instead so users see what's missing.
-- `envVar?: string[]` — names of the missing env vars (only set when `configured: false`). Surfaced in the Connections panel's "Missing env vars" block.
-- `url?: string` — resolved upstream URL the service was tried at. Used by the Connections panel for debug.
-- `queueItems?: QueueItem[]` — top-3 active downloads (Radarr/Sonarr/qBit). Each has `title`, `pct`, optional `etaSec`. The legacy single `queueItem` is still emitted for back-compat.
-- `health?: { warning, error }` — populated for Radarr/Sonarr/Prowlarr from their `/health` endpoints. Card renders an orange/red pill in the header when set.
-- `weekly?: { plays?, topShow?, topUser? }` — populated for Tautulli when no streams active, from `cmd=get_home_stats&time_range=7` + `cmd=get_history&after=<7d>`.
+### The load story — read this before touching any fetch
 
-Per-service enrichment:
-- **Radarr**: library size = `sum(movie.sizeOnDisk)`; cutoff-unmet count from `/wanted/cutoff?pageSize=1` `totalRecords`.
-- **Sonarr**: library size = `sum(series.statistics.sizeOnDisk)` (requires the default `includeStatistics=true` on `/series`).
-- **qBit**: aggregate ratio = `sum(uploaded) / sum(downloaded)`. Active speeds always shown. Top-3 downloads sorted by progress descending.
-- **PiHole**: top blocked domain from `/api/stats/top_domains?blocked=true&count=1`; active client count from `len(/api/stats/top_clients?count=99)`.
+The original 3s polling fired ~20 upstream calls/sec and repeatedly **crashed
+the *arr containers and PiHole** on this host. Four independent layers now
+prevent that, and every one of them matters:
 
-`speedtest/route.ts` tries `/api/speedtest/latest` (Mbps) and `/api/v1/results?take=5` (the latter requires `Bearer ${SPEEDTEST_API_KEY}`). **Never trigger tests** — SpeedTracker schedules them. Note: the two endpoints return different units; see `memory.md` → "Speedtest unit mismatch".
+1. **`app/lib/fetch-agent.ts`** — process-wide undici dispatcher capped at
+   **2 concurrent sockets per origin**. Auto-installs on import. Means no
+   regression anywhere can open a connection storm.
+2. **`app/lib/circuit-breaker.ts`** — per-origin breaker. 5 consecutive
+   failures opens the circuit; cooldown backs off 30s → 5min. One probe is let
+   through (half-open); success closes, failure re-opens longer. Trips on 5xx
+   and network errors but **deliberately not on 4xx** — a bad API key means the
+   upstream is healthy and answering.
+3. **Per-endpoint memoization** in `services/route.ts` — heavy library calls
+   (`radarr/movies`, `sonarr/series`) cached 5min, enrichment 3–5min. Only
+   genuinely real-time data (queue items, active streams, qBit speeds) is
+   fetched fresh each cycle. This is the real load-killer: ~150 calls/hour per
+   upstream instead of 1800+.
+4. **Staged batching** — `services/route.ts` splits its 10 upstream fetches into
+   2 batches of 5 with a 250ms gap, avoiding a thundering herd.
 
-`mikrotik/route.ts` uses Basic auth via `MIKROTIK_USERNAME`/`MIKROTIK_PASSWORD`. Has 10s cache.
+Plus a per-service last-known-good cache (60s) that keeps cards populated across
+brief failures, flagged `stale: true`.
 
-`weather/route.ts` → open-meteo, no auth, coords from `loadConfig()` (default Launceston, TAS). Also returns a 3-day forecast via the `daily` endpoint fields (`temperature_2m_max/min`, `weather_code`). Exports `ForecastDay` type. Response shape: `{ temp, condition, code, forecast: ForecastDay[], timestamp }`.
+### Shared lib modules — use these, don't re-roll them
 
-`config/route.ts` is the **runtime config endpoint** the client fetches once on mount. Returns: `truenasIp`, `mikrotikUrl`, `weather` coords, `grafana { baseUrl, panelUrl, dashboardUid, datasourceUid }`, `serviceUrls` map, `bookmarks` array (loaded from `bookmarks.json` in cwd by default; override path via `BOOKMARKS_PATH`), `fsPathPrefix`, and `preferences { searchEngine, timezone }`. **Nothing returned here is a secret** — never include API keys / passwords. Cached server-side for 60s. Lets the same Docker image work for any user without rebuilding.
+Each of these exists because the pattern had been copy-pasted across many routes
+and drifted. Reach for them before writing a new one.
 
-`activity/route.ts` aggregates three history sources via `Promise.all`: Sonarr `/api/v3/history` filtered to `grabbed`/`downloadFolderImported`, Radarr `/api/v3/history` same filter, Tautulli `cmd=get_history`. Each source is independently try/catched — one failing returns `[]` rather than blanking the feed. 60s in-memory cache. Returns `{ events: ActivityEvent[], timestamp }` sorted newest-first, capped at 30 events.
+| Module | Use for |
+|--------|---------|
+| `lib/http.ts` | **All outbound HTTP.** `fetchWithTimeout` (raw Response, throws) / `fetchJson` (parsed or `null`). Installs the undici agent and runs the circuit breaker. Default timeout 5s. |
+| `lib/cache.ts` | `createTTLCache` (single value) / `createKeyedTTLCache` (per-key, size-capped). Replaced ~15 hand-rolled `{data, ts}` objects. |
+| `lib/json-store.ts` | Anything persisted under `data/`. `createJsonStore(file, fallback)` → `read`/`write`/`tryWrite`. Atomic temp-file + rename. Exports `DATA_DIR`/`dataPath`. |
+| `lib/prometheus.ts` | `promScalar(base, query)` / `promVector(base, query)`. Keeps the brittle `data.result[0].value[1]` shape knowledge in one place. |
+| `lib/validate.ts` | `isNonEmptyString` / `isHttpUrl`. Required on every write route that persists client JSON or fetches a client-supplied URL. |
+| `lib/server-config.ts` | `loadConfig()` — see below. |
+| `lib/formatters.ts` | `fmtBytes`, `fmtTemp`, `fmtUptime`, `fmtPct`, `barColor`, `tempColor`, `normalizeSpeedResult`, … Pure, no React. |
+| `lib/alerts.ts` | Pure threshold → `AlertLevel` functions + `computeHealth`. |
+| `lib/types.ts` | All shared types. Types only, no runtime code. |
 
-### `app/setup/page.tsx` — setup wizard
-
-A separate page (route `/setup`) for first-time config. Single-page form with sections for TrueNAS IP, per-service enable/URL/credential fields, MikroTik, Grafana, and **Preferences** (search engine + timezone). Each enabled service has a **Test** button that POSTs to `/api/test-connection`; the wizard renders the result inline (✓ Connected / ✗ message).
-
-The "Save & apply" button POSTs the form to `/api/config` (which writes to `/app/data/config.json` — a writable mounted volume). The next request to any service route picks up the new credentials within ~3 seconds. No redeploy needed.
-
-If the writable volume isn't mounted, the wizard detects this from the GET `/api/config` `writable: false` field and falls back to "Or copy the generated config manually" — three tabs (`docker-compose.yml`, `docker run`, `.env`) with the same content the user would have edited by hand pre-wizard.
-
-Form state persists in `localStorage` (key `comexe:setup-wizard`) so a refresh doesn't clobber inputs. There's a "Clear everything" red button to wipe localStorage on demand.
+`lib/server-config.ts`, `lib/history.ts`, `lib/custom-cards.ts`, `lib/docker.ts`,
+`lib/auth.ts`, `lib/json-store.ts` are **server-only** — importing any of them
+from a `"use client"` module breaks the bundle.
 
 ### Config resolution — `app/lib/server-config.ts`
 
-Single source of truth for "what URL / API key / password should we use for service X right now?". Merges three layers, highest precedence first:
+Single source of truth for "what URL / key / password for service X right now?".
+Three layers, highest precedence first:
 
 1. `data/config.json` — written by the `/setup` wizard via POST `/api/config`
-2. `process.env.*`    — set via `docker run -e`
+2. `process.env.*` — set via `docker run -e`
 3. baked-in defaults
 
-Service routes call `loadConfig()` once per request and use `cfg.services.<name>.{url,apiKey,…}` instead of reading `process.env` directly. POST `/api/config` calls `invalidateConfigCache()` after a successful write so the next read sees fresh values.
+Routes call `await loadConfig()` **once per request** and read
+`cfg.services.<name>.{url,apiKey,username,password,configured}`.
 
-### `app/page.tsx` — the frontend
+> **Recurring bug class — do not repeat it:** reading `process.env.*` at *module
+> scope* in a route makes wizard-written config invisible, because the module is
+> evaluated once at boot and `data/config.json` changes later. This has been
+> fixed at least three separate times (speedtest, Prometheus, smart). Always go
+> through `loadConfig()` inside the handler.
 
-All UI components live in this one file. Categories:
+Cached 5s. POST `/api/config` calls `invalidateConfigCache()` after a write, so
+changes apply in seconds with no redeploy.
 
-**Primitives** (~20 components):
-`GaugeBar`, `Sparkline`, `MiniBarChart`, `DonutChart`, `ThreeSegmentDonut`, `RadialGauge`, `BigValue`, `LabeledBar`, `SubRow`, `StatRow`, `Card`, `StatusBanner`, `SettingsPanel`, `ServiceIcon`, `BookmarkItem`, `AnimatedNumber`, `TrendDelta`, `HeroStat`, `ActivityEventPill`, plus `animatedLine()` and `relativeAgo()` helpers.
+### API routes (33)
 
-**Feature components**:
-`SpeedtestDualChart` (SVG), `SpeedtestBarChart` (Canvas + DPR + ResizeObserver), `SearchBar` (multi-engine, replaces old `GoogleSearch`), `SearchEngineIcon` (per-engine SVG icons), `MikrotikTab`, `GrafanaCard`, `ActivityFeed`.
+All server-side proxies. All credentials resolved via `loadConfig()`.
 
-**Polling intervals** (managed in `Dashboard` via `useEffect` + `setInterval`):
+**Core data (the six SSE endpoints)**
 
-| Endpoint | Interval |
-|----------|----------|
-| `/api/metrics` | `settings.refreshInterval`s (default 10s, options 10/15/30/60) |
-| `/api/services` | 30s |
-| `/api/mikrotik` | 15s |
-| `/api/activity` | 120s |
-| `/api/speedtest` | 600s |
-| `/api/weather` | 600s |
-| Clock | 1s |
+| Route | Purpose |
+|-------|---------|
+| `metrics/` | ~30 PromQL queries via one `Promise.all`. Also appends to `history.jsonl`. |
+| `services/` | 10 service health cards via `Promise.allSettled`. |
+| `mikrotik/` | RouterOS stats (Basic auth). 10s cache. |
+| `activity/` | Sonarr + Radarr history + Tautulli watches, merged. 60s cache. |
+| `speedtest/` | SpeedTracker history. **Never triggers tests.** |
+| `weather/` | open-meteo, no auth, + 3-day forecast. |
 
-**Throttling philosophy:** the original 3s polling generated ~20 upstream API calls/sec which was crashing *arr containers and PiHole/Prowlarr on this user's TrueNAS. Now deliberately slow: services 30s, mikrotik 15s, metrics 10s. Server-side cache TTLs match (services 30s, mikrotik 9s, metrics 9s). Hard floors on user overrides (services ≥20s, metrics ≥5s, mikrotik ≥10s) prevent accidental flooding.
+> **`metrics/route.ts` positional destructuring:** the ~30 queries are
+> destructured positionally out of one `Promise.all`. **Query-array order and
+> destructuring order must stay in sync.** Append new queries at the *end*.
+> Getting this wrong produces silently-wrong data, not a crash.
 
-**Per-endpoint memoization** in the services route is the real load-killer: heavy library calls (`radarr/movies`, `sonarr/series`) cached 5 min; enrichment (cutoff, health, missing, indexerstats, overseerr counts, bazarr counts) cached 3-5 min. Only genuinely real-time data (queue items, active streams, qBit dl speeds) is fetched fresh on every 30s services poll. Net effect: each upstream service sees ~150 calls/hour instead of the original 1800+/hour — a 12× reduction.
+**Config & setup:** `config/` (runtime client config; POST writes
+`data/config.json`), `test-connection/` (wizard's live auth check),
+`bookmarks/`, `backup/` (export/import all of `data/`), `version/`,
+`health/` (local-only liveness for the Docker HEALTHCHECK),
+`diagnostics/` (per-origin circuit state + Prometheus scrape-target health).
 
-Services route stages its 10 upstream fetches in 2 batches of 5 with a 250ms gap to avoid a thundering herd. Per-service last-known-good cache (60s window) keeps cards populated across brief failures, flagged `stale: true`.
+**Auth:** `auth/login/` (rate-limited), `auth/logout/`, `auth/status/`.
 
-### Components — what to know
+**Observability:** `history/` (ranged + downsampled), `insights/` (z-score
+anomalies, linear-regression forecasts, SLA/MTTR), `smart/` (SMART disk health
+from `smartmon_*`), `alerts/` (GET config+recent / POST evaluate+dispatch /
+PATCH config), `stream/` (SSE).
 
-**`Card`** — shared shell for every metric card. New behavior since the polish pass:
-- Top border replaced by a 3px gradient stripe (`color → 60% → 20%`) with a colored glow
-- Background has a radial brand-color tint at the top (~8% opacity)
-- Hover: -3px lift, brand-color drop shadow + inner ring
-- Header has a small **status dot** that pulses green/amber/red based on `alertLevel` prop
+**Infrastructure:** `docker/containers|logs|restart/`, `mikrotik/devices|wol/`,
+`topology/`, `servers/` (multi-server fleet CRUD), `dependencies/` (service
+dependency graph CRUD), `custom-cards/` + `custom-cards/query/`,
+`grafana/render|test/`.
 
-**`AnimatedNumber`** — interpolates between value changes (~600ms ease-out cubic). Used by `animatedLine()` and `HeroStat`. Preserves comma separators and decimal precision from the source string.
+**`services/route.ts` contract** — `ServiceResult` (see `lib/types.ts`):
+- `configured: false` — required env var(s) missing. Returns immediately without
+  hitting the upstream. Use the `unconfigured(name, ["VAR"])` helper. The
+  frontend hides these from the grid and lists them in Settings → Connections.
+- `envVar?: string[]` — the missing var names, surfaced in that panel.
+- `queueItems?` — top-3 active downloads (Radarr/Sonarr/qBit). Legacy single
+  `queueItem` still emitted for back-compat.
+- `health?: { warning, error, messages? }` — from `/health` endpoints
+  (Radarr/Sonarr/Prowlarr). Renders an amber/red pill.
+- `weekly?` — Tautulli stats when no streams are active.
+- `stale?` / `staleSince?` — served from last-known-good cache.
+- `authError?` — upstream returned 401/403 (wrong key), distinct from down.
 
-**`animatedLine(line, keyPrefix)`** — parses any string like `"16,173 queries today"` and returns `React.ReactNode[]` where every numeric literal has been wrapped in `<AnimatedNumber>`. Use this whenever rendering pre-formatted stat strings.
+Each service function has one primary fetch that must succeed plus optional
+enrichment fetches (`apiFetchOpt` returns `null` instead of throwing) that fail
+individually without sinking the card.
 
-**`HeroStat`** — splits `lines[0]` of a service into "leading number + rest" and renders the number large (19px bold) with the rest as small muted suffix. Used by every services-panel card.
+### Frontend
 
-**`TrendDelta`** — small ↑/↓ indicator next to a hero metric. Compares `current` against `history[history.length - lookback]`. Caller sets `goodDirection` ("up" or "down") so coloring matches intent. Has a built-in sanity guard: suppresses output if `|delta|/|current| > 5` (catches unit-mismatch bugs like the speedtest one).
+`app/page.tsx` (~1500 lines) is the **orchestrator**, not the whole UI: state,
+data wiring, the metric grid JSX, and layout. Everything reusable lives in
+`app/components/`. When adding a feature, add a component — do not grow
+`page.tsx` back into a monolith.
 
-**`Sparkline`** — used everywhere. Stronger gradient since the polish pass (`0.5 → 0`), soft glow path under the main line, stroke width 2.2.
+**Pages:** `/` (dashboard), `/setup` (config wizard with per-service Test
+buttons), `/welcome` (4-step first-run flow, auto-redirected to when zero
+services are configured), `/login`, `/analytics` (interactive area charts over
+`/api/history`), `/forecast` (SLA + anomalies + resource forecasting), `/logs`
+(container log viewer with search, level filters, tail mode).
 
-**`SearchBar`** — multi-engine search. Renders `SearchEngineIcon` + input. Config record `SEARCH_ENGINES` maps engine key → `{ label, url, placeholder }`. Opens results in `_blank`. Engine comes from `settings.searchEngine`.
+**Primitives** (`components/primitives.tsx`): `Card`, `StatusBanner`, `GaugeBar`,
+`Sparkline`, `RadialGauge`, `ThreeSegmentDonut`, `LabeledBar`, `BigValue`,
+`StatRow`, `Skeleton`, `AnimatedNumber`, `TrendDelta`, `HeroStat`,
+`animatedLine()`, `CARD_INFO`.
 
-**`MikrotikTab`** — calls `/api/mikrotik` server-side (NOT the router directly anymore — that hit CORS). Falls back to a static-info row if the route returns an error.
+- **`AnimatedNumber`** — interpolates between values (~600ms ease-out cubic),
+  preserving comma separators and decimal precision.
+- **`animatedLine(line, keyPrefix)`** — parses `"16,173 queries today"` and wraps
+  every numeric literal in `<AnimatedNumber>`. Use this for any pre-formatted
+  stat string.
+- **`HeroStat`** — splits `lines[0]` into big leading number + muted suffix.
+- **`TrendDelta`** — ↑/↓ vs history. Caller sets `goodDirection` so coloring
+  matches intent. Has a sanity guard: suppresses output when
+  `|delta|/|current| > 5`, which catches unit-mismatch bugs (see `memory.md` →
+  "Speedtest unit mismatch").
+- **`Card`** — gradient brand stripe, radial tint, hover lift, pulsing status dot
+  driven by `alertLevel`, optional ⓘ info popover from `CARD_INFO`.
 
-**Settings persistence** — `Settings` state (refresh interval, temp/data units, visible cards, search engine, timezone) is stored in `localStorage` key `comexe:settings`. On mount, the dashboard reads localStorage; if empty, it seeds from the server-side `preferences` returned by `/api/config`. Changes in the Settings panel write to localStorage immediately. The setup wizard writes preferences server-side to `data/config.json`, which seeds new browsers that haven't customized yet.
+**Feature components:** `ServicesPanel`, `ServiceDetailSheet`, `BookmarksPanel`,
+`SettingsPanel`, `SearchBar`, `MikrotikTab`, `GrafanaCard`, `ActivityFeed`,
+`AreaChart`, `CommandPalette`, `KeyboardShortcuts`, `NotificationCenter`,
+`HeaderSparklines`, `UptimeTimeline`, `DiskHealthPanel`, `NetworkTopology`,
+`ServerFleetPanel`, `DependencyMap`, `CustomCards` + `CustomCardEditor`,
+`ContainerLogsSheet`, `DraggableCard`, `ErrorBoundary`, `Clock`, `icons`.
 
-**Weather forecast popup** — hovering the weather pill in the header reveals a 3-day forecast popup (CSS `peer` trick, no JS state). Each row shows day name, emoji, condition text, high/low temps. Temps respect the `tempUnit` setting (°C/°F).
+**Services panel** renders two categories (`SVC_CATEGORIES` in
+`ServicesPanel.tsx`): *media stack* (radarr, sonarr, bazarr, tautulli,
+qbittorrent, overseerr, prowlarr) and *infrastructure* (pihole, nginx,
+uptimekuma). Cards sort by health priority — down → error → warning → active →
+idle — preserving route order within a tier. Click opens the service UI in a new
+tab; there's also a detail sheet, a restart button, and a logs sheet.
 
-**`ActivityFeed`** — horizontal scrolling ticker just above the services panel. Pulls from `/api/activity`. Hover pauses the scroll. Empty state renders nothing. Uses the `tickerScroll` keyframe in `globals.css` (translates `0` → `-50%` over a duration scaled to event count). Events are duplicated in the rendered list so the loop is seamless. Toggle via `CARD_KEYS["activity"]` in Settings.
+**Client state** lives in `localStorage`, all under a `comexe:` prefix:
 
-### Services panel — services rendering
+| Key | Holds |
+|-----|-------|
+| `comexe:settings` | refresh interval + overrides, temp/data units, visible cards, search engine, timezone, theme |
+| `comexe:card-order` | drag-to-reorder metric grid order |
+| `comexe:layouts` | named layout presets (visibility + order) |
+| `comexe:setup-wizard` | wizard form state, so a refresh doesn't clobber input |
+| `comexe:welcome-done` | first-run flag |
+| `comexe:update-dismissed` | per-release banner dismissal |
 
-Service cards render in two **categories** (`SVC_CATEGORIES` constant near top of page.tsx):
+On mount the dashboard reads `comexe:settings`; if empty it seeds from the
+server-side `preferences` in `/api/config`.
 
-- **Media stack**: radarr, sonarr, bazarr, tautulli, qbittorrent, overseerr, prowlarr (7 cards)
-- **Infrastructure**: pihole, nginx, uptimekuma (3 cards)
+### Theming
 
-Each category has a header with an accent dot, divider line, and live up-count (turns green at 100%). Each card has:
-- Brand-color gradient stripe at top (3px, with glow)
-- Subtle radial brand-color background
-- Status dot, optional health pill (`1 ERR` red / `1 WARN` amber), label, hero stat (lines[0] with big number), other lines
-- Progress bars: top-3 queue items for Radarr/Sonarr/qBit (each with title, ETA pill, thin bar), live stream progress bars for Tautulli
-- Click anywhere → opens that service's web UI in a new tab (URLs from `SVC_URLS` constant)
+Five themes — **Midnight** (cyan, default), **Forge** (amber), **Forest**
+(emerald), **Plum** (magenta), **Paper** (light) — defined in
+`lib/constants.ts` and implemented as `.theme-*` classes in `globals.css`.
 
-Cards within a category are **sorted by health priority** before render: down → error → warning → active (has queue/stream) → idle. Same-tier services preserve route-array order.
+Everything is driven by CSS custom properties on `:root`: `--bg`, `--card`,
+`--text*`, `--brand`, `--ok`/`--warn`/`--critical`, and per-card accents
+(`--accent-cpu`, `--accent-memory`, …). A ~250-color hardcode refactor produced
+this; **don't reintroduce literal hex colors** where a variable exists.
 
-### Page layout
+`layout.tsx` runs an inline pre-hydration script that reads the saved theme from
+localStorage (falling back to `prefers-color-scheme`) and sets the class before
+React mounts, preventing a flash.
 
-1. Fixed elements: 3px loading bar at very top + 2px cyan healthy line
-2. Sticky frosted header (z-30): logo, uptime pill, weather pill, clock, status dot, TrueNAS/settings buttons
-3. Main content: SearchBar → MikrotikTab → StatusBanner → 3-col metric grid → Speedtest (full width) → Services → Bookmarks → Footer
+### Auth (optional, off by default)
 
-**Grid** (3-column on xl):
-- Row 1: CPU · Memory · Filesystems
-- Row 2: Network · GPU · Speedtest
-- Row 3: System · Grafana (each col-span-1, leaves col-span-1 empty)
+- `DASHBOARD_PASSWORD` — native single-password auth, cookie session (7d),
+  rate-limited login (10/min/IP), `/login` page.
+- `AUTH_PROXY_HEADER` — trust an upstream proxy (Authelia, Authentik, Cloudflare
+  Access). No login page.
 
-**Filesystems card** — overhauled. Hero (top): pool used / total + colored %. Below: per-mount rows sorted by usage % (fullest at top), each with a thin 4px bar and unified amber folder icon (no more rainbow icons).
+**`proxy.ts`** (repo root) is the enforcement point — renamed from
+`middleware.ts` for Next 16, which deprecated the `middleware` convention in
+favour of `proxy` on the nodejs runtime.
 
-**GPU card** — tertiary tier (clocks, fan, ENC/DEC) consolidated into a single divider-prefixed row of muted pills. ENC/DEC only render when at least one is nonzero.
+**`lib/session-token.ts`** issues HMAC-signed stateless tokens
+(`<nonce>.<issuedAt>.<hmac>`), with the signing key derived from
+`DASHBOARD_PASSWORD` — so changing the password invalidates every session for
+free. It is deliberately dependency-free (`node:crypto` only) so **both**
+`proxy.ts` and the routes can import it; `lib/auth.ts` can't be imported by the
+proxy because it pulls in `next/headers`. That split is exactly why the proxy
+once checked only that the cookie *existed* — a full auth bypass. Keep signature
+verification in the proxy.
+
+### Persistence — `data/`
+
+| File | Written by |
+|------|------------|
+| `config.json` | POST `/api/config` (the setup wizard) — **contains plaintext credentials** |
+| `bookmarks.json` | POST `/api/bookmarks` |
+| `custom-cards.json` | POST `/api/custom-cards` |
+| `alerts.json` | `/api/alerts` |
+| `servers.json` | `/api/servers` |
+| `dependencies.json` | `/api/dependencies` |
+| `history.jsonl` | `lib/history.ts`, appended from the metrics route |
+
+`data/` is **gitignored and dockerignored** — never commit it, never bake it
+into an image. The directory is created on demand by the Dockerfile
+(`mkdir -p /app/data`, owned by uid 1001) and by `json-store.ts`.
+
+In production it must be a **writable mounted volume** at `/app/data`. `/api/config`
+reports `writable: false` when it isn't, and the wizard degrades to "copy this
+config manually" with `docker-compose` / `docker run` / `.env` tabs.
+
+`history.jsonl` is a JSONL ring buffer, rotated at 30 days **or** 50MB
+(`HISTORY_RETENTION_DAYS` / `HISTORY_MAX_SIZE_MB`), triggered every 500 writes
+from `appendHistory`. Reads walk backwards from the newest line and stop at the
+range cutoff rather than parsing the whole file.
+
+> **Caution:** GET `/api/backup` bundles `config.json`, so a downloaded backup
+> file contains every API key and password in plaintext. Treat it accordingly.
+
+### Docker control (opt-in)
+
+`/api/docker/*` is disabled unless `COMEXE_DOCKER_ENABLED=1`, because the socket
+is root-equivalent. Container names are checked against a built-in allowlist
+(the known service names) plus `COMEXE_DOCKER_ALLOW`. Keep both the env gate and
+the allowlist on any new Docker-touching route.
+
+---
 
 ## Env vars
 
-Server-side only. **Never** prefix with `NEXT_PUBLIC_` (would expose to client bundle). All listed in `.env.local.example`. Production values live in `/root/update-dashboard.sh` on TrueNAS, passed as `-e VAR=value` to `docker run`. **Never** hardcoded in source, never in the image.
+Server-side only. **Never** prefix with `NEXT_PUBLIC_` — that bakes the value
+into the client bundle and forces a rebuild to change it. All listed in
+`.env.local.example`. Production values live in `/root/update-dashboard.sh` on
+TrueNAS as `-e` flags. Never hardcoded in source, never in the image.
 
-### Required for any meaningful display
-- `TRUENAS_IP` (default `192.168.88.196`)
-- API keys for whichever services you actually use (see below)
+**Required for anything meaningful:** `TRUENAS_IP` (default `192.168.88.196`),
+plus API keys for whichever services you use.
 
-### Service credentials
-- `RADARR_API_KEY`, `SONARR_API_KEY`, `BAZARR_API_KEY`, `TAUTULLI_API_KEY`, `PROWLARR_API_KEY`, `OVERSEERR_API_KEY`
-- `QBIT_API_KEY` (qBit 5.1+, format `qbt_...`) **OR** `QBIT_USERNAME` + `QBIT_PASSWORD`
-- `PIHOLE_PASSWORD`
-- `NGINX_USERNAME`, `NGINX_PASSWORD`
-- `UPTIME_KUMA_API_KEY`
-- `MIKROTIK_USERNAME`, `MIKROTIK_PASSWORD`
-- `SPEEDTEST_API_KEY`
+**Service credentials:** `RADARR_API_KEY`, `SONARR_API_KEY`, `BAZARR_API_KEY`,
+`TAUTULLI_API_KEY`, `PROWLARR_API_KEY`, `OVERSEERR_API_KEY`, `PIHOLE_PASSWORD`,
+`NGINX_USERNAME`/`NGINX_PASSWORD`, `UPTIME_KUMA_API_KEY`, `SPEEDTEST_API_KEY`,
+`MIKROTIK_USERNAME`/`MIKROTIK_PASSWORD`, and `QBIT_API_KEY` (qBit 5.1+,
+`qbt_...`) **or** `QBIT_USERNAME` + `QBIT_PASSWORD`.
 
-### Per-service URL overrides (optional — default to `${TRUENAS_IP}:<port>`)
-`RADARR_URL`, `SONARR_URL`, `BAZARR_URL`, `TAUTULLI_URL`, `QBIT_URL`, `OVERSEERR_URL`, `PIHOLE_URL`, `PROWLARR_URL`, `NGINX_URL`, `UPTIME_KUMA_URL`, `PROMETHEUS_URL`, `MIKROTIK_URL`
+**URL overrides** (default to `${TRUENAS_IP}:<port>`): `RADARR_URL`, `SONARR_URL`,
+`BAZARR_URL`, `TAUTULLI_URL`, `QBIT_URL`, `OVERSEERR_URL`, `PIHOLE_URL`,
+`PROWLARR_URL`, `NGINX_URL`, `UPTIME_KUMA_URL`, `SPEEDTEST_URL`,
+`PROMETHEUS_URL`, `MIKROTIK_URL`.
 
-### Infrastructure config (defaults match the original homelab)
-- `FS_PATH_PREFIX` (default `/mnt/Pool/Media/`)
-- `POOL_PATH` (default `/mnt/Pool`)
-- `NETWORK_DEVICE_EXCLUDE` (default `lo|veth.*|docker.*|br.*`)
-- `WEATHER_LAT`, `WEATHER_LON` (default Launceston, TAS)
+**Infra:** `FS_PATH_PREFIX` (`/mnt/Pool/Media/`), `POOL_PATH` (`/mnt/Pool`),
+`NETWORK_DEVICE_EXCLUDE` (`lo|veth.*|docker.*|br.*`), `WEATHER_LAT`/`WEATHER_LON`
+(Launceston, TAS).
 
-### Grafana embed (optional — without these the card shows a "not configured" hint)
-- `GRAFANA_BASE_URL` (default `${TRUENAS_IP}:30037`)
-- `GRAFANA_DASHBOARD_UID`, `GRAFANA_DATASOURCE_UID` (no default — if either missing, embed is null)
-- `GRAFANA_PANEL_ID` (default `panel-77`)
-- `GRAFANA_DASHBOARD_SLUG` (default `node-exporter-full`)
+**Grafana:** `GRAFANA_BASE_URL`, `GRAFANA_DASHBOARD_UID`, `GRAFANA_DATASOURCE_UID`
+(no default — embed is null if either is missing), `GRAFANA_PANEL_ID`
+(`panel-77`), `GRAFANA_DASHBOARD_SLUG` (`node-exporter-full`),
+`GRAFANA_API_TOKEN` (enables the server-side PNG render path, which sidesteps
+iframe cookie problems entirely).
 
-### Preferences (optional — sensible defaults)
-- `SEARCH_ENGINE` (default `google` — options: `google`, `bing`, `duckduckgo`, `kagi`)
-- `TIMEZONE` (default `` empty = browser local — any IANA timezone string like `Australia/Hobart`)
+**Preferences:** `SEARCH_ENGINE` (`google`|`bing`|`duckduckgo`|`kagi`),
+`TIMEZONE` (IANA, `""` = browser local), `THEME`.
 
-### Authentication (optional — off by default, fine for LAN-only)
-- `DASHBOARD_PASSWORD` — set to enable native basic auth. Single shared password, cookie session (7d), rate-limited login endpoint. Shows `/login` page.
-- `AUTH_PROXY_HEADER` — set to e.g. `X-Authenticated-User` to trust an upstream auth proxy (Authelia, Authentik, Cloudflare Access). No login page needed.
+**Auth / paths / misc:** `DASHBOARD_PASSWORD`, `AUTH_PROXY_HEADER`,
+`BOOKMARKS_PATH`, `CONFIG_PATH`, `DOCKER_SOCK`, `COMEXE_DOCKER_ENABLED`,
+`COMEXE_DOCKER_ALLOW`, `HISTORY_RETENTION_DAYS`, `HISTORY_MAX_SIZE_MB`,
+`COMEXE_GIT_SHA` (set by CI as a build-arg).
 
-### Bookmarks file path
-- `BOOKMARKS_PATH` (default `<cwd>/bookmarks.json` ⇒ `/app/bookmarks.json` in the image)
+---
 
 ## Hard rules
 
-- Never trigger speedtests — SpeedTracker handles scheduling.
+- Never trigger speedtests — SpeedTracker schedules them.
 - No external chart libraries. Canvas or inline SVG only.
-- Wrap external fetches in try/catch. Render `"—"` on failure, never crash.
+- All outbound HTTP goes through `lib/http.ts`. Never bare `fetch` to an
+  upstream — that bypasses the circuit breaker and the socket cap.
+- Wrap external fetches so failure renders `"—"`. Never crash the page.
+- Resolve credentials via `loadConfig()` inside the handler, never
+  `process.env` at module scope.
+- Validate every write route's input with `lib/validate.ts` — several of them
+  persist client JSON and one fetches client-supplied URLs server-side (SSRF).
+- Never commit `data/` or `.env.local`.
+- New hardcoded infra values (IPs, ports, paths, lat/lon) → env-var-driven from
+  the start. This image is distributable; per-deploy values must not bake in.
+- New client-side runtime config → expose via `/api/config`, never `NEXT_PUBLIC_*`.
 - All external links open in `_blank`.
 - `font-variant-numeric: tabular-nums` on all numeric displays.
-- Mobile responsiveness is **not** required.
-- Never commit `.env.local` (gitignored).
-- New hardcoded infra values (IPs, ports, paths, lat/lon) → make them env-var-driven from the start. The dashboard is now distributable; per-deploy values must not bake into the image.
-- New client-side runtime config → expose it through `/api/config`, never via `NEXT_PUBLIC_*` (those bake into the bundle and force a rebuild for any change).
+
+---
 
 ## Styling conventions
 
-- Background: `#0a0c12` + radial gradient overlay
-- Cards: `rgba(255,255,255,0.04)` bg + radial brand-color tint, `border-radius: 14px`, padding 18px
-- Card hover: `translateY(-3px)`, brand-color drop shadow, brand-color inner ring
-- Card brand stripe: 3px gradient bar (full → 60% → 20% with glow)
-- Card status dot: 1.5×1.5 px, pulses on `pulseDot` keyframe (defined in `globals.css`)
-- Severity colors: ok `#10b981`, mid `#06b6d4`, warn `#f59e0b`, critical `#ef4444`
-- Card accent assignments — **don't change without reason**:
-  - CPU `#06b6d4`, Memory `#10b981`, Filesystems `#f59e0b`, Network `#3b82f6`
-  - GPU `#ef4444` (dynamic via `gpuUtilColor`), Speedtest `#8b5cf6`
-  - System `#d946ef`, Grafana `#f97316`
-- Fonts: Inter (UI), JetBrains Mono (numbers — use `font-mono` or inline `fontFamily: "monospace"`)
-- Inline `style` props for colors/sizes; Tailwind for layout/spacing/flex. No CSS modules, no styled-components.
+- Use CSS variables (`var(--brand)`, `var(--accent-cpu)`, …), not literal hex,
+  wherever one exists — otherwise the four non-default themes break.
+- Cards: `var(--card)` bg + radial brand tint, `border-radius: 14px`, padding 18px.
+- Card hover: `translateY(-3px)`, brand drop shadow, brand inner ring.
+- Card brand stripe: 3px gradient bar (full → 60% → 20%, with glow).
+- Severity: ok `--ok` `#10b981`, mid `#06b6d4`, warn `--warn` `#f59e0b`,
+  critical `--critical` `#ef4444`.
+- Card accent assignments — **don't change without reason**: CPU `--accent-cpu`,
+  Memory `--accent-memory`, Filesystems `--accent-fs`, Network `--accent-network`,
+  GPU `--accent-gpu` (dynamic via `gpuUtilColor`), Speedtest `--accent-speedtest`,
+  System `--accent-system`, Grafana `--accent-grafana`.
+- Fonts: Inter (UI), JetBrains Mono (numbers — `font-mono` or `var(--font-mono)`).
+- Inline `style` for colors/sizes; Tailwind for layout/spacing/flex. No CSS
+  modules, no styled-components.
+- Mobile responsiveness **is** implemented (`sm:`/`lg:`/`xl:` breakpoints) —
+  keep new layout work responsive rather than desktop-only.
+
+---
+
+## Testing
+
+- **Unit** — vitest, `tests/unit/`. 77 tests over 10 files, all covering
+  `app/lib/*` (auth, cache, circuit-breaker, history, json-store, http,
+  prometheus, server-config, validate).
+- **E2E** — Playwright, `tests/e2e/smoke.spec.ts`.
+- **Storybook** — `stories/Primitives.stories.tsx`.
+
+> **Known gap:** there are **zero route tests** across 33 routes, including the
+> write/SSRF-adjacent ones (`/api/servers`, `/api/dependencies`,
+> `/api/custom-cards`) and the Docker-socket routes. The guards in `validate.ts`
+> are applied but nothing verifies they stay applied. New API routes should ship
+> with tests.
+
+---
 
 ## Domain knowledge
 
-**Prometheus**: single instance at `${TRUENAS_IP}:30104`. GPU metrics use `nvidia_smi_*` names. Network device is `enp4s0`.
+**Prometheus** — single instance at `${TRUENAS_IP}:30104`. GPU metrics use
+`nvidia_smi_*`. Network device is `enp4s0`. SMART metrics come from
+`smartmon_*` and degrade gracefully when the exporter isn't installed.
 
-**Memory accounting**: TrueNAS ZFS ARC inflates raw `MemAvailable`. Use `MemTotal - MemAvailable - SReclaimable` as real-used. Thresholds: warn >85%, critical >95%.
+**Memory accounting** — TrueNAS ZFS ARC inflates raw `MemAvailable`. Use
+`MemTotal - MemAvailable - SReclaimable` as real-used. Warn >93%, critical >97%
+(see `lib/alerts.ts` for the authoritative thresholds).
 
-**Filesystem filter**: only mounts under `/mnt/Pool/Media/` displayed. Exclude `tmpfs|devtmpfs|overlay|squashfs|ramfs` at PromQL via `FS_EXCLUDE`.
+**Filesystem filter** — only mounts under `FS_PATH_PREFIX` are shown. Exclude
+`tmpfs|devtmpfs|overlay|squashfs|ramfs` at the PromQL level.
 
-**GPU temp thresholds**: warn >80°C, critical >90°C.
+**GPU temp** — warn >80°C, critical >90°C. **CPU** — warn >80%, critical >95%.
+**Disk** — warn >85%, critical >95%.
 
-**Service ports** — see `context.md` for the full table.
+**Service ports** — see `SVC_PORTS` in `lib/constants.ts` and `context.md`.
 
-**Known CORS surfaces** — services that must be called via the server-side route, never directly from the browser:
-- PiHole `:20720`, Bazarr `:30046`, qBittorrent `:30024` — server-side proxy in `services/route.ts`
-- MikroTik `192.168.88.1` — server-side proxy in `mikrotik/route.ts`
+**Known CORS surfaces** — must be called server-side, never from the browser:
+PiHole `:20720`, Bazarr `:30046`, qBittorrent `:30024` (all via
+`services/route.ts`), MikroTik `192.168.88.1` (via `mikrotik/route.ts`).
+
+---
 
 ## MCP tools available
 
-- **Context7** — fetch latest library docs. Use before writing code that touches Next.js, React, Tailwind, Node, etc.
-- **Playwright** — browser automation, useful for verifying UI changes after a build.
-
-Use Context7 by default over WebFetch/WebSearch for library docs.
+- **Context7** — fetch latest library docs. Use before writing code touching
+  Next.js, React, Tailwind, or Node. Prefer over WebFetch/WebSearch for docs.
+- **Playwright** — browser automation for verifying UI changes.
 
 ## Hashmi-homelab skill
 
-`.claude/skills/Hashmi-homelab/SKILL.md` — workflow + style conventions (PC=PowerShell, TrueNAS=bash, concise direct prose, secrets via `-e` flags only). Apply on any task touching this repo, Docker on TrueNAS, MikroTik, or related services.
+`.claude/skills/Hashmi-homelab/SKILL.md` — workflow + style conventions
+(PC = PowerShell, TrueNAS = bash, concise direct prose, secrets via `-e` flags
+only). Apply on any task touching this repo, Docker on TrueNAS, MikroTik, or
+related services. Note that `.claude/` is gitignored, so this file does not
+survive a fresh clone.
 
 ## Supplementary files
 
@@ -293,7 +514,7 @@ Use Context7 by default over WebFetch/WebSearch for library docs.
 |------|---------|
 | `context.md` | Infra inventory — env var names, ports, hardware specs |
 | `memory.md` | Past bug fixes and architectural decisions |
-| `skills.md` | Reusable code patterns (PromQL queries, polling, primitives) |
+| `skills.md` | Reusable code patterns (PromQL, polling, primitives) |
+| `ROADMAP.md` | Shipped-tier changelog; open work is in Parts A/B/C at the end |
+| `INSTALL.md` | End-user install guide |
 | `.env.local.example` | Template for `.env.local` (gitignored) |
-
-When `CLAUDE.md` conflicts with `skills.md` or `memory.md`, **CLAUDE.md wins** — those two are historical and may lag.
