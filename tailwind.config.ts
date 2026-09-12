@@ -19,33 +19,15 @@ const config: Config = {
         sans: ["var(--font-inter)", "Inter", "system-ui", "sans-serif"],
         mono: ["var(--font-mono)", "JetBrains Mono", "Fira Code", "ui-monospace", "monospace"],
       },
-      colors: {
-        surface: {
-          DEFAULT: "#0a0c12",
-          card: "rgba(255,255,255,0.04)",
-          border: "rgba(255,255,255,0.08)",
-        },
-        accent: {
-          cyan:   "#06b6d4",
-          green:  "#10b981",
-          amber:  "#f59e0b",
-          blue:   "#3b82f6",
-          red:    "#ef4444",
-          violet: "#8b5cf6",
-        },
-      },
-      animation: {
-        "pulse-dot": "pulseDot 2s ease-in-out infinite",
-      },
-      keyframes: {
-        fadeSlideIn: {
-          from: { opacity: "0", transform: "translateY(10px)" },
-          to:   { opacity: "1", transform: "translateY(0)" },
-        },
-      },
-      borderRadius: {
-        "2xl": "14px",
-      },
+      // Deliberately no `colors` here. Theming is done entirely with CSS custom
+      // properties in globals.css (--bg, --card, --brand, --accent-*, …) so the
+      // five themes can swap at runtime. This file used to carry a second,
+      // static, dark-only copy of that palette — `surface.card`,
+      // `accent.cyan` and friends — which no component ever used and which
+      // would silently break the four non-default themes if anyone did. The
+      // animation/keyframes entries were likewise duplicates of the @keyframes
+      // already in globals.css (which is what the inline `animation:` styles
+      // actually resolve against), and `rounded-2xl` was never used anywhere.
     },
   },
   plugins: [],

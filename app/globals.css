@@ -430,7 +430,6 @@ body {
 /* ── Mobile responsive ─────────────────────────────────────────────────── */
 
 @media (max-width: 640px) {
-  .mobile-hidden { display: none !important; }
 
   .header-inner {
     padding-left: 12px !important;
