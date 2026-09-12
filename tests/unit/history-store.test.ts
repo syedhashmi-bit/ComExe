@@ -16,6 +16,21 @@ vi.mock("node:fs", () => ({
       if (!files.has(p)) throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
       return { size: Buffer.byteLength(files.get(p)!, "utf8") };
     }),
+    // readHistory reads backwards in chunks via a file handle rather than
+    // slurping the whole file, so the mock has to model positional reads.
+    open: vi.fn(async (p: string) => {
+      if (!files.has(p)) throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
+      const buf = Buffer.from(files.get(p)!, "utf8");
+      return {
+        stat:  async () => ({ size: buf.length }),
+        read:  async (target: Buffer, offset: number, length: number, position: number) => {
+          const slice = buf.subarray(position, position + length);
+          slice.copy(target, offset);
+          return { bytesRead: slice.length, buffer: target };
+        },
+        close: async () => undefined,
+      };
+    }),
   },
 }));
 
@@ -111,5 +126,38 @@ describe("history store", () => {
 
     const cpus = files.get(historyPath())!.trim().split("\n").map(l => JSON.parse(l).cpu);
     expect(cpus).not.toContain(99); // the stale point was rotated away
+  });
+
+  // readHistory reads in 64 KB chunks from the end. Anything that only ever
+  // tests a small file never exercises the chunk-boundary handling, which is
+  // where a backwards reader gets split lines wrong.
+  it("reassembles lines split across chunk boundaries", async () => {
+    const { appendHistory, readHistory } = await import("@/app/lib/history");
+    const now = Date.now();
+
+    // ~93 bytes/point, so 2000 points is ~186 KB — three chunks.
+    const COUNT = 2000;
+    for (let i = 0; i < COUNT; i++) {
+      await appendHistory({ ts: now - (COUNT - i) * 1000, cpu: i, mem: null, net_rx: null, net_tx: null, gpu: null, disk_pct: null });
+    }
+    const raw = files.get(historyPath())!;
+    expect(Buffer.byteLength(raw, "utf8")).toBeGreaterThan(64 * 1024);
+
+    // Every point is inside the range, so all of them must come back intact
+    // and in oldest -> newest order. A mishandled boundary shows up as a
+    // dropped or corrupt line, i.e. a gap in this sequence.
+    const all = await readHistory({ rangeMs: COUNT * 1000 + 60_000 });
+    expect(all).toHaveLength(COUNT);
+    expect(all.map(p => p.cpu)).toEqual(Array.from({ length: COUNT }, (_, i) => i));
+  });
+
+  it("stops at the limit without reading the whole file", async () => {
+    const { appendHistory, readHistory } = await import("@/app/lib/history");
+    const now = Date.now();
+    for (let i = 0; i < 2000; i++) {
+      await appendHistory({ ts: now - (2000 - i) * 1000, cpu: i, mem: null, net_rx: null, net_tx: null, gpu: null, disk_pct: null });
+    }
+    const tail = await readHistory({ rangeMs: 3_000_000, limit: 5 });
+    expect(tail.map(p => p.cpu)).toEqual([1995, 1996, 1997, 1998, 1999]);
   });
 });

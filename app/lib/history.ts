@@ -14,6 +14,9 @@ import path from "node:path";
 const DATA_DIR      = path.join(process.cwd(), "data");
 const HISTORY_PATH  = path.join(DATA_DIR, "history.jsonl");
 const MAX_SIZE_MB   = Number(process.env.HISTORY_MAX_SIZE_MB) || 50;
+// Backwards-read chunk size for readHistory. 64 KB holds ~700 points at the
+// ~93 bytes/point this file averages, so a 1h/6h range is usually one read.
+const READ_CHUNK_BYTES = 64 * 1024;
 
 // 30 days, because /forecast offers a "30 days" range and /api/insights
 // accepts range=30d — a 7-day retention silently capped that view at a week.
@@ -62,36 +65,80 @@ export async function readHistory(opts?: {
   rangeMs?: number;   // only points within this many ms from now
   limit?: number;     // max points to return (tail)
 }): Promise<HistoryPoint[]> {
-  let raw: string;
+  const cutoff = opts?.rangeMs ? Date.now() - opts.rangeMs : 0;
+  const limit  = opts?.limit;
+  const collected: HistoryPoint[] = [];
+
+  // Read BACKWARDS from the end of the file in chunks.
+  //
+  // This used to be readFile() + split("\n"), then a backwards walk over the
+  // resulting array. That walk saved the JSON *parsing* but not the reading:
+  // every /api/history and /api/insights request still allocated the whole file
+  // as a string plus an array of every line in it, before looking at a single
+  // point. data/history.jsonl is ~3 MB today and rotation only caps it at 50 MB,
+  // so asking for the last hour cost tens of megabytes of allocation.
+  //
+  // Points are appended in timestamp order, so reading from the end means we
+  // touch only the bytes we actually need and stop at the cutoff.
+  let fh: Awaited<ReturnType<typeof fs.open>>;
   try {
-    raw = await fs.readFile(HISTORY_PATH, "utf8");
+    fh = await fs.open(HISTORY_PATH, "r");
   } catch {
     return [];
   }
 
-  const cutoff = opts?.rangeMs ? Date.now() - opts.rangeMs : 0;
-  const lines = raw.trim().split("\n");
+  try {
+    const { size } = await fh.stat();
+    let pos = size;
+    // Bytes belonging to a line whose start lies in an earlier (not yet read)
+    // chunk. Kept as a Buffer, not a string: decoding a chunk that begins
+    // mid-character would corrupt multi-byte UTF-8 at the boundary.
+    let pending = Buffer.alloc(0);
 
-  // Walk backwards from the newest line. Points are appended in timestamp
-  // order, so the first line older than the cutoff means everything before it
-  // is older too — we can stop there instead of parsing the whole file. Asking
-  // for one hour out of seven days used to cost a full-file parse on every
-  // /api/history and /api/insights request.
-  const limit = opts?.limit;
-  const collected: HistoryPoint[] = [];
+    while (pos > 0) {
+      const len = Math.min(READ_CHUNK_BYTES, pos);
+      pos -= len;
+      const buf = Buffer.alloc(len);
+      await fh.read(buf, 0, len, pos);
 
-  for (let i = lines.length - 1; i >= 0; i--) {
-    const line = lines[i];
-    if (!line) continue;
-    let p: HistoryPoint;
-    try {
-      p = JSON.parse(line) as HistoryPoint;
-    } catch {
-      continue; // skip corrupt lines
+      const combined = Buffer.concat([buf, pending]);
+      let completeBytes: Buffer;
+
+      if (pos === 0) {
+        // Reached the start of the file — everything left is complete.
+        completeBytes = combined;
+        pending = Buffer.alloc(0);
+      } else {
+        const nl = combined.indexOf(0x0a); // "\n"
+        if (nl === -1) {
+          // No line break in this chunk: the line spans further back.
+          pending = combined;
+          continue;
+        }
+        completeBytes = combined.subarray(nl + 1);
+        pending = combined.subarray(0, nl + 1);
+      }
+
+      const lines = completeBytes.toString("utf8").split("\n");
+      for (let i = lines.length - 1; i >= 0; i--) {
+        const line = lines[i];
+        if (!line) continue;
+        let p: HistoryPoint;
+        try {
+          p = JSON.parse(line) as HistoryPoint;
+        } catch {
+          continue; // skip corrupt lines
+        }
+        // A non-numeric ts (a corrupt or hand-edited line) would make every
+        // comparison false and defeat the early exit — treat it as corrupt.
+        if (typeof p.ts !== "number" || Number.isNaN(p.ts)) continue;
+        if (p.ts < cutoff) return collected.reverse();
+        collected.push(p);
+        if (limit && collected.length >= limit) return collected.reverse();
+      }
     }
-    if (p.ts < cutoff) break;
-    collected.push(p);
-    if (limit && collected.length >= limit) break;
+  } finally {
+    await fh.close().catch(() => {});
   }
 
   return collected.reverse(); // restore oldest → newest
