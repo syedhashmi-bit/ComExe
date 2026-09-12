@@ -49,7 +49,7 @@ $env:PATH = "C:\Program Files\nodejs;" + $env:PATH
 npm run dev        # localhost:3000
 npm run build      # local sanity check; CI does the real build
 npm run lint
-npm test           # vitest, 98 unit tests
+npm test           # vitest, 229 unit tests
 npm run test:e2e   # playwright
 npm run storybook  # primitives sandbox on :6006
 ```
@@ -475,17 +475,28 @@ iframe cookie problems entirely).
 
 ## Testing
 
-- **Unit** — vitest, `tests/unit/`. 98 tests over 11 files, mostly covering
-  `app/lib/*` (auth, cache, circuit-breaker, history, json-store, http,
-  prometheus, server-config, validate).
-- **E2E** — Playwright, `tests/e2e/smoke.spec.ts`.
+- **Unit** — vitest, `tests/unit/`. 229 tests over 16 files covering `app/lib/*`
+  plus `tests/unit/routes/` for API route handlers.
+- **E2E** — Playwright, `tests/e2e/smoke.spec.ts`, run by its own CI job.
 - **Storybook** — `stories/Primitives.stories.tsx`.
 
-> **Known gap:** there are **zero route tests** across 33 routes, including the
-> write/SSRF-adjacent ones (`/api/servers`, `/api/dependencies`,
-> `/api/custom-cards`) and the Docker-socket routes. The guards in `validate.ts`
-> are applied but nothing verifies they stay applied. New API routes should ship
-> with tests.
+**Writing a route test** (`tests/unit/routes/`): App Router handlers are plain
+`(req: Request) => Response`, so import and call them directly — no Next runtime
+needed. Two gotchas:
+- Routes hold module-level caches, so `vi.resetModules()` in `beforeEach` and
+  `await import(...)` inside the test body, not at file scope.
+- `loadConfig()` reads `data/config.json` and `process.env` — mock it with
+  `vi.doMock("@/app/lib/server-config", …)`.
+
+`tests/unit/routes/grafana.test.ts` is the worked example.
+
+> **Remaining gap:** route coverage is the security-critical paths (the Grafana
+> SSRF guard, the Content-Type guard on all 14 write handlers), not the routes'
+> business logic. Still untested: `metrics`'s ~30-slot positional destructure,
+> `insights`'s z-score/regression maths, the Docker allowlists, and
+> `services/route.ts` — the last of which fires a `setTimeout` on module load
+> that starts a real upstream fetch, so it needs a guard before it can be
+> imported in a test at all.
 
 ---
 
