@@ -78,12 +78,12 @@ export default function AnalyticsPage() {
     <div style={{ background: "var(--bg)", minHeight: "100vh", color: "var(--text)" }}>
       {/* Header */}
       <div className="sticky top-0 z-30" style={{ background: "var(--header-bg)", backdropFilter: "blur(12px)", borderBottom: "1px solid var(--border-dim)" }}>
-        <div className="flex items-center gap-4 px-6 py-3" style={{ maxWidth: 1400, margin: "0 auto" }}>
+        <div className="flex items-center gap-2 sm:gap-4 flex-wrap px-3 sm:px-6 py-3" style={{ maxWidth: 1400, margin: "0 auto" }}>
           <Link href="/" style={{ color: "var(--brand)", textDecoration: "none", fontSize: 12, fontWeight: 600 }}>
             &larr; Dashboard
           </Link>
           <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.02em" }}>Analytics</span>
-          <div className="flex gap-1 ml-auto">
+          <div className="flex gap-1 ml-auto flex-wrap justify-end">
             {RANGES.map(r => (
               <button key={r.key} onClick={() => changeRange(r.key)}
                 style={{

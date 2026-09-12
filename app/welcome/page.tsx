@@ -175,7 +175,7 @@ export default function WelcomePage() {
 
           <div style={{
             display: "grid",
-            gridTemplateColumns: "repeat(5, 1fr)",
+            gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))",
             gap: 12,
             marginBottom: 32,
           }}>

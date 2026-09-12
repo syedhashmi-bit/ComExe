@@ -359,7 +359,7 @@ export default function SetupWizard() {
   const generated = useMemo(() => generateConfig(state), [state]);
 
   return (
-    <div style={{ maxWidth: 1100, margin: "0 auto", padding: "32px 24px 80px" }}>
+    <div className="setup-page" style={{ maxWidth: 1100, margin: "0 auto", padding: "32px 24px 80px" }}>
       <header style={{ marginBottom: 32 }}>
         <Link href="/" style={{ fontSize: 11, color: "var(--text-ghost)", textDecoration: "none", display: "inline-block", marginBottom: 12 }}>
           &larr; Dashboard
@@ -416,7 +416,7 @@ export default function SetupWizard() {
                 </div>
                 {row.enabled && (
                   <div style={{ marginTop: 12, marginLeft: 26, display: "flex", flexDirection: "column", gap: 8 }}>
-                    <div style={{ display: "grid", gridTemplateColumns: "minmax(280px, 2fr) 1fr 1fr auto", gap: 10, alignItems: "end" }}>
+                    <div className="setup-grid" style={{ display: "grid", gridTemplateColumns: "minmax(280px, 2fr) 1fr 1fr auto", gap: 10, alignItems: "end" }}>
                       <Field label="URL" value={row.url} onChange={v => updateRow(svc.id, { url: v })} mono />
                       {svc.authShape === "apikey" && (
                         <Field label="API key" value={row.apiKey} onChange={v => updateRow(svc.id, { apiKey: v })} type={showPasswords ? "text" : "password"} mono />
@@ -470,7 +470,7 @@ export default function SetupWizard() {
             <div style={{ marginLeft: "auto" }}><StatusPill status={state.mikrotik.testStatus} /></div>
           </div>
           {state.mikrotik.enabled && (
-            <div style={{ marginTop: 12, marginLeft: 26, display: "grid", gridTemplateColumns: "minmax(220px, 1.5fr) 1fr 1fr auto", gap: 10, alignItems: "end" }}>
+            <div className="setup-grid" style={{ marginTop: 12, marginLeft: 26, display: "grid", gridTemplateColumns: "minmax(220px, 1.5fr) 1fr 1fr auto", gap: 10, alignItems: "end" }}>
               <Field label="URL" value={state.mikrotik.url} onChange={v => setState(s => ({ ...s, mikrotik: { ...s.mikrotik, url: v } }))} mono />
               <Field label="Username" value={state.mikrotik.username} onChange={v => setState(s => ({ ...s, mikrotik: { ...s.mikrotik, username: v } }))} mono />
               <Field label="Password" value={state.mikrotik.password} onChange={v => setState(s => ({ ...s, mikrotik: { ...s.mikrotik, password: v } }))} type={showPasswords ? "text" : "password"} mono />
@@ -500,7 +500,7 @@ export default function SetupWizard() {
           </div>
           {state.grafana.enabled && (
             <div style={{ marginTop: 12, marginLeft: 26, display: "flex", flexDirection: "column", gap: 14 }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 10 }}>
+              <div className="setup-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 10 }}>
                 <Field label="Grafana URL" value={state.grafana.baseUrl} onChange={v => setState(s => ({ ...s, grafana: { ...s.grafana, baseUrl: v } }))} mono />
                 <Field label="Dashboard UID" value={state.grafana.dashboardUid} onChange={v => setState(s => ({ ...s, grafana: { ...s.grafana, dashboardUid: v } }))} placeholder="rYdddlPWk" mono />
                 <Field label="Datasource UID" value={state.grafana.datasourceUid} onChange={v => setState(s => ({ ...s, grafana: { ...s.grafana, datasourceUid: v } }))} placeholder="cflfv1hjeg9vka" mono />
@@ -521,7 +521,7 @@ export default function SetupWizard() {
                   }}>+ Add panel</button>
                 </div>
                 {state.grafana.panels.map((panel, pi) => (
-                  <div key={pi} style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto auto", gap: 8, marginBottom: 6, alignItems: "end" }}>
+                  <div key={pi} className="setup-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto auto", gap: 8, marginBottom: 6, alignItems: "end" }}>
                     <Field label={pi === 0 ? "Panel ID" : ""} value={panel.panelId} placeholder="panel-42"
                       onChange={v => { const s = { ...state, grafana: { ...state.grafana, panels: state.grafana.panels.map((p, i) => i === pi ? { ...p, panelId: v } : p) } }; setState(s); saveState(s); }} mono />
                     <Field label={pi === 0 ? "Label" : ""} value={panel.label} placeholder="CPU Temp"
@@ -567,7 +567,7 @@ export default function SetupWizard() {
 
       {/* ── 5. Preferences ── */}
       <Section title="5 · Preferences" subtitle="Search engine, timezone, theme, and display defaults. These are optional — the dashboard works with sensible defaults.">
-        <div style={{
+        <div className="setup-grid" style={{
           display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12,
           background: "var(--surface-dim)",
           border: "1px solid var(--border)",

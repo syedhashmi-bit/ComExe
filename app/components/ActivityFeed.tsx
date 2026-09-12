@@ -2,13 +2,8 @@
 
 import { useEffect, useState } from "react";
 import type { ActivityEvent } from "@/app/lib/types";
+import { SVC_COLORS } from "@/app/lib/constants";
 
-const SVC_COLORS: Record<string, string> = {
-  radarr: "#f5c518", sonarr: "#35c5f4", bazarr: "#4a90d9",
-  tautulli: "#e5a00d", qbittorrent: "#2196f3", overseerr: "#e5a00d",
-  pihole: "#f60d1a", prowlarr: "#ff8c00", nginx: "#2ecc71",
-  uptimekuma: "#5cdd8b",
-};
 
 export function relativeAgo(unixMs: number): string {
   const sec = Math.max(0, Math.round((Date.now() - unixMs) / 1000));

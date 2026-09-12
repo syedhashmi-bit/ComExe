@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { ServiceResult, ClientConfig } from "@/app/lib/types";
-import { SVC_PORTS } from "@/app/lib/constants";
+import { SVC_COLORS, SVC_ICONS, SVC_LABELS, SVC_PORTS } from "@/app/lib/constants";
 import { cleanTitle, fmtEtaShort, fmtSmoothAgo } from "@/app/lib/formatters";
 import { IconServices } from "@/app/components/icons";
 import {
@@ -10,25 +10,7 @@ import {
 } from "@/app/components/primitives";
 import { ServiceDetailSheet } from "@/app/components/ServiceDetailSheet";
 
-const SVC_COLORS: Record<string, string> = {
-  radarr: "#f5c518", sonarr: "#35c5f4", bazarr: "#4a90d9",
-  tautulli: "#e5a00d", qbittorrent: "#2196f3", overseerr: "#e5a00d",
-  pihole: "#f60d1a", prowlarr: "#ff8c00", nginx: "#2ecc71",
-  uptimekuma: "#5cdd8b",
-};
 
-const SVC_ICONS: Record<string, string> = {
-  radarr:      "/icons/radarr.png",
-  sonarr:      "/icons/sonarr.png",
-  bazarr:      "/icons/bazarr.png",
-  tautulli:    "/icons/tautulli.png",
-  qbittorrent: "/icons/qbittorrent.png",
-  overseerr:   "/icons/overseerr.png",
-  nginx:       "/icons/nginx.png",
-  pihole:      "/icons/pihole.png",
-  prowlarr:    "/icons/prowlarr.png",
-  uptimekuma:  "/icons/uptimekuma.png",
-};
 
 function buildSvcUrls(ip: string): Record<string, string> {
   return Object.fromEntries(
@@ -38,18 +20,6 @@ function buildSvcUrls(ip: string): Record<string, string> {
 
 // Display names with official brand casing — without an entry the card falls
 // back to the raw lowercase route name.
-const SVC_LABELS: Record<string, string> = {
-  radarr:      "Radarr",
-  sonarr:      "Sonarr",
-  bazarr:      "Bazarr",
-  tautulli:    "Tautulli",
-  qbittorrent: "qBittorrent",
-  overseerr:   "Overseerr",
-  prowlarr:    "Prowlarr",
-  pihole:      "Pi-hole",
-  nginx:       "Nginx Proxy",
-  uptimekuma:  "Uptime Kuma",
-};
 
 const SVC_CATEGORIES: { id: string; label: string; accent: string; services: string[] }[] = [
   { id: "media", label: "media stack",   accent: "var(--warn)", services: ["radarr", "sonarr", "bazarr", "tautulli", "qbittorrent", "overseerr", "prowlarr"] },

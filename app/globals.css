@@ -455,3 +455,20 @@ body {
     padding-right: 8px !important;
   }
 }
+
+/* ── /setup responsive form rows ─────────────────────────────────────────────
+   The wizard's rows are inline-styled grids with fixed track counts, e.g.
+   `minmax(280px, 2fr) 1fr 1fr auto` — ~600px minimum once gaps, the 26px
+   indent and the page's 24px padding are counted. Inline styles can't carry a
+   media query, so the breakpoint lives here and the rows opt in by class.
+   Below 720px every field goes full-width and stacks, which is the only
+   sensible shape for a credential form on a phone. */
+@media (max-width: 720px) {
+  .setup-grid {
+    grid-template-columns: 1fr !important;
+    margin-left: 0 !important;
+  }
+  .setup-page {
+    padding: 20px 14px 64px !important;
+  }
+}

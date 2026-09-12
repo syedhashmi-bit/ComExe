@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { SVC_COLORS } from "@/app/lib/constants";
 
 interface DependencyEdge {
   from: string;
@@ -19,12 +20,6 @@ interface DependencyMapProps {
   services: ServiceStatus[];
 }
 
-const SVC_COLORS: Record<string, string> = {
-  radarr: "#ffc230", sonarr: "#00ccff", bazarr: "#e6a817", tautulli: "#cc7b19",
-  qbittorrent: "#4a90d9", overseerr: "#6366f1", prowlarr: "#f9802d",
-  pihole: "#96060c", nginx: "#009639", uptimekuma: "#5cdd8b",
-  plex: "#e5a00d", grafana: "#f97316", prometheus: "#e6522c",
-};
 
 function getColor(name: string): string {
   return SVC_COLORS[name.toLowerCase()] ?? "var(--text-ghost)";

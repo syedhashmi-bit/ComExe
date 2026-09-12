@@ -152,7 +152,7 @@ export function CustomCardsGrid({ refreshInterval }: { refreshInterval: number }
   if (cards.length === 0) return null;
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 16 }}>
       {cards.map(card => (
         <CustomCardRenderer
           key={card.id}

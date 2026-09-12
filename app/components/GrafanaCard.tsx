@@ -265,7 +265,7 @@ export function GrafanaCard({ baseUrl, panelUrl, panels, tokenSet }: {
       ) : allPanels.length === 1 ? (
         <GrafanaPanel url={allPanels[0].url} label={allPanels[0].label} height={220} baseUrl={baseUrl} tokenSet={tokenSet} />
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 10 }}>
           {allPanels.map((p, i) => {
             const colSpan = p.size === "lg" ? 3 : p.size === "md" ? 2 : 1;
             const h = p.size === "lg" ? 220 : p.size === "md" ? 180 : 150;
