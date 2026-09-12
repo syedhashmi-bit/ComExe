@@ -43,9 +43,19 @@ export function ContainerLogsSheet({ containerName, onClose }: { containerName: 
     return () => { cancelled = true; };
   }, [containerName, follow]);
 
+  // The only overlay that couldn't be dismissed from the keyboard: page.tsx's
+  // Escape handler clears four of the eight overlay states and this isn't one
+  // of them, and the sheet had no handler of its own. It's a side sheet rather
+  // than a centred dialog, so it doesn't use <Modal>, but it still needs this.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
   return (
     <>
-      <div className="fixed inset-0 z-40" style={{ background: "rgba(0,0,0,0.6)" }} onClick={onClose} />
+      <div className="fixed inset-0 z-40" style={{ background: "rgba(0,0,0,0.6)" }} onClick={onClose} aria-hidden="true" />
       <div
         className="fixed top-0 right-0 h-full z-50 flex flex-col gap-3 p-5"
         style={{ width: 640, maxWidth: "90vw", background: "var(--settings-bg)", borderLeft: "1px solid var(--settings-border)", boxShadow: "-12px 0 40px rgba(0,0,0,0.7)" }}

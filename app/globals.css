@@ -472,3 +472,45 @@ body {
     padding: 20px 14px 64px !important;
   }
 }
+
+/* ── Focus visibility ────────────────────────────────────────────────────────
+   There was no :focus or :focus-visible rule anywhere in the app, and 21 inline
+   `outline: "none"` declarations across the components removed the browser
+   default. A keyboard user had no visible focus indicator on any control —
+   inputs, buttons, links, the command palette, the setup wizard.
+
+   `!important` is deliberate and load-bearing: the outline is suppressed by
+   INLINE styles, which a plain stylesheet rule cannot override. Scoped to
+   :focus-visible so it appears for keyboard/AT navigation but not on mouse
+   clicks, which is why those inline `outline: none` were added in the first
+   place.
+
+   Two tokens so the ring stays legible on every theme: the brand colour for
+   the line, plus a soft halo for contrast against both the dark card surfaces
+   and the light paper background. */
+:focus-visible {
+  outline: 2px solid var(--brand) !important;
+  outline-offset: 2px !important;
+  border-radius: 3px;
+}
+
+/* The dialog panel itself takes focus when it has no focusable child; that is a
+   programmatic focus target, not something the user navigated to, so it should
+   not draw a ring. */
+[role="dialog"]:focus-visible {
+  outline: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Respect the OS setting. The dashboard animates a lot — number tweens,
+     skeleton shimmer, pulsing status dots, the activity ticker marquee, card
+     hover lifts. None of it carries information that the static state doesn't.
+     The ticker in particular is a WCAG 2.2.2 concern: it scrolls continuously
+     and its only pause is hover, which is unreachable by keyboard or touch. */
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

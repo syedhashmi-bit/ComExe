@@ -80,12 +80,17 @@ export function SearchBar({ inputRef, engine }: { inputRef: React.RefObject<HTML
             caretColor: "var(--brand)",
           }}
         />
-        <button onClick={doSearch}
+        {/* SVG-only button: needed an accessible name, and a type — without
+            type="submit" a button inside a form defaults to submit anyway, but
+            this one isn't in a form, so it stays a plain button with a label.
+            The hover colours were hardcoded rgba(255,255,255,…) and so invisible
+            on the light theme; they use tokens now. */}
+        <button onClick={doSearch} type="button" aria-label="Search"
           style={{ background: "none", border: "none", cursor: "pointer", padding: 2, color: "var(--text-faint)", display: "flex", transition: "color 0.15s" }}
-          onMouseEnter={e => (e.currentTarget.style.color = "rgba(255,255,255,0.7)")}
-          onMouseLeave={e => (e.currentTarget.style.color = "rgba(255,255,255,0.3)")}
+          onMouseEnter={e => (e.currentTarget.style.color = "var(--text-mid)")}
+          onMouseLeave={e => (e.currentTarget.style.color = "var(--text-faint)")}
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
           </svg>
         </button>

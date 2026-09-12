@@ -84,6 +84,7 @@ export function ServicesPanel({
             <button
               onClick={() => { setServiceFilter(""); serviceFilterRef.current?.focus(); }}
               title="Clear filter (Esc)"
+              aria-label="Clear service filter"
               className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center justify-center"
               style={{
                 background: "transparent", border: "none", cursor: "pointer",
@@ -191,6 +192,7 @@ export function ServicesPanel({
                               <button
                                 onClick={e => { e.stopPropagation(); setDetailServiceName(name); }}
                                 title="Show details"
+                                aria-label={`Show details for ${label}`}
                                 style={{
                                   background: "var(--card-alt)", border: "1px solid var(--border)",
                                   borderRadius: 4, padding: "1px 5px", fontSize: 9,
@@ -204,12 +206,14 @@ export function ServicesPanel({
                                   <button
                                     onClick={e => { e.stopPropagation(); setLogsContainer(name); }}
                                     title="View container logs"
+                                    aria-label={`View container logs for ${label}`}
                                     style={{ background: "var(--card-alt)", border: "1px solid var(--border)", borderRadius: 4, padding: "1px 5px", fontSize: 9, color: "var(--text-dim)", cursor: "pointer" }}
                                   >logs</button>
                                   <button
                                     onClick={e => { e.stopPropagation(); if (confirm(`Restart ${name}?`)) restartService(name); }}
                                     disabled={restartingSvc === name}
                                     title="Restart container"
+                                    aria-label={`Restart ${label}`}
                                     style={{ background: "var(--card-alt)", border: "1px solid var(--border)", borderRadius: 4, padding: "1px 5px", fontSize: 9, color: restartingSvc === name ? "var(--text-faint)" : "var(--text-dim)", cursor: restartingSvc === name ? "wait" : "pointer" }}
                                   >{restartingSvc === name ? "…" : "↻"}</button>
                                 </>

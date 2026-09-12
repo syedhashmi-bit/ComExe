@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Modal } from "@/app/components/Modal";
 
 interface TopoDevice {
   ip: string;
@@ -119,31 +120,21 @@ export function NetworkTopology({ onClose }: { onClose: () => void }) {
 
   return (
     <>
-      <div className="fixed inset-0 z-40" style={{ background: "rgba(0,0,0,0.5)" }} onClick={onClose} />
-      <div className="fixed z-50" style={{
-        top: "50%", left: "50%", transform: "translate(-50%, -50%)",
-        width: "min(900px, calc(100vw - 40px))", maxHeight: "calc(100vh - 80px)",
-        background: "var(--card)", border: "1px solid var(--border-bright)",
-        borderRadius: 14, overflow: "hidden",
-        boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
-        display: "flex", flexDirection: "column",
-      }}>
-        <div className="flex items-center justify-between p-4" style={{ borderBottom: "1px solid var(--border-dim)" }}>
-          <div className="flex items-center gap-2">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="5" r="3"/><circle cx="5" cy="19" r="3"/><circle cx="19" cy="19" r="3"/>
-              <line x1="12" y1="8" x2="5" y2="16"/><line x1="12" y1="8" x2="19" y2="16"/>
-            </svg>
-            <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text)" }}>Network Topology</span>
-            <span style={{ fontSize: 10, color: "var(--text-ghost)" }}>
-              {devices.length} device{devices.length !== 1 ? "s" : ""}
-            </span>
-          </div>
-          <button onClick={onClose} style={{ color: "var(--text-dim)", background: "none", border: "none", cursor: "pointer", fontSize: 14 }}>
-            &times;
-          </button>
-        </div>
-
+      <Modal
+        onClose={onClose}
+        title="Network Topology"
+        icon={
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <circle cx="12" cy="5" r="3"/><circle cx="5" cy="19" r="3"/><circle cx="19" cy="19" r="3"/>
+            <line x1="12" y1="8" x2="5" y2="16"/><line x1="12" y1="8" x2="19" y2="16"/>
+          </svg>
+        }
+        titleExtra={
+          <span style={{ fontSize: 10, color: "var(--text-ghost)" }}>
+            {devices.length} device{devices.length !== 1 ? "s" : ""}
+          </span>
+        }
+      >
         <div style={{ overflow: "auto", flex: 1, padding: 16 }}>
           {loading ? (
             <div style={{ padding: "40px 0", textAlign: "center", color: "var(--text-ghost)", fontSize: 12 }}>
@@ -246,7 +237,7 @@ export function NetworkTopology({ onClose }: { onClose: () => void }) {
           </div>
           <span>via MikroTik ARP + DHCP</span>
         </div>
-      </div>
+      </Modal>
     </>
   );
 }

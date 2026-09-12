@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { usePollingInterval } from "@/app/hooks/usePolling";
 import { isDemoMode } from "@/app/lib/demo-data";
+import { Modal } from "@/app/components/Modal";
 
 interface ServerStatus {
   id: string;
@@ -106,37 +107,29 @@ export function ServerFleetPanel({ onClose }: { onClose: () => void }) {
 
   return (
     <>
-      <div className="fixed inset-0 z-40" style={{ background: "rgba(0,0,0,0.5)" }} onClick={onClose} />
-      <div className="fixed z-50" style={{
-        top: "50%", left: "50%", transform: "translate(-50%, -50%)",
-        width: "min(600px, calc(100vw - 40px))", maxHeight: "calc(100vh - 80px)",
-        background: "var(--card)", border: "1px solid var(--border-bright)",
-        borderRadius: 14, overflow: "hidden",
-        boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
-        display: "flex", flexDirection: "column",
-      }}>
-        <div className="flex items-center justify-between p-4" style={{ borderBottom: "1px solid var(--border-dim)" }}>
-          <div className="flex items-center gap-2">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/>
-              <line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>
-            </svg>
-            <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text)" }}>Server Fleet</span>
-            <span style={{ fontSize: 10, color: "var(--text-ghost)" }}>
-              {servers.filter(s => s.reachable).length}/{servers.length} online
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <button onClick={() => setShowAdd(v => !v)}
-              style={{ fontSize: 10, padding: "3px 8px", borderRadius: 4, background: "var(--surface)", color: "var(--brand)", border: "1px solid var(--border-mid)", cursor: "pointer", fontWeight: 600 }}>
-              + Add
-            </button>
-            <button onClick={onClose} style={{ color: "var(--text-dim)", background: "none", border: "none", cursor: "pointer", fontSize: 14 }}>
-              &times;
-            </button>
-          </div>
-        </div>
-
+      <Modal
+        onClose={onClose}
+        title="Server Fleet"
+        width="min(600px, calc(100vw - 40px))"
+        icon={
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/>
+            <line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>
+          </svg>
+        }
+        titleExtra={
+          <span style={{ fontSize: 10, color: "var(--text-ghost)" }}>
+            {servers.filter(s => s.reachable).length}/{servers.length} online
+          </span>
+        }
+        headerAction={
+          <button onClick={() => setShowAdd(v => !v)}
+            aria-expanded={showAdd}
+            style={{ fontSize: 10, padding: "3px 8px", borderRadius: 4, background: "var(--surface)", color: "var(--brand)", border: "1px solid var(--border-mid)", cursor: "pointer", fontWeight: 600 }}>
+            + Add
+          </button>
+        }
+      >
         <div style={{ overflow: "auto", flex: 1, padding: 16 }} className="flex flex-col gap-3">
           {showAdd && (
             <div style={{ background: "var(--surface)", border: "1px solid var(--border-mid)", borderRadius: 8, padding: 12 }}
@@ -233,7 +226,7 @@ export function ServerFleetPanel({ onClose }: { onClose: () => void }) {
             ))
           )}
         </div>
-      </div>
+      </Modal>
     </>
   );
 }

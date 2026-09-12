@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { SVC_COLORS } from "@/app/lib/constants";
+import { Modal } from "@/app/components/Modal";
 
 interface DependencyEdge {
   from: string;
@@ -142,27 +143,15 @@ export function DependencyMap({ onClose, services }: DependencyMapProps) {
 
   return (
     <>
-      <div className="fixed inset-0 z-40" style={{ background: "rgba(0,0,0,0.5)" }} onClick={onClose} />
-      <div className="fixed z-50" style={{
-        top: "50%", left: "50%", transform: "translate(-50%, -50%)",
-        width: "min(900px, calc(100vw - 40px))", maxHeight: "calc(100vh - 80px)",
-        background: "var(--card)", border: "1px solid var(--border-bright)",
-        borderRadius: 14, overflow: "hidden",
-        boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
-        display: "flex", flexDirection: "column",
-      }}>
-        <div className="flex items-center justify-between p-4" style={{ borderBottom: "1px solid var(--border-dim)" }}>
-          <div className="flex items-center gap-2">
-            <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text)" }}>Dependency Map</span>
-            <span style={{ fontSize: 10, color: "var(--text-ghost)" }}>
-              {nodes.length} services, {deps.length} dependencies
-            </span>
-          </div>
-          <button onClick={onClose} style={{ color: "var(--text-dim)", background: "none", border: "none", cursor: "pointer", fontSize: 14 }}>
-            &times;
-          </button>
-        </div>
-
+      <Modal
+        onClose={onClose}
+        title="Dependency Map"
+        titleExtra={
+          <span style={{ fontSize: 10, color: "var(--text-ghost)" }}>
+            {nodes.length} services, {deps.length} dependencies
+          </span>
+        }
+      >
         <div style={{ overflow: "auto", flex: 1, padding: 16 }}>
           {loading ? (
             <div style={{ padding: "40px 0", textAlign: "center", color: "var(--text-ghost)", fontSize: 12 }}>
@@ -287,7 +276,7 @@ export function DependencyMap({ onClose, services }: DependencyMapProps) {
           <span>Hover a down service to see impact chain</span>
           <span>Arrows show &quot;depends on&quot; direction</span>
         </div>
-      </div>
+      </Modal>
     </>
   );
 }
