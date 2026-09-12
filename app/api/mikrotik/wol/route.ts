@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { isJsonContentType } from "@/app/lib/validate";
 import { loadConfig } from "@/app/lib/server-config";
+import { fetchWithTimeout } from "@/app/lib/http";
 import dgram from "node:dgram";
 
 // ── /api/mikrotik/wol ────────────────────────────────────────────────────────
@@ -57,11 +58,11 @@ async function sendViaMikrotik(mac: string, iface?: string): Promise<{ ok: boole
     const auth = Buffer.from(`${cfg.mikrotik.username}:${cfg.mikrotik.password}`, "utf8").toString("base64");
     const body: Record<string, string> = { mac };
     if (iface) body.interface = iface;
-    const res = await fetch(`${cfg.mikrotik.url}/rest/tool/wol`, {
+    const res = await fetchWithTimeout(`${cfg.mikrotik.url}/rest/tool/wol`, {
       method:  "POST",
       headers: { Authorization: "Basic " + auth, "Content-Type": "application/json", Accept: "application/json" },
       body:    JSON.stringify(body),
-      signal:  AbortSignal.timeout(5000),
+      timeoutMs: 5000,
     });
     if (!res.ok) {
       const text = await res.text().catch(() => "");

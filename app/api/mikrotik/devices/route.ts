@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { loadConfig } from "@/app/lib/server-config";
+import { fetchWithTimeout } from "@/app/lib/http";
 
 // ── /api/mikrotik/devices ────────────────────────────────────────────────────
 // Lists DHCP leases from the MikroTik router so the user sees what's actually
@@ -50,10 +51,9 @@ export async function GET() {
 
   try {
     const auth = Buffer.from(`${cfg.mikrotik.username}:${cfg.mikrotik.password}`, "utf8").toString("base64");
-    const res = await fetch(`${cfg.mikrotik.url}/rest/ip/dhcp-server/lease`, {
+    const res = await fetchWithTimeout(`${cfg.mikrotik.url}/rest/ip/dhcp-server/lease`, {
       headers: { Authorization: "Basic " + auth, Accept: "application/json" },
-      cache:   "no-store",
-      signal:  AbortSignal.timeout(5000),
+      timeoutMs: 5000,
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const raw = await res.json() as Record<string, unknown>[];

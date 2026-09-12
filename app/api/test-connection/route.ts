@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { fetchWithTimeout } from "@/app/lib/http";
 import { isJsonContentType } from "@/app/lib/validate";
 
 // ── /api/test-connection ──────────────────────────────────────────────────────
@@ -16,6 +17,14 @@ import { isJsonContentType } from "@/app/lib/validate";
 //   }
 //
 // Response: { ok: boolean, message: string }
+//
+// Every call here passes skipBreaker: true. This is a MANUAL probe — the user
+// clicked "Test" in the wizard — and the circuit for a service is open exactly
+// when that service has been failing, which is the situation that sends someone
+// to the wizard in the first place. A breaker-gated Test would answer "circuit
+// open" instead of telling them whether their new API key works. These calls
+// are also not recorded against the origin, so a deliberate test against a
+// known-down service can't push a circuit toward opening.
 
 interface TestRequest {
   service: string;
@@ -38,8 +47,8 @@ function pass(msg: string): TestResult { return { ok: true,  message: msg }; }
 async function testRadarr(url: string, key: string): Promise<TestResult> {
   if (!key) return fail("Missing API key");
   try {
-    const r = await fetch(`${url}/api/v3/system/status?apiKey=${encodeURIComponent(key)}`,
-      { signal: AbortSignal.timeout(TIMEOUT), headers: { Accept: "application/json" } });
+    const r = await fetchWithTimeout(`${url}/api/v3/system/status?apiKey=${encodeURIComponent(key)}`,
+      { timeoutMs: TIMEOUT, skipBreaker: true, headers: { Accept: "application/json" } });
     if (r.status === 401 || r.status === 403) return fail(`Unauthorized (HTTP ${r.status}) — wrong API key`);
     if (!r.ok) return fail(`HTTP ${r.status}`);
     const data = await r.json() as { version?: string; appName?: string };
@@ -52,8 +61,8 @@ async function testRadarr(url: string, key: string): Promise<TestResult> {
 async function testSonarr(url: string, key: string): Promise<TestResult> {
   if (!key) return fail("Missing API key");
   try {
-    const r = await fetch(`${url}/api/v3/system/status?apiKey=${encodeURIComponent(key)}`,
-      { signal: AbortSignal.timeout(TIMEOUT), headers: { Accept: "application/json" } });
+    const r = await fetchWithTimeout(`${url}/api/v3/system/status?apiKey=${encodeURIComponent(key)}`,
+      { timeoutMs: TIMEOUT, skipBreaker: true, headers: { Accept: "application/json" } });
     if (r.status === 401 || r.status === 403) return fail(`Unauthorized (HTTP ${r.status}) — wrong API key`);
     if (!r.ok) return fail(`HTTP ${r.status}`);
     const data = await r.json() as { version?: string };
@@ -66,8 +75,8 @@ async function testSonarr(url: string, key: string): Promise<TestResult> {
 async function testProwlarr(url: string, key: string): Promise<TestResult> {
   if (!key) return fail("Missing API key");
   try {
-    const r = await fetch(`${url}/api/v1/system/status?apikey=${encodeURIComponent(key)}`,
-      { signal: AbortSignal.timeout(TIMEOUT), headers: { Accept: "application/json" } });
+    const r = await fetchWithTimeout(`${url}/api/v1/system/status?apikey=${encodeURIComponent(key)}`,
+      { timeoutMs: TIMEOUT, skipBreaker: true, headers: { Accept: "application/json" } });
     if (r.status === 401 || r.status === 403) return fail(`Unauthorized — wrong API key`);
     if (!r.ok) return fail(`HTTP ${r.status}`);
     const data = await r.json() as { version?: string };
@@ -80,8 +89,8 @@ async function testProwlarr(url: string, key: string): Promise<TestResult> {
 async function testBazarr(url: string, key: string): Promise<TestResult> {
   if (!key) return fail("Missing API key");
   try {
-    const r = await fetch(`${url}/api/system/status`, {
-      signal: AbortSignal.timeout(TIMEOUT),
+    const r = await fetchWithTimeout(`${url}/api/system/status`, {
+      timeoutMs: TIMEOUT, skipBreaker: true,
       headers: { "X-API-KEY": key, Accept: "application/json" },
     });
     if (r.status === 401 || r.status === 403) return fail(`Unauthorized — wrong API key`);
@@ -95,8 +104,8 @@ async function testBazarr(url: string, key: string): Promise<TestResult> {
 async function testTautulli(url: string, key: string): Promise<TestResult> {
   if (!key) return fail("Missing API key");
   try {
-    const r = await fetch(`${url}/api/v2?apikey=${encodeURIComponent(key)}&cmd=server_status`,
-      { signal: AbortSignal.timeout(TIMEOUT), headers: { Accept: "application/json" } });
+    const r = await fetchWithTimeout(`${url}/api/v2?apikey=${encodeURIComponent(key)}&cmd=server_status`,
+      { timeoutMs: TIMEOUT, skipBreaker: true, headers: { Accept: "application/json" } });
     if (!r.ok) return fail(`HTTP ${r.status}`);
     const data = await r.json() as { response?: { result?: string; message?: string } };
     if (data.response?.result === "success") return pass("Connected");
@@ -109,8 +118,8 @@ async function testTautulli(url: string, key: string): Promise<TestResult> {
 async function testOverseerr(url: string, key: string): Promise<TestResult> {
   if (!key) return fail("Missing API key");
   try {
-    const r = await fetch(`${url}/api/v1/status`, {
-      signal: AbortSignal.timeout(TIMEOUT),
+    const r = await fetchWithTimeout(`${url}/api/v1/status`, {
+      timeoutMs: TIMEOUT, skipBreaker: true,
       headers: { "X-Api-Key": key, Accept: "application/json" },
     });
     if (r.status === 401 || r.status === 403) return fail(`Unauthorized — wrong API key`);
@@ -124,11 +133,11 @@ async function testOverseerr(url: string, key: string): Promise<TestResult> {
 async function testQbittorrent(url: string, user: string, pass_: string): Promise<TestResult> {
   if (!user || !pass_) return fail("Missing username or password");
   try {
-    const r = await fetch(`${url}/api/v2/auth/login`, {
+    const r = await fetchWithTimeout(`${url}/api/v2/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded", "Referer": url },
       body: new URLSearchParams({ username: user, password: pass_ }).toString(),
-      signal: AbortSignal.timeout(TIMEOUT),
+      timeoutMs: TIMEOUT, skipBreaker: true,
     });
     if (!r.ok) return fail(`HTTP ${r.status}`);
     const text = await r.text();
@@ -144,11 +153,11 @@ async function testQbittorrent(url: string, user: string, pass_: string): Promis
 async function testPihole(url: string, password: string): Promise<TestResult> {
   if (!password) return fail("Missing password");
   try {
-    const r = await fetch(`${url}/api/auth`, {
+    const r = await fetchWithTimeout(`${url}/api/auth`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ password }),
-      signal: AbortSignal.timeout(TIMEOUT),
+      timeoutMs: TIMEOUT, skipBreaker: true,
     });
     if (!r.ok) return fail(`HTTP ${r.status} — wrong password`);
     const data = await r.json() as { session?: { sid?: string; valid?: boolean } };
@@ -162,11 +171,11 @@ async function testPihole(url: string, password: string): Promise<TestResult> {
 async function testNginx(url: string, user: string, pass_: string): Promise<TestResult> {
   if (!user || !pass_) return fail("Missing username or password");
   try {
-    const r = await fetch(`${url}/api/tokens`, {
+    const r = await fetchWithTimeout(`${url}/api/tokens`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ identity: user, secret: pass_ }),
-      signal: AbortSignal.timeout(TIMEOUT),
+      timeoutMs: TIMEOUT, skipBreaker: true,
     });
     if (r.status === 401) return fail("Wrong email or password");
     if (!r.ok) return fail(`HTTP ${r.status}`);
@@ -181,7 +190,7 @@ async function testNginx(url: string, user: string, pass_: string): Promise<Test
 async function testUptimeKuma(url: string, key: string): Promise<TestResult> {
   // Try /metrics first — version-dependent whether it returns monitor data.
   try {
-    const r = await fetch(`${url}/metrics`, { signal: AbortSignal.timeout(TIMEOUT) });
+    const r = await fetchWithTimeout(`${url}/metrics`, { timeoutMs: TIMEOUT, skipBreaker: true });
     if (r.ok) {
       const text = await r.text();
       if (text.includes("monitor_status")) return pass("Connected via /metrics (no auth needed)");
@@ -191,8 +200,8 @@ async function testUptimeKuma(url: string, key: string): Promise<TestResult> {
   // If a key is provided, try the bearer-auth status-page endpoint.
   if (key) {
     try {
-      const r = await fetch(`${url}/api/status-page/heartbeat/services`,
-        { signal: AbortSignal.timeout(TIMEOUT), headers: { Authorization: `Bearer ${key}`, Accept: "application/json" } });
+      const r = await fetchWithTimeout(`${url}/api/status-page/heartbeat/services`,
+        { timeoutMs: TIMEOUT, skipBreaker: true, headers: { Authorization: `Bearer ${key}`, Accept: "application/json" } });
       if (r.ok) return pass("Connected via API key");
       if (r.status === 401 || r.status === 403) return fail("Unauthorized — wrong API key");
     } catch { /* fall through to generic reachability */ }
@@ -202,7 +211,7 @@ async function testUptimeKuma(url: string, key: string): Promise<TestResult> {
   // Means the host is up but we couldn't pull monitor data; the card will
   // render "online" without per-monitor counts.
   try {
-    const r = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT) });
+    const r = await fetchWithTimeout(url, { timeoutMs: TIMEOUT, skipBreaker: true });
     if (r.status >= 200 && r.status < 500) {
       return pass(`Reachable, but couldn't pull monitor data (HTTP ${r.status}). Dashboard will show "online" only.`);
     }
@@ -216,9 +225,9 @@ async function testMikrotik(url: string, user: string, pass_: string): Promise<T
   if (!user || !pass_) return fail("Missing username or password");
   try {
     const auth = Buffer.from(`${user}:${pass_}`, "utf8").toString("base64");
-    const r = await fetch(`${url}/rest/system/resource`, {
+    const r = await fetchWithTimeout(`${url}/rest/system/resource`, {
       headers: { Authorization: `Basic ${auth}`, Accept: "application/json" },
-      signal: AbortSignal.timeout(TIMEOUT),
+      timeoutMs: TIMEOUT, skipBreaker: true,
     });
     if (r.status === 401) return fail("Unauthorized — wrong username or password");
     if (!r.ok) return fail(`HTTP ${r.status}`);
@@ -232,8 +241,8 @@ async function testMikrotik(url: string, user: string, pass_: string): Promise<T
 async function testSpeedtest(url: string, key: string): Promise<TestResult> {
   if (!key) return fail("Missing bearer token");
   try {
-    const r = await fetch(`${url}/api/v1/results?take=1`, {
-      signal: AbortSignal.timeout(TIMEOUT),
+    const r = await fetchWithTimeout(`${url}/api/v1/results?take=1`, {
+      timeoutMs: TIMEOUT, skipBreaker: true,
       headers: { Authorization: `Bearer ${key}`, Accept: "application/json" },
     });
     if (r.status === 401 || r.status === 403) return fail("Unauthorized — wrong bearer token");

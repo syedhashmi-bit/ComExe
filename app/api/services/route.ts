@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
 import { loadConfig, type ServiceCreds } from "@/app/lib/server-config";
-// Side-effect import: installs a process-wide undici Agent capped at 2
-// connections per origin. Defense-in-depth against connection-storm
-// regressions.
-import "@/app/lib/fetch-agent";
+// Every outbound call in this file goes through fetchWithTimeout, which installs
+// the per-origin undici socket cap AND runs the circuit breaker. This route makes
+// more upstream calls than any other, and for a long time it used bare fetch() —
+// so the breaker, which exists precisely because 3s polling used to SIGKILL the
+// *arr stack, did not cover the *arr stack. /api/diagnostics was blind to these
+// origins for the same reason.
+import { fetchWithTimeout, fetchJson } from "@/app/lib/http";
 
 interface QueueItem { title: string; pct: number; etaSec?: number | null }
 interface Stream    { title: string; user: string; progress: number; posStr: string }
@@ -113,10 +116,13 @@ class UpstreamServerError extends Error {
 }
 
 async function apiFetch(url: string, headers?: Record<string, string>): Promise<unknown> {
-  const res = await fetch(url, {
+  // 6s, not the lib default of 5s — these are the slowest upstreams we call.
+  // fetchWithTimeout records 5xx/network failures against the origin's breaker
+  // and treats 4xx as a success, which is exactly right here: a bad API key
+  // means the service is healthy and answering, so it must not trip the circuit.
+  const res = await fetchWithTimeout(url, {
     headers: { Accept: "application/json", ...headers },
-    signal: AbortSignal.timeout(6000),
-    next: { revalidate: 0 },
+    timeoutMs: 6000,
   });
   if (res.status === 401 || res.status === 403) throw new AuthError(res.status);
   if (!res.ok) {
@@ -198,10 +204,9 @@ async function apiFetchOpt(url: string, headers?: Record<string, string>): Promi
 // enough that 10 of these in a cold-start storm don't pile up to 60s.
 async function checkReachable(baseUrl: string): Promise<boolean> {
   try {
-    const res = await fetch(baseUrl, {
+    const res = await fetchWithTimeout(baseUrl, {
       method: "HEAD",
-      signal: AbortSignal.timeout(4000),
-      next: { revalidate: 0 },
+      timeoutMs: 4000,
     });
     // Any HTTP response (even 4xx/5xx) means the server is alive. 405 means
     // HEAD isn't supported but the server itself responded.
@@ -210,10 +215,7 @@ async function checkReachable(baseUrl: string): Promise<boolean> {
   } catch {
     // HEAD failed — try a cheap GET in case the server rejected HEAD entirely.
     try {
-      await fetch(baseUrl, {
-        signal: AbortSignal.timeout(3000),
-        next: { revalidate: 0 },
-      });
+      await fetchWithTimeout(baseUrl, { timeoutMs: 3000 });
       return true;
     } catch {
       return false;
@@ -532,15 +534,14 @@ async function qbittorrent(creds: ServiceCreds): Promise<ServiceResult> {
     if (KEY) {
       requestHeaders = { Authorization: `Bearer ${KEY}`, Referer: BASE };
     } else {
-      const loginRes = await fetch(`${BASE}/api/v2/auth/login`, {
+      const loginRes = await fetchWithTimeout(`${BASE}/api/v2/auth/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
           "Referer": BASE,
         },
         body: new URLSearchParams({ username: USER, password: PASS }).toString(),
-        signal: AbortSignal.timeout(6000),
-        next: { revalidate: 0 },
+        timeoutMs: 6000,
       });
       if (loginRes.status === 401 || loginRes.status === 403) throw new AuthError(loginRes.status);
       const setCookie = loginRes.headers.get("set-cookie");
@@ -552,10 +553,9 @@ async function qbittorrent(creds: ServiceCreds): Promise<ServiceResult> {
         : { Referer: BASE };
     }
 
-    const torrentsRes = await fetch(`${BASE}/api/v2/torrents/info`, {
+    const torrentsRes = await fetchWithTimeout(`${BASE}/api/v2/torrents/info`, {
       headers: requestHeaders,
-      signal: AbortSignal.timeout(6000),
-      next: { revalidate: 0 },
+      timeoutMs: 6000,
     });
     if (torrentsRes.status === 401 || torrentsRes.status === 403) throw new AuthError(torrentsRes.status);
     if (!torrentsRes.ok) throw new Error(`torrents HTTP ${torrentsRes.status}`);
@@ -638,11 +638,11 @@ async function pihole(creds: ServiceCreds): Promise<ServiceResult> {
   async function getSid(): Promise<string> {
     const now = Date.now();
     if (piholeSession && now < piholeSession.expiry) return piholeSession.sid;
-    const authRes = await fetch(`${BASE}/api/auth`, {
+    const authRes = await fetchWithTimeout(`${BASE}/api/auth`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ password: PASSWORD }),
-      signal: AbortSignal.timeout(6000),
+      timeoutMs: 6000,
     });
     const authData = await authRes.json() as { session?: { sid?: string; validity?: number } };
     const sid = authData?.session?.sid;
@@ -654,22 +654,17 @@ async function pihole(creds: ServiceCreds): Promise<ServiceResult> {
 
   // Optional fetch wrapper that uses the SID header. Returns null on failure
   // so a missing endpoint on the user's PiHole version doesn't sink the card.
+  // fetchJson already is "parsed body, or null on non-2xx / timeout / network /
+  // bad JSON" — this was a third local copy of it.
   async function piFetchOpt<T>(path: string, sid: string): Promise<T | null> {
-    try {
-      const r = await fetch(`${BASE}${path}`, {
-        headers: { sid },
-        signal: AbortSignal.timeout(6000),
-      });
-      if (!r.ok) return null;
-      return await r.json() as T;
-    } catch { return null; }
+    return fetchJson<T>(`${BASE}${path}`, { headers: { sid }, timeoutMs: 6000 });
   }
 
   try {
     const sid = await getSid();
-    const statsRes = await fetch(`${BASE}/api/stats/summary`, {
+    const statsRes = await fetchWithTimeout(`${BASE}/api/stats/summary`, {
       headers: { sid },
-      signal: AbortSignal.timeout(6000),
+      timeoutMs: 6000,
     });
     if (!statsRes.ok) throw new Error(`stats HTTP ${statsRes.status}`);
     const stats = await statsRes.json() as {
@@ -815,7 +810,7 @@ async function uptimeKuma(creds: ServiceCreds): Promise<ServiceResult> {
 
   // Parse Prometheus metrics endpoint
   try {
-    const res = await fetch(`${BASE}/metrics`, { signal: AbortSignal.timeout(5000), next: { revalidate: 0 } });
+    const res = await fetchWithTimeout(`${BASE}/metrics`, { timeoutMs: 5000 });
     if (res.ok) {
       const text = await res.text();
       const upCount   = (text.match(/monitor_status\{[^}]*\}\s+1/g) ?? []).length;
@@ -837,12 +832,11 @@ async function nginxProxy(creds: ServiceCreds): Promise<ServiceResult> {
   const USER = creds.username ?? "";
   const PASS = creds.password ?? "";
   try {
-    const tokenRes = await fetch(`${BASE}/api/tokens`, {
+    const tokenRes = await fetchWithTimeout(`${BASE}/api/tokens`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ identity: USER, secret: PASS }),
-      signal: AbortSignal.timeout(6000),
-      next: { revalidate: 0 },
+      timeoutMs: 6000,
     });
     if (!tokenRes.ok) throw new Error("auth");
     const { token } = await tokenRes.json() as { token: string };

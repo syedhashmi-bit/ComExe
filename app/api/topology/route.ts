@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { loadConfig } from "@/app/lib/server-config";
+import { fetchJson } from "@/app/lib/http";
 
 interface TopoDevice {
   ip: string;
@@ -26,20 +27,19 @@ export async function GET() {
   try {
     const auth = Buffer.from(`${cfg.mikrotik.username}:${cfg.mikrotik.password}`, "utf8").toString("base64");
     const headers = { Authorization: "Basic " + auth, Accept: "application/json" };
-    const opts = { headers, cache: "no-store" as const, signal: AbortSignal.timeout(8000) };
-
-    const [arpRes, dhcpRes, ifRes] = await Promise.allSettled([
-      fetch(`${cfg.mikrotik.url}/rest/ip/arp`, opts),
-      fetch(`${cfg.mikrotik.url}/rest/ip/dhcp-server/lease`, opts),
-      fetch(`${cfg.mikrotik.url}/rest/interface`, opts),
+    // fetchJson is "parsed body or null" and never throws, so plain Promise.all
+    // is enough — the allSettled + `fulfilled && ok ? json : []` dance this
+    // replaces was three hand-rolled copies of exactly that.
+    const opts = { headers, timeoutMs: 8000 };
+    type Row = Record<string, unknown>;
+    const [arp, dhcp, ifaces] = await Promise.all([
+      fetchJson<Row[]>(`${cfg.mikrotik.url}/rest/ip/arp`, opts),
+      fetchJson<Row[]>(`${cfg.mikrotik.url}/rest/ip/dhcp-server/lease`, opts),
+      fetchJson<Row[]>(`${cfg.mikrotik.url}/rest/interface`, opts),
     ]);
-
-    const arpData: Record<string, unknown>[] = arpRes.status === "fulfilled" && arpRes.value.ok
-      ? await arpRes.value.json() : [];
-    const dhcpData: Record<string, unknown>[] = dhcpRes.status === "fulfilled" && dhcpRes.value.ok
-      ? await dhcpRes.value.json() : [];
-    const ifData: Record<string, unknown>[] = ifRes.status === "fulfilled" && ifRes.value.ok
-      ? await ifRes.value.json() : [];
+    const arpData:  Row[] = arp    ?? [];
+    const dhcpData: Row[] = dhcp   ?? [];
+    const ifData:   Row[] = ifaces ?? [];
 
     const dhcpMap = new Map<string, string>();
     for (const lease of dhcpData) {

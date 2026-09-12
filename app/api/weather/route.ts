@@ -70,6 +70,11 @@ export async function GET() {
     const config = await loadConfig();
     const { lat, lon } = config.weather;
 
+    // Deliberately a bare fetch, not lib/http. open-meteo is a public internet
+    // API, not a homelab upstream — the circuit breaker exists to stop this app
+    // from crashing the user's own *arr/PiHole containers, which does not apply
+    // here. It also relies on `next: { revalidate: 900 }` for a 15-minute cache,
+    // which would conflict with lib/http's `cache: "no-store"`.
     const res = await fetch(
       `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
       `&current=temperature_2m,weather_code` +

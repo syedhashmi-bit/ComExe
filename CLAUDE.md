@@ -49,7 +49,7 @@ $env:PATH = "C:\Program Files\nodejs;" + $env:PATH
 npm run dev        # localhost:3000
 npm run build      # local sanity check; CI does the real build
 npm run lint
-npm test           # vitest, 77 unit tests
+npm test           # vitest, 98 unit tests
 npm run test:e2e   # playwright
 npm run storybook  # primitives sandbox on :6006
 ```
@@ -132,9 +132,9 @@ prevent that, and every one of them matters:
    failures opens the circuit; cooldown backs off 30s → 5min. One probe is let
    through (half-open); success closes, failure re-opens longer. Trips on 5xx
    and network errors but **deliberately not on 4xx** — a bad API key means the
-   upstream is healthy and answering. ⚠️ **Reaches only the 8 routes that import
-   `lib/http.ts`** — notably *not* `services/route.ts`, so the *arr stack is
-   currently unprotected by it. See the hard rule below.
+   upstream is healthy and answering. Now covers every upstream call including
+   `services/route.ts` — for a long time it didn't, which meant the breaker
+   didn't protect the *arr stack whose crashes motivated it.
 3. **Per-endpoint memoization** in `services/route.ts` — heavy library calls
    (`radarr/movies`, `sonarr/series`) cached 5min, enrichment 3–5min. Only
    genuinely real-time data (queue items, active streams, qBit speeds) is
@@ -419,18 +419,25 @@ iframe cookie problems entirely).
 
 - Never trigger speedtests — SpeedTracker schedules them.
 - No external chart libraries. Canvas or inline SVG only.
-- All **new** outbound HTTP goes through `lib/http.ts`. Never add a bare `fetch`
-  to an upstream — that bypasses the circuit breaker.
+- All outbound HTTP to an upstream goes through `lib/http.ts`. Never add a bare
+  `fetch` — that bypasses the circuit breaker and leaves the origin invisible to
+  `/api/diagnostics`.
 
-  > **Current reality:** only **8 of 33** routes actually import `lib/http.ts`.
-  > `services/route.ts` (10 bare `fetch` calls), `test-connection` (13),
-  > `mikrotik/devices`, `mikrotik/wol`, `topology` and `weather` do not, so the
-  > breaker does **not** cover the *arr stack — the very services whose crashes
-  > motivated it — and `/api/diagnostics` under-reports because those origins
-  > never register. The socket cap still applies everywhere (`fetch-agent.ts`
-  > installs globally on import). Migrating the stragglers is planned work; treat
-  > the rule above as binding for new code and don't read it as a description of
-  > the current state.
+  > There are exactly **two** deliberate exceptions, both documented at the call
+  > site. Don't "fix" them:
+  > - `stream/route.ts` — self-fetches our own origin. No upstream to protect,
+  >   and breaker-gating it would let one failing internal route open a circuit
+  >   against the dashboard itself.
+  > - `weather/route.ts` — open-meteo is a public internet API, not a homelab
+  >   container, and it depends on `next: { revalidate: 900 }`, which conflicts
+  >   with `lib/http`'s `cache: "no-store"`.
+  >
+  > `test-connection` **does** use `lib/http`, but passes `skipBreaker: true`.
+  > That flag is only for manual, user-initiated probes: the circuit for a
+  > service is open precisely when that service has been failing, which is
+  > exactly when someone opens the wizard to fix its credentials — a
+  > breaker-gated Test would answer "circuit open" instead of testing the key.
+  > **Never set `skipBreaker` on a polled path.**
 - Wrap external fetches so failure renders `"—"`. Never crash the page.
 - Resolve credentials via `loadConfig()` inside the handler, never
   `process.env` at module scope.
@@ -468,7 +475,7 @@ iframe cookie problems entirely).
 
 ## Testing
 
-- **Unit** — vitest, `tests/unit/`. 77 tests over 10 files, all covering
+- **Unit** — vitest, `tests/unit/`. 98 tests over 11 files, mostly covering
   `app/lib/*` (auth, cache, circuit-breaker, history, json-store, http,
   prometheus, server-config, validate).
 - **E2E** — Playwright, `tests/e2e/smoke.spec.ts`.
@@ -536,3 +543,13 @@ clones see.
 | `ROADMAP.md` | Shipped-tier changelog; open work is in Parts A/B/C at the end |
 | `INSTALL.md` | End-user install guide |
 | `.env.local.example` | Template for `.env.local` (gitignored) |
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

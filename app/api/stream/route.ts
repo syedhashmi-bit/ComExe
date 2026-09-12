@@ -80,6 +80,12 @@ export async function GET(req: NextRequest) {
       async function fetchAndPush(key: string) {
         if (!alive) return;
         try {
+          // Deliberately a bare fetch, not lib/http. This is a SELF-fetch to our
+          // own origin, so there is no upstream to protect and no breaker state
+          // worth recording — the real upstream calls happen inside the routes
+          // being called, which do go through lib/http. Routing this through the
+          // breaker would also let one failing internal route open a circuit
+          // against the dashboard itself.
           const res = await fetch(`${origin}${ENDPOINTS[key]}`, {
             cache: "no-store",
             // These are self-fetches back through our own HTTP surface, so the
