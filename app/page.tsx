@@ -1439,19 +1439,27 @@ export default function Dashboard() {
       </main>
 
       {showSettings && (
-        <SettingsPanel settings={settings} onUpdate={setSettings} onClose={() => setShowSettings(false)} services={services} />
+        <ErrorBoundary name="Settings">
+          <SettingsPanel settings={settings} onUpdate={setSettings} onClose={() => setShowSettings(false)} services={services} />
+        </ErrorBoundary>
       )}
 
       {showShortcuts && (
-        <KeyboardShortcuts onClose={() => setShowShortcuts(false)} />
+        <ErrorBoundary name="Keyboard shortcuts">
+          <KeyboardShortcuts onClose={() => setShowShortcuts(false)} />
+        </ErrorBoundary>
       )}
 
       {showNotifications && (
-        <NotificationCenter onClose={() => setShowNotifications(false)} />
+        <ErrorBoundary name="Notifications">
+          <NotificationCenter onClose={() => setShowNotifications(false)} />
+        </ErrorBoundary>
       )}
 
       {showCommandPalette && (
-        <CommandPalette onClose={() => setShowCommandPalette(false)} actions={commandActions} />
+        <ErrorBoundary name="Command palette">
+          <CommandPalette onClose={() => setShowCommandPalette(false)} actions={commandActions} />
+        </ErrorBoundary>
       )}
 
       {showTopology && (
@@ -1476,7 +1484,9 @@ export default function Dashboard() {
       )}
 
       {logsContainer && (
-        <ContainerLogsSheet containerName={logsContainer} onClose={() => setLogsContainer(null)} />
+        <ErrorBoundary name="Container logs">
+          <ContainerLogsSheet containerName={logsContainer} onClose={() => setLogsContainer(null)} />
+        </ErrorBoundary>
       )}
 
       {restartMsg && (

@@ -29,6 +29,10 @@ export function MikrotikTab({ mikrotikUrl, refreshSec, demoMode = false }: {
 }) {
   const [data, setData] = useState<MtData | null>(null);
   const [corsBlocked, setCorsBlocked] = useState(false);
+  // Distinguishes "first fetch hasn't finished" from "fetch failed". Without
+  // it, `!data` was treated as failure, so the failure branch rendered on every
+  // single page load — see the comment on that branch below.
+  const [loading, setLoading] = useState(true);
   const mikrotikHost = mikrotikUrl.replace(/^https?:\/\//, "").replace(/\/$/, "");
 
   useEffect(() => {
@@ -58,6 +62,8 @@ export function MikrotikTab({ mikrotikUrl, refreshSec, demoMode = false }: {
         setCorsBlocked(false);
       } catch {
         setCorsBlocked(true);
+      } finally {
+        setLoading(false);
       }
     }
     const everySec = Math.max(MIKROTIK_MIN_SEC, refreshSec || MIKROTIK_DEFAULT_SEC);
@@ -113,6 +119,12 @@ export function MikrotikTab({ mikrotikUrl, refreshSec, demoMode = false }: {
     </div>
   );
 
+  // Shown while the first fetch is in flight, and when the router can't be
+  // reached. It used to render hardcoded literals here — `"RouterOS 7.22.1"`
+  // and `"Uptime 13d 4h"` — so a user saw a plausible, completely fabricated
+  // uptime on every page load before real data arrived, and permanently
+  // whenever the router was unreachable. Values are only ever shown now if
+  // they came from the router.
   if (corsBlocked || !data) {
     return (
       <a href={mikrotikUrl} target="_blank" rel="noopener noreferrer"
@@ -138,15 +150,11 @@ export function MikrotikTab({ mikrotikUrl, refreshSec, demoMode = false }: {
           <span style={{ color: "var(--text-label)", fontSize: 11 }}>hAP ax³</span>
         </div>
         {staticSep()}
-        {staticPill("RouterOS", "7.22.1")}
-        {staticSep()}
         {staticPill("IP", mikrotikHost)}
         {staticSep()}
-        {staticPill("CPU", "—")}
-        {staticSep()}
-        {staticPill("RAM", "—")}
-        {staticSep()}
-        {staticPill("Uptime", "13d 4h")}
+        {loading
+          ? <span style={{ color: "var(--text-label)", fontSize: 11, flexShrink: 0 }}>connecting&hellip;</span>
+          : <span style={{ color: "var(--warn)", fontSize: 11, flexShrink: 0 }}>unreachable</span>}
         <span style={{ color: "var(--text-ghost)", fontSize: 10, marginLeft: "auto", flexShrink: 0 }}>tap to open ↗</span>
       </a>
     );

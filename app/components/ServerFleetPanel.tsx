@@ -42,6 +42,10 @@ function MiniBar({ value, color }: { value: number | null; color: string }) {
 export function ServerFleetPanel({ onClose }: { onClose: () => void }) {
   const [servers, setServers] = useState<ServerStatus[]>([]);
   const [loading, setLoading] = useState(true);
+  // "Fetch failed" and "you genuinely have no servers" must not render the same
+  // way — otherwise a flaky network shows a confident "No additional servers
+  // configured". Same reasoning as NotificationCenter, which already does this.
+  const [error, setError] = useState(false);
   const [newName, setNewName] = useState("");
   const [newUrl, setNewUrl] = useState("");
   const [adding, setAdding] = useState(false);
@@ -50,11 +54,13 @@ export function ServerFleetPanel({ onClose }: { onClose: () => void }) {
   const fetchServers = useCallback(async () => {
     try {
       const res = await fetch("/api/servers");
-      if (!res.ok) return;
+      if (!res.ok) { setError(true); return; }
       const data = await res.json();
       setServers(data.servers ?? []);
-    } catch { /* ignore */ }
-    finally { setLoading(false); }
+      setError(false);
+    } catch {
+      setError(true);
+    } finally { setLoading(false); }
   }, []);
 
   usePollingInterval(fetchServers, 30_000, { enabled: !isDemoMode() });
@@ -153,6 +159,14 @@ export function ServerFleetPanel({ onClose }: { onClose: () => void }) {
           {loading ? (
             <div style={{ padding: "24px 0", textAlign: "center", color: "var(--text-ghost)", fontSize: 11 }}>
               Loading fleet status...
+            </div>
+          ) : error ? (
+            <div className="flex flex-col items-center gap-2 py-8" style={{ color: "var(--warn)" }}>
+              <span style={{ fontSize: 12 }}>Couldn&apos;t load the server list</span>
+              <span style={{ fontSize: 10, maxWidth: 280, textAlign: "center", lineHeight: 1.6, color: "var(--text-dim)" }}>
+                /api/servers didn&apos;t respond. This is a dashboard problem, not a
+                report that you have no servers — retrying automatically.
+              </span>
             </div>
           ) : servers.length === 0 ? (
             <div className="flex flex-col items-center gap-2 py-8" style={{ color: "var(--text-ghost)" }}>

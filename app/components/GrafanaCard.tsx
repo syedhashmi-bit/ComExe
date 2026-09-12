@@ -142,7 +142,7 @@ function RefreshingImg({ url, width, height, onLoaded, onError }: {
 function GrafanaFallback({ height, probe, baseUrl, panelUrl }: { height: number; probe: ProbeResult; baseUrl: string; panelUrl: string }) {
   const isAuth = probe.reason === "auth";
   const isNotFound = probe.reason === "not_found";
-  const accent = isAuth ? "var(--warning)" : "var(--critical)";
+  const accent = isAuth ? "var(--warn)" : "var(--critical)";
 
   return (
     <div style={{

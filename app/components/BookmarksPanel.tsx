@@ -83,7 +83,7 @@ export function BookmarksPanel({ clientConfig, setClientConfig }: BookmarksPanel
       </div>
 
       {editBookmarks && readonly && (
-        <div style={{ fontSize: 11, color: "var(--warning)", background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.3)", borderRadius: 6, padding: "8px 10px", lineHeight: 1.5 }}>
+        <div style={{ fontSize: 11, color: "var(--warn)", background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.3)", borderRadius: 6, padding: "8px 10px", lineHeight: 1.5 }}>
           <strong>Read-only install.</strong> <code style={{ fontFamily: "monospace" }}>{clientConfig?.writablePath ?? "/app/data"}</code> is not writable, so saves will fail. Add <code style={{ fontFamily: "monospace" }}>-v /host/path/data:/app/data</code> to your <code>docker run</code> command (host dir must be writable by uid 1001) and restart the container.
           {clientConfig?.writableReason && (
             <div style={{ marginTop: 4, fontFamily: "monospace", fontSize: 10, opacity: 0.85 }}>OS error: {clientConfig.writableReason}</div>

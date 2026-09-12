@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { ErrorBoundary } from "@/app/components/ErrorBoundary";
 
 // ── DraggableCard ────────────────────────────────────────────────────────────
 // Wraps a metric card with HTML5 drag-and-drop. The whole card is draggable;
@@ -77,7 +78,12 @@ export function DraggableCard({
           }}
         >⋮⋮</span>
       )}
-      {children}
+      {/* Every metric card renders here, so one boundary covers all six and
+          keeps a failure local to the card that caused it. Previously the
+          metric grid was entirely unprotected: a malformed /api/metrics payload
+          in a single card — e.g. Math.max(...rxHistory) on an unexpected shape
+          — unmounted the whole dashboard. */}
+      <ErrorBoundary name={`${cardKey} card`}>{children}</ErrorBoundary>
     </div>
   );
 }

@@ -34,15 +34,20 @@ export function DependencyMap({ onClose, services }: DependencyMapProps) {
   const [deps, setDeps] = useState<DependencyEdge[]>([]);
   const [loading, setLoading] = useState(true);
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
+  // See ServerFleetPanel / NotificationCenter — a swallowed fetch error used to
+  // render "No dependencies configured", which is a different claim entirely.
+  const [error, setError] = useState(false);
 
   const fetchDeps = useCallback(async () => {
     try {
       const res = await fetch("/api/dependencies");
-      if (!res.ok) return;
+      if (!res.ok) { setError(true); return; }
       const data = await res.json();
       setDeps(data.dependencies ?? []);
-    } catch { /* ignore */ }
-    finally { setLoading(false); }
+      setError(false);
+    } catch {
+      setError(true);
+    } finally { setLoading(false); }
   }, []);
 
   useEffect(() => { fetchDeps(); }, [fetchDeps]);
@@ -167,6 +172,13 @@ export function DependencyMap({ onClose, services }: DependencyMapProps) {
           {loading ? (
             <div style={{ padding: "40px 0", textAlign: "center", color: "var(--text-ghost)", fontSize: 12 }}>
               Loading dependency graph...
+            </div>
+          ) : error ? (
+            <div style={{ padding: "40px 0", textAlign: "center", color: "var(--warn)", fontSize: 12 }}>
+              Couldn&apos;t load the dependency graph
+              <div style={{ fontSize: 10, color: "var(--text-dim)", marginTop: 6 }}>
+                /api/dependencies didn&apos;t respond — this isn&apos;t a report that none are configured.
+              </div>
             </div>
           ) : nodes.length === 0 ? (
             <div style={{ padding: "40px 0", textAlign: "center", color: "var(--text-ghost)", fontSize: 12 }}>
