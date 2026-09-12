@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 // ── lib imports ──────────────────────────────────────────────────────────────
 import { THEMES, SVC_PORTS, type ThemeKey } from "@/app/lib/constants";
@@ -68,6 +69,10 @@ const SETTINGS_KEY = "comexe:settings";
 // ── Dashboard ────────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
+  // window.location.href forces a full document reload; router.push does a
+  // client-side transition. Next 16's no-location-assign-relative-destination
+  // rule flags the former for internal routes.
+  const router = useRouter();
   const [metrics,      setMetrics]      = useState<Metrics | null>(null);
   const [loading,      setLoading]      = useState(true);
   const [error,        setError]        = useState<string | null>(null);
@@ -486,9 +491,9 @@ export default function Dashboard() {
     if (!services || servicesLoading) return;
     const configured = services.filter(s => s.configured !== false).length;
     if (configured === 0 && !localStorage.getItem("comexe:welcome-done")) {
-      window.location.href = "/welcome";
+      router.push("/welcome");
     }
-  }, [services, servicesLoading, demoMode]);
+  }, [services, servicesLoading, demoMode, router]);
 
   usePollingInterval(
     fetchMetrics,
@@ -546,13 +551,13 @@ export default function Dashboard() {
     { id: "topology", label: "Network topology", section: "Panels", icon: "🕸️", action: () => setShowTopology(true) },
     { id: "fleet", label: "Server fleet", section: "Panels", icon: "🖥️", action: () => setShowServerFleet(true) },
     { id: "dependencies", label: "Dependency map", section: "Panels", icon: "🔗", action: () => setShowDependencyMap(true) },
-    { id: "analytics", label: "Open analytics", section: "Navigate", icon: "📊", action: () => { window.location.href = "/analytics"; } },
-    { id: "logs", label: "Log viewer", section: "Navigate", icon: "📜", action: () => { window.location.href = "/logs"; } },
-    { id: "forecast", label: "Insights & forecasting", section: "Navigate", icon: "🔮", action: () => { window.location.href = "/forecast"; } },
-    { id: "setup", label: "Setup wizard", section: "Navigate", icon: "🧙", action: () => { window.location.href = "/setup"; } },
+    { id: "analytics", label: "Open analytics", section: "Navigate", icon: "📊", action: () => { router.push("/analytics"); } },
+    { id: "logs", label: "Log viewer", section: "Navigate", icon: "📜", action: () => { router.push("/logs"); } },
+    { id: "forecast", label: "Insights & forecasting", section: "Navigate", icon: "🔮", action: () => { router.push("/forecast"); } },
+    { id: "setup", label: "Setup wizard", section: "Navigate", icon: "🧙", action: () => { router.push("/setup"); } },
     { id: "truenas", label: "Open TrueNAS UI", section: "Navigate", icon: "🖥️", action: () => window.open(`http://${clientConfig?.truenasIp ?? "192.168.88.196"}`, "_blank") },
     { id: "prometheus", label: "Open Prometheus", section: "Navigate", icon: "📈", action: () => window.open(`http://${clientConfig?.truenasIp ?? "192.168.88.196"}:30104`, "_blank") },
-  ], [fetchMetrics, clientConfig?.truenasIp]);
+  ], [fetchMetrics, clientConfig?.truenasIp, router]);
 
   // ── render ─────────────────────────────────────────────────────────────────
   return (
@@ -583,7 +588,13 @@ export default function Dashboard() {
           letterSpacing: "0.02em",
         }}>
           Demo mode — showing sample data.{" "}
+          {/* Deliberately a full reload, not router.push. demoMode is derived
+              from window.location.search during render, and every demo-seeded
+              piece of state (metrics, services, history arrays) was set by a
+              one-shot effect. A client-side transition would change the URL
+              while leaving that state in place. Reloading is the honest reset. */}
           <span style={{ textDecoration: "underline", fontWeight: 700, cursor: "pointer" }}
+            // eslint-disable-next-line @next/next/no-location-assign-relative-destination
             onClick={() => { window.location.href = "/"; }}>Exit demo</span>
         </div>
       )}
