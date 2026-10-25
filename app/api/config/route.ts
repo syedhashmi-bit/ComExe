@@ -1,14 +1,18 @@
 import { NextResponse } from "next/server";
 import { isJsonContentType } from "@/app/lib/validate";
-import { loadConfig, writeConfigFile, probeWritable, invalidateConfigCache, type PartialFileConfig } from "@/app/lib/server-config";
+import {
+  loadConfig, writeConfigFile, probeWritable, invalidateConfigCache,
+  readConfigFile, describeSavedConfig, keepSavedSecrets, type PartialFileConfig,
+} from "@/app/lib/server-config";
 import { loadBookmarks } from "@/app/lib/bookmarks";
-import type { BookmarkColumn } from "@/app/lib/types";
+import type { BookmarkColumn, SavedConfig } from "@/app/lib/types";
 
 // ── /api/config ───────────────────────────────────────────────────────────────
 // GET  → runtime client-side config (URLs, bookmarks, Grafana embed, etc.).
 //        Nothing returned here is a secret — credentials never leave the server.
 // POST → save config to data/config.json (the writable mount). Lets the /setup
-//        wizard apply config without a redeploy. Body is a PartialFileConfig.
+//        wizard apply config without a redeploy. Body is a PartialFileConfig;
+//        a secret left blank keeps the saved one (see keepSavedSecrets).
 //
 // The same image works for any user. Layers (high precedence first):
 //   1. data/config.json (written by POST)
@@ -48,6 +52,9 @@ export interface ClientConfig {
   // True when GRAFANA_API_TOKEN is set. Tells the GrafanaCard to use the
   // server-side /render proxy instead of an iframe.
   grafanaTokenSet?: boolean;
+  // What data/config.json holds, so /setup can prefill from it. Secrets are
+  // reported as present/absent only. null when nothing has been saved.
+  saved: SavedConfig | null;
 }
 
 export async function GET() {
@@ -109,6 +116,7 @@ export async function GET() {
     writablePath:   writableProbe.ok ? undefined : writableProbe.path,
     dockerEnabled: process.env.COMEXE_DOCKER_ENABLED === "1" || process.env.COMEXE_DOCKER_ENABLED === "true",
     grafanaTokenSet: !!process.env.GRAFANA_API_TOKEN?.trim(),
+    saved:           describeSavedConfig(await readConfigFile()),
   };
 
   return NextResponse.json(response);
@@ -208,7 +216,8 @@ export async function POST(req: Request) {
     }, { status: 503 });
   }
 
-  const result = await writeConfigFile(validated.cfg);
+  // The wizard never sees saved secrets, so blank ones mean "keep", not "clear".
+  const result = await writeConfigFile(keepSavedSecrets(validated.cfg, await readConfigFile()));
   if (!result.ok) {
     return NextResponse.json(result, { status: 500 });
   }

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { THEMES, TIMEZONES } from "@/app/lib/constants";
+import type { SavedConfig } from "@/app/lib/types";
 
 // ── Setup wizard ──────────────────────────────────────────────────────────────
 // Single-page form. The user picks which services they have, fills in URLs and
@@ -100,6 +101,42 @@ function loadState(): WizardState {
   }
 }
 
+// Overlay what data/config.json actually holds, so the form shows the live
+// config rather than only what this browser last typed. Saved secrets aren't
+// sent to the browser: their fields stay as typed (usually blank), and POST
+// /api/config keeps the stored value for any secret left blank.
+function withSaved(s: WizardState, saved: SavedConfig): WizardState {
+  const ip = saved.truenasIp || s.truenasIp;
+  const rows = { ...s.rows };
+  for (const svc of SERVICES) {
+    const sv = saved.services[svc.id];
+    if (!sv) continue;
+    rows[svc.id] = {
+      ...rows[svc.id], enabled: true,
+      url:      sv.url      || rows[svc.id].url || deriveDefaultUrl(ip, svc.defaultPort),
+      username: sv.username || rows[svc.id].username,
+    };
+  }
+  const g = saved.grafana, p = saved.preferences, m = saved.mikrotik;
+  return {
+    ...s, truenasIp: ip, rows,
+    mikrotik: m ? { ...s.mikrotik, enabled: true, url: m.url || s.mikrotik.url, username: m.username || s.mikrotik.username } : s.mikrotik,
+    grafana: g ? {
+      ...s.grafana, enabled: true,
+      baseUrl:       g.baseUrl       ?? s.grafana.baseUrl,
+      dashboardUid:  g.dashboardUid  ?? s.grafana.dashboardUid,
+      datasourceUid: g.datasourceUid ?? s.grafana.datasourceUid,
+      panelId:       g.panelId       ?? s.grafana.panelId,
+      panels:        g.panels        ?? s.grafana.panels,
+    } : s.grafana,
+    preferences: p ? {
+      searchEngine: p.searchEngine ?? s.preferences.searchEngine,
+      timezone:     p.timezone     ?? s.preferences.timezone,
+      theme:        p.theme        ?? s.preferences.theme,
+    } : s.preferences,
+  };
+}
+
 function saveState(s: WizardState) {
   if (typeof window === "undefined") return;
   try { localStorage.setItem(LS_KEY, JSON.stringify(s)); } catch { /* over-quota etc. */ }
@@ -192,6 +229,7 @@ export default function SetupWizard() {
   const [showPasswords, setShowPasswords] = useState(false);
   const [outputTab, setOutputTab] = useState<"compose" | "run" | "env">("compose");
   const [writable, setWritable] = useState<boolean | null>(null);
+  const [saved, setSaved] = useState<SavedConfig | null>(null);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>({ state: "idle" });
   const [showAdvanced, setShowAdvanced] = useState(false);
 
@@ -200,13 +238,21 @@ export default function SetupWizard() {
   useEffect(() => { if (hydrated) saveState(state); }, [state, hydrated]);
 
   // Check whether the writable volume is mounted — disables the Save button
-  // with a friendly message if not.
+  // with a friendly message if not — and prefill from the saved config.
   useEffect(() => {
     fetch("/api/config", { cache: "no-store" })
       .then(r => r.ok ? r.json() : null)
-      .then((cfg: { writable?: boolean } | null) => { if (cfg) setWritable(cfg.writable ?? false); })
+      .then((cfg: { writable?: boolean; saved?: SavedConfig | null } | null) => {
+        if (!cfg) return;
+        setWritable(cfg.writable ?? false);
+        const s = cfg.saved;
+        if (s) { setSaved(s); setState(prev => withSaved(prev, s)); }
+      })
       .catch(() => setWritable(false));
   }, []);
+
+  // Placeholder for a secret field whose value is saved server-side.
+  const keepHint = (has?: boolean) => has ? "saved — leave blank to keep" : undefined;
 
   function updateRow(id: string, patch: Partial<ServiceRow>) {
     setState(s => ({ ...s, rows: { ...s.rows, [id]: { ...s.rows[id], ...patch } } }));
@@ -421,20 +467,20 @@ export default function SetupWizard() {
                     <div className="setup-grid" style={{ display: "grid", gridTemplateColumns: "minmax(280px, 2fr) 1fr 1fr auto", gap: 10, alignItems: "end" }}>
                       <Field label="URL" value={row.url} onChange={v => updateRow(svc.id, { url: v })} mono />
                       {svc.authShape === "apikey" && (
-                        <Field label="API key" value={row.apiKey} onChange={v => updateRow(svc.id, { apiKey: v })} type={showPasswords ? "text" : "password"} mono />
+                        <Field label="API key" value={row.apiKey} onChange={v => updateRow(svc.id, { apiKey: v })} placeholder={keepHint(saved?.services[svc.id]?.hasApiKey)} type={showPasswords ? "text" : "password"} mono />
                       )}
                       {svc.authShape === "bearer" && (
-                        <Field label="Bearer token (optional)" value={row.apiKey} onChange={v => updateRow(svc.id, { apiKey: v })} type={showPasswords ? "text" : "password"} mono />
+                        <Field label="Bearer token (optional)" value={row.apiKey} onChange={v => updateRow(svc.id, { apiKey: v })} placeholder={keepHint(saved?.services[svc.id]?.hasApiKey)} type={showPasswords ? "text" : "password"} mono />
                       )}
                       {keyOrLogin(svc) && (
-                        <Field label="API key" value={row.apiKey} onChange={v => updateRow(svc.id, { apiKey: v })} type={showPasswords ? "text" : "password"} mono />
+                        <Field label="API key" value={row.apiKey} onChange={v => updateRow(svc.id, { apiKey: v })} placeholder={keepHint(saved?.services[svc.id]?.hasApiKey)} type={showPasswords ? "text" : "password"} mono />
                       )}
                       {svc.authShape === "userpass" && !keyOrLogin(svc) && <>
                         <Field label="Username" value={row.username} onChange={v => updateRow(svc.id, { username: v })} mono />
-                        <Field label="Password" value={row.password} onChange={v => updateRow(svc.id, { password: v })} type={showPasswords ? "text" : "password"} mono />
+                        <Field label="Password" value={row.password} onChange={v => updateRow(svc.id, { password: v })} placeholder={keepHint(saved?.services[svc.id]?.hasPassword)} type={showPasswords ? "text" : "password"} mono />
                       </>}
                       {svc.authShape === "password" && (
-                        <Field label="Password" value={row.password} onChange={v => updateRow(svc.id, { password: v })} type={showPasswords ? "text" : "password"} mono />
+                        <Field label="Password" value={row.password} onChange={v => updateRow(svc.id, { password: v })} placeholder={keepHint(saved?.services[svc.id]?.hasPassword)} type={showPasswords ? "text" : "password"} mono />
                       )}
                       {(svc.authShape === "apikey" || svc.authShape === "bearer" || keyOrLogin(svc)) && (
                         <div /> // spacer to fill the 3rd column
@@ -447,7 +493,7 @@ export default function SetupWizard() {
                       <div className="setup-grid" style={{ display: "grid", gridTemplateColumns: "minmax(280px, 2fr) 1fr 1fr auto", gap: 10, alignItems: "end" }}>
                         <div style={{ fontSize: 11, color: "var(--text-faint)", paddingBottom: 8 }}>Or, without an API key, log in with:</div>
                         <Field label="Username" value={row.username} onChange={v => updateRow(svc.id, { username: v })} mono />
-                        <Field label="Password" value={row.password} onChange={v => updateRow(svc.id, { password: v })} type={showPasswords ? "text" : "password"} mono />
+                        <Field label="Password" value={row.password} onChange={v => updateRow(svc.id, { password: v })} placeholder={keepHint(saved?.services[svc.id]?.hasPassword)} type={showPasswords ? "text" : "password"} mono />
                         <div />
                       </div>
                     )}
@@ -486,7 +532,7 @@ export default function SetupWizard() {
             <div className="setup-grid" style={{ marginTop: 12, marginLeft: 26, display: "grid", gridTemplateColumns: "minmax(220px, 1.5fr) 1fr 1fr auto", gap: 10, alignItems: "end" }}>
               <Field label="URL" value={state.mikrotik.url} onChange={v => setState(s => ({ ...s, mikrotik: { ...s.mikrotik, url: v } }))} mono />
               <Field label="Username" value={state.mikrotik.username} onChange={v => setState(s => ({ ...s, mikrotik: { ...s.mikrotik, username: v } }))} mono />
-              <Field label="Password" value={state.mikrotik.password} onChange={v => setState(s => ({ ...s, mikrotik: { ...s.mikrotik, password: v } }))} type={showPasswords ? "text" : "password"} mono />
+              <Field label="Password" value={state.mikrotik.password} onChange={v => setState(s => ({ ...s, mikrotik: { ...s.mikrotik, password: v } }))} placeholder={keepHint(saved?.mikrotik?.hasPassword)} type={showPasswords ? "text" : "password"} mono />
               <Btn onClick={testMikrotik} disabled={state.mikrotik.testStatus.state === "testing"}>
                 {state.mikrotik.testStatus.state === "testing" ? "…" : "Test"}
               </Btn>

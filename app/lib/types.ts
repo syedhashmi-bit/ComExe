@@ -181,3 +181,13 @@ export interface ClientConfig {
   dockerEnabled?:    boolean;
   grafanaTokenSet?:  boolean;
 }
+
+// What data/config.json holds, as GET /api/config reports it for the /setup
+// wizard to prefill from. Secrets appear only as "is one saved", never values.
+export interface SavedConfig {
+  truenasIp?:   string;
+  services:     Record<string, { url?: string; username?: string; hasApiKey: boolean; hasPassword: boolean }>;
+  mikrotik?:    { url?: string; username?: string; hasPassword: boolean };
+  grafana?:     { baseUrl?: string; dashboardUid?: string; datasourceUid?: string; panelId?: string; panels?: { panelId: string; label: string; size: "sm" | "md" | "lg" }[] };
+  preferences?: { searchEngine?: string; timezone?: string; theme?: string };
+}

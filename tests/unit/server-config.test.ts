@@ -89,3 +89,45 @@ describe("server-config", () => {
     expect(cfg.grafana.dashboardSlug).toBe("node-exporter-full");
   });
 });
+
+describe("wizard round-trip", () => {
+  // The /setup wizard never receives saved secrets, so it can't send them
+  // back. A save from a browser with an empty form used to wipe every key.
+  const saved = {
+    truenasIp: "10.0.0.5",
+    services: {
+      radarr:      { url: "http://r:1", apiKey: "rk" },
+      qbittorrent: { url: "http://q:2", apiKey: "qk", username: "admin", password: "qp" },
+    },
+    mikrotik: { url: "http://m", username: "mon", password: "mp" },
+  };
+
+  it("describes saved config without leaking secret values", async () => {
+    const { describeSavedConfig } = await import("@/app/lib/server-config");
+    const d = describeSavedConfig(saved)!;
+    expect(d.services.qbittorrent).toEqual({ url: "http://q:2", username: "admin", hasApiKey: true, hasPassword: true });
+    expect(d.services.radarr).toEqual({ url: "http://r:1", username: undefined, hasApiKey: true, hasPassword: false });
+    expect(d.mikrotik).toEqual({ url: "http://m", username: "mon", hasPassword: true });
+    expect(JSON.stringify(d)).not.toMatch(/rk|qk|qp|mp/);
+    expect(describeSavedConfig(null)).toBeNull();
+  });
+
+  it("keeps saved secrets that the form left blank", async () => {
+    const { keepSavedSecrets } = await import("@/app/lib/server-config");
+    const next = keepSavedSecrets({
+      services: { radarr: { url: "http://r:9", apiKey: "" }, qbittorrent: { url: "http://q:2", username: "admin" } },
+      mikrotik: { url: "http://m", username: "mon", password: "" },
+    }, saved);
+    expect(next.services?.radarr).toMatchObject({ url: "http://r:9", apiKey: "rk" });
+    expect(next.services?.qbittorrent).toMatchObject({ apiKey: "qk", password: "qp" });
+    expect(next.mikrotik?.password).toBe("mp");
+  });
+
+  it("lets a typed secret replace the saved one, and drops unticked services", async () => {
+    const { keepSavedSecrets } = await import("@/app/lib/server-config");
+    const next = keepSavedSecrets({ services: { radarr: { apiKey: "new" } } }, saved);
+    expect(next.services?.radarr?.apiKey).toBe("new");
+    expect(next.services?.qbittorrent).toBeUndefined();
+    expect(keepSavedSecrets({}, saved)).toEqual({ services: undefined, mikrotik: undefined });
+  });
+});

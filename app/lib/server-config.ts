@@ -15,6 +15,8 @@
 
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import { randomUUID } from "node:crypto";
+import type { SavedConfig } from "@/app/lib/types";
 
 const CONFIG_PATH = process.env.CONFIG_PATH ?? path.join(process.cwd(), "data", "config.json");
 const CACHE_TTL   = 5_000;
@@ -119,7 +121,7 @@ const MANIFEST: ServiceManifest[] = [
 
 let fileCache: { data: PartialFileConfig | null; ts: number } | null = null;
 
-async function readConfigFile(): Promise<PartialFileConfig | null> {
+export async function readConfigFile(): Promise<PartialFileConfig | null> {
   if (fileCache && Date.now() - fileCache.ts < CACHE_TTL) return fileCache.data;
   try {
     const raw = await fs.readFile(CONFIG_PATH, "utf8");
@@ -149,6 +151,47 @@ export async function writeConfigFile(config: PartialFileConfig): Promise<{ ok: 
   } catch (e) {
     return { ok: false, message: `Could not write ${CONFIG_PATH}: ${(e as Error).message}. Mount a writable volume at ${dir} to enable Save & apply.` };
   }
+}
+
+// ── wizard round-trip ────────────────────────────────────────────────────
+// GET /api/config never sends saved secrets to the browser, so the /setup
+// wizard can't send them back. These two make that round-trip safe: the
+// wizard prefills from describeSavedConfig(), and POST runs keepSavedSecrets()
+// so a key or password left blank means "keep what's saved", not "clear it".
+// Without this, saving from a browser with an empty form wiped every key.
+
+export function describeSavedConfig(file: PartialFileConfig | null): SavedConfig | null {
+  if (!file) return null;
+  const services: SavedConfig["services"] = {};
+  for (const [name, svc] of Object.entries(file.services ?? {})) {
+    if (!svc) continue;
+    services[name] = { url: svc.url, username: svc.username, hasApiKey: !!svc.apiKey, hasPassword: !!svc.password };
+  }
+  return {
+    truenasIp:   file.truenasIp,
+    services,
+    mikrotik:    file.mikrotik && { url: file.mikrotik.url, username: file.mikrotik.username, hasPassword: !!file.mikrotik.password },
+    grafana:     file.grafana,
+    preferences: file.preferences,
+  };
+}
+
+export function keepSavedSecrets(next: PartialFileConfig, prev: PartialFileConfig | null): PartialFileConfig {
+  if (!prev) return next;
+  let services = next.services;
+  if (services) {
+    services = { ...services };
+    for (const name of Object.keys(services) as ServiceName[]) {
+      const svc = services[name];
+      const old = prev.services?.[name];
+      if (!svc || !old) continue;
+      services[name] = { ...svc, apiKey: svc.apiKey || old.apiKey, password: svc.password || old.password };
+    }
+  }
+  const mikrotik = next.mikrotik && prev.mikrotik
+    ? { ...next.mikrotik, password: next.mikrotik.password || prev.mikrotik.password }
+    : next.mikrotik;
+  return { ...next, services, mikrotik };
 }
 
 // ── resolver ─────────────────────────────────────────────────────────────
@@ -269,7 +312,9 @@ export async function probeWritable(): Promise<{ ok: true } | { ok: false; reaso
   const dir = path.dirname(CONFIG_PATH);
   try {
     await fs.mkdir(dir, { recursive: true });
-    const probe = path.join(dir, ".write-probe");
+    // Unique per call: concurrent GETs sharing one name unlinked each other's
+    // probe (ENOENT/EPERM) and reported a writable volume as read-only.
+    const probe = path.join(dir, `.write-probe-${randomUUID()}`);
     await fs.writeFile(probe, "");
     await fs.unlink(probe);
     return { ok: true };
