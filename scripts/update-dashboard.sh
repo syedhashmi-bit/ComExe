@@ -18,6 +18,10 @@
 # Install:
 #   cp scripts/update-dashboard.sh /root/update-dashboard.sh
 #   chmod +x /root/update-dashboard.sh
+#
+# /app/data (wizard config, alerts, history) is always kept on the host. If
+# the running container has no mount there, its data is copied out to
+# DATA_DIR (default /root/comexe-data) and mounted from then on.
 
 set -euo pipefail
 
@@ -26,6 +30,7 @@ NAME="comexe"
 CANDIDATE="comexe-next"
 CANDIDATE_PORT="${CANDIDATE_PORT:-3001}"
 HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-90}"   # seconds to wait for healthy
+DATA_DIR="${DATA_DIR:-/root/comexe-data}"
 
 log()  { printf '\033[36m==>\033[0m %s\n' "$*"; }
 warn() { printf '\033[33m!!!\033[0m %s\n' "$*"; }
@@ -40,19 +45,22 @@ docker inspect "$NAME" >/dev/null 2>&1 || die "Container '$NAME' not found. Depl
 
 # Reuse the running container's env so secrets live in exactly one place (the
 # container) instead of being duplicated into this script. Image-level vars are
-# filtered out so we don't pin things the new image should choose for itself.
+# filtered out so we don't pin things the new image should choose for itself —
+# COMEXE_GIT_SHA especially: carrying the old image's SHA over froze
+# /api/version on it and left "update available" showing forever.
 log "Capturing environment from running container"
 mapfile -t ENV_ARGS < <(
   docker inspect "$NAME" --format '{{range .Config.Env}}{{println .}}{{end}}' \
-    | grep -vE '^(PATH|HOME|HOSTNAME|TERM|NODE_VERSION|YARN_VERSION|NEXT_TELEMETRY|PORT)=' \
+    | grep -vE '^(PATH|HOME|HOSTNAME|TERM|NODE_VERSION|YARN_VERSION|NEXT_TELEMETRY|PORT|COMEXE_GIT_SHA)=' \
     | grep -vE '^\s*$' \
     | sed 's/^/--env=/'
 )
 [ ${#ENV_ARGS[@]} -gt 0 ] || warn "No environment variables captured — check the new container afterwards"
 
+# Bind mounts by host path, named (and anonymous) volumes by volume name.
 mapfile -t MOUNT_ARGS < <(
   docker inspect "$NAME" --format \
-    '{{range .Mounts}}{{if eq .Type "bind"}}{{.Source}}:{{.Destination}}{{if not .RW}}:ro{{end}}{{println}}{{end}}{{end}}' \
+    '{{range .Mounts}}{{if eq .Type "bind"}}{{.Source}}:{{.Destination}}{{if not .RW}}:ro{{end}}{{println}}{{else if eq .Type "volume"}}{{.Name}}:{{.Destination}}{{if not .RW}}:ro{{end}}{{println}}{{end}}{{end}}' \
     | grep -vE '^\s*$' \
     | sed 's/^/--volume=/'
 )
@@ -68,6 +76,20 @@ NEW_IMAGE_ID="$(docker inspect "$IMAGE" --format '{{.Id}}')"
 if [ "$NEW_IMAGE_ID" = "$PREV_IMAGE_ID" ]; then
   log "Already running the latest image — nothing to do."
   exit 0
+fi
+
+# ── Keep /app/data across the swap ───────────────────────────────────────────
+# config.json (every key the /setup wizard saved), alerts.json and history all
+# live in /app/data. Unmounted, they sit in the container's own writable layer
+# and the `docker rm` below deletes them — every update sent you back to the
+# setup wizard. Rescue them to the host first; nothing has been touched yet,
+# so a failed copy aborts with the old container still running.
+if [ -z "$(docker inspect "$NAME" --format '{{range .Mounts}}{{if eq .Destination "/app/data"}}x{{end}}{{end}}')" ]; then
+  warn "/app/data is not mounted — copying it to $DATA_DIR and mounting that from now on"
+  mkdir -p "$DATA_DIR"
+  docker cp "$NAME:/app/data/." "$DATA_DIR/" || die "Could not copy /app/data out of '$NAME'. Nothing changed."
+  chown -R 1001:1001 "$DATA_DIR"   # the image runs as nextjs (uid 1001)
+  MOUNT_ARGS+=("--volume=$DATA_DIR:/app/data")
 fi
 
 # ── Stage the candidate ──────────────────────────────────────────────────────
