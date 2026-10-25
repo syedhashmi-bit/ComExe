@@ -33,7 +33,7 @@ const SERVICES: ServiceSpec[] = [
   { id: "sonarr",      label: "Sonarr",            defaultPort: 33027, authShape: "apikey",   category: "media", envKeys: { url: "SONARR_URL",      apiKey: "SONARR_API_KEY"      }, description: "TV series library + queue", helpText: "Settings → General → Security → API Key" },
   { id: "bazarr",      label: "Bazarr",            defaultPort: 30046, authShape: "apikey",   category: "media", envKeys: { url: "BAZARR_URL",      apiKey: "BAZARR_API_KEY"      }, description: "Subtitle downloader", helpText: "Settings → General → Security → API Key" },
   { id: "tautulli",    label: "Tautulli",          defaultPort: 30047, authShape: "apikey",   category: "media", envKeys: { url: "TAUTULLI_URL",    apiKey: "TAUTULLI_API_KEY"    }, description: "Plex stream / history stats", helpText: "Settings → Web Interface → API key" },
-  { id: "qbittorrent", label: "qBittorrent",       defaultPort: 30024, authShape: "userpass", category: "media", envKeys: { url: "QBIT_URL",        username: "QBIT_USERNAME", password: "QBIT_PASSWORD" }, description: "Torrent client", helpText: "Tools → Options → Web UI → Authentication" },
+  { id: "qbittorrent", label: "qBittorrent",       defaultPort: 30024, authShape: "userpass", category: "media", envKeys: { url: "QBIT_URL",        apiKey: "QBIT_API_KEY", username: "QBIT_USERNAME", password: "QBIT_PASSWORD" }, description: "Torrent client", helpText: "Tools → Options → Web UI → API Key (or Authentication, for username + password)" },
   { id: "overseerr",   label: "Overseerr",         defaultPort: 30002, authShape: "apikey",   category: "media", envKeys: { url: "OVERSEERR_URL",   apiKey: "OVERSEERR_API_KEY"   }, description: "Request management", helpText: "Settings → General → API Key (copy from the top)" },
   { id: "prowlarr",    label: "Prowlarr",          defaultPort: 30050, authShape: "apikey",   category: "media", envKeys: { url: "PROWLARR_URL",    apiKey: "PROWLARR_API_KEY"    }, description: "Indexer manager", helpText: "Settings → General → Security → API Key" },
   { id: "pihole",      label: "Pi-hole",           defaultPort: 20720, authShape: "password", category: "infra", envKeys: { url: "PIHOLE_URL",      password: "PIHOLE_PASSWORD"   }, description: "DNS-level ad/tracker blocking", helpText: "The password you set during Pi-hole installation" },
@@ -42,7 +42,11 @@ const SERVICES: ServiceSpec[] = [
   { id: "speedtest",   label: "SpeedTracker",      defaultPort: 30220, authShape: "bearer",   category: "infra", envKeys: { url: "SPEEDTEST_URL",   apiKey: "SPEEDTEST_API_KEY"   }, description: "Speedtest history (display only)", helpText: "SpeedTracker Settings → Authentication → API Token" },
 ];
 
-type TestStatus = { state: "idle" } | { state: "testing" } | { state: "ok"; msg: string } | { state: "err"; msg: string };
+// qBittorrent takes either a WebUI API key (preferred) or a username + password
+// login. lib/server-config.ts treats either one as "configured".
+const keyOrLogin = (svc: ServiceSpec) => svc.authShape === "userpass" && !!svc.envKeys.apiKey;
+
+type TestStatus ={ state: "idle" } | { state: "testing" } | { state: "ok"; msg: string } | { state: "err"; msg: string };
 
 interface ServiceRow {
   enabled:    boolean;
@@ -302,9 +306,7 @@ export default function SetupWizard() {
       if (!row?.enabled) continue;
       const entry: Record<string, string> = {};
       if (row.url)      entry.url      = row.url;
-      if (svc.authShape === "apikey" || svc.authShape === "bearer") {
-        if (row.apiKey) entry.apiKey = row.apiKey;
-      }
+      if (svc.envKeys.apiKey && row.apiKey) entry.apiKey = row.apiKey;
       if (svc.authShape === "userpass") {
         if (row.username) entry.username = row.username;
         if (row.password) entry.password = row.password;
@@ -424,20 +426,31 @@ export default function SetupWizard() {
                       {svc.authShape === "bearer" && (
                         <Field label="Bearer token (optional)" value={row.apiKey} onChange={v => updateRow(svc.id, { apiKey: v })} type={showPasswords ? "text" : "password"} mono />
                       )}
-                      {svc.authShape === "userpass" && <>
+                      {keyOrLogin(svc) && (
+                        <Field label="API key" value={row.apiKey} onChange={v => updateRow(svc.id, { apiKey: v })} type={showPasswords ? "text" : "password"} mono />
+                      )}
+                      {svc.authShape === "userpass" && !keyOrLogin(svc) && <>
                         <Field label="Username" value={row.username} onChange={v => updateRow(svc.id, { username: v })} mono />
                         <Field label="Password" value={row.password} onChange={v => updateRow(svc.id, { password: v })} type={showPasswords ? "text" : "password"} mono />
                       </>}
                       {svc.authShape === "password" && (
                         <Field label="Password" value={row.password} onChange={v => updateRow(svc.id, { password: v })} type={showPasswords ? "text" : "password"} mono />
                       )}
-                      {(svc.authShape === "apikey" || svc.authShape === "bearer") && (
+                      {(svc.authShape === "apikey" || svc.authShape === "bearer" || keyOrLogin(svc)) && (
                         <div /> // spacer to fill the 3rd column
                       )}
                       <Btn onClick={() => testService(svc.id)} disabled={row.testStatus.state === "testing"}>
                         {row.testStatus.state === "testing" ? "…" : "Test"}
                       </Btn>
                     </div>
+                    {keyOrLogin(svc) && (
+                      <div className="setup-grid" style={{ display: "grid", gridTemplateColumns: "minmax(280px, 2fr) 1fr 1fr auto", gap: 10, alignItems: "end" }}>
+                        <div style={{ fontSize: 11, color: "var(--text-faint)", paddingBottom: 8 }}>Or, without an API key, log in with:</div>
+                        <Field label="Username" value={row.username} onChange={v => updateRow(svc.id, { username: v })} mono />
+                        <Field label="Password" value={row.password} onChange={v => updateRow(svc.id, { password: v })} type={showPasswords ? "text" : "password"} mono />
+                        <div />
+                      </div>
+                    )}
                     {svc.helpText && (
                       <div style={{ fontSize: 10, color: "var(--text-faint)", display: "flex", alignItems: "center", gap: 4 }}>
                         <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 14, height: 14, borderRadius: 7, border: "1px solid var(--border-bright)", fontSize: 9, color: "var(--text-label)", flexShrink: 0 }}>?</span>
@@ -770,7 +783,10 @@ function generateConfig(state: WizardState): GeneratedConfig {
     if (svc.authShape === "bearer" && svc.envKeys.apiKey && row.apiKey) {
       envPairs.push([svc.envKeys.apiKey, row.apiKey]);
     }
-    if (svc.authShape === "userpass") {
+    if (keyOrLogin(svc) && row.apiKey) {
+      // The key wins at runtime, so don't also emit a login nobody uses.
+      envPairs.push([svc.envKeys.apiKey!, row.apiKey]);
+    } else if (svc.authShape === "userpass") {
       if (svc.envKeys.username) envPairs.push([svc.envKeys.username, row.username]);
       if (svc.envKeys.password) envPairs.push([svc.envKeys.password, row.password]);
     }

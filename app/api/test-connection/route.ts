@@ -130,8 +130,23 @@ async function testOverseerr(url: string, key: string): Promise<TestResult> {
   }
 }
 
-async function testQbittorrent(url: string, user: string, pass_: string): Promise<TestResult> {
-  if (!user || !pass_) return fail("Missing username or password");
+async function testQbittorrent(url: string, apiKey: string, user: string, pass_: string): Promise<TestResult> {
+  // Same precedence as lib/services.ts: a WebUI API key (qbt_...) is sent as
+  // a Bearer token and wins over username + password.
+  if (apiKey) {
+    try {
+      const r = await fetchWithTimeout(`${url}/api/v2/app/version`, {
+        headers: { Authorization: `Bearer ${apiKey}`, Referer: url },
+        timeoutMs: TIMEOUT, skipBreaker: true,
+      });
+      if (r.status === 401 || r.status === 403) return fail("API key rejected — copy it again from Options → Web UI → API Key (needs a qBittorrent version with API key support)");
+      if (!r.ok) return fail(`HTTP ${r.status}`);
+      return pass(`Connected — qBittorrent ${(await r.text()).trim()}`);
+    } catch (e) {
+      return fail(`Could not reach ${url} — ${(e as Error).message}`);
+    }
+  }
+  if (!user || !pass_) return fail("Missing API key, or username and password");
   try {
     const r = await fetchWithTimeout(`${url}/api/v2/auth/login`, {
       method: "POST",
@@ -278,7 +293,7 @@ export async function POST(req: Request) {
     case "tautulli":    result = await testTautulli(cleanUrl, apiKey ?? "");                  break;
     case "prowlarr":    result = await testProwlarr(cleanUrl, apiKey ?? "");                  break;
     case "overseerr":   result = await testOverseerr(cleanUrl, apiKey ?? "");                 break;
-    case "qbittorrent": result = await testQbittorrent(cleanUrl, username ?? "", password ?? ""); break;
+    case "qbittorrent": result = await testQbittorrent(cleanUrl, apiKey ?? "", username ?? "", password ?? ""); break;
     case "pihole":      result = await testPihole(cleanUrl, password ?? "");                  break;
     case "nginx":       result = await testNginx(cleanUrl, username ?? "", password ?? "");   break;
     case "uptimekuma":  result = await testUptimeKuma(cleanUrl, apiKey ?? "");                break;

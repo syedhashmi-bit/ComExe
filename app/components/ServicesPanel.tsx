@@ -315,9 +315,9 @@ export function ServicesPanel({
                           )}
                           {up && authError && (
                             <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                              <span style={{ fontSize: 10, color: "#ef4444" }}>API key rejected</span>
+                              <span style={{ fontSize: 10, color: "#ef4444" }}>Credentials rejected</span>
                               <span style={{ fontSize: 9, color: "var(--text-ghost)", lineHeight: 1.4 }}>
-                                Service is reachable but returned <code style={{ fontSize: 8, color: "var(--text-dim)" }}>401</code>. Check the env var on TrueNAS.
+                                Service is reachable but returned <code style={{ fontSize: 8, color: "var(--text-dim)" }}>401/403</code>. Check them in Setup or the env vars on TrueNAS.
                               </span>
                             </div>
                           )}
