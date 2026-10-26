@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { ActivityEvent } from "@/app/lib/types";
 import { SVC_COLORS } from "@/app/lib/constants";
+import { withAlpha } from "@/app/lib/formatters";
 
 
 export function relativeAgo(unixMs: number): string {
@@ -21,7 +22,7 @@ function ActivityEventPill({ ev }: { ev: ActivityEvent }) {
   return (
     <span className="flex items-center gap-1.5 shrink-0" style={{ paddingInline: 14 }}>
       <span className="w-1.5 h-1.5 rounded-full shrink-0"
-        style={{ background: color, boxShadow: `0 0 5px ${color}aa` }} />
+        style={{ background: color, boxShadow: `0 0 5px ${withAlpha(color, 67)}` }} />
       <span style={{
         color, fontSize: 9, fontWeight: 700,
         textTransform: "uppercase", letterSpacing: "0.1em",

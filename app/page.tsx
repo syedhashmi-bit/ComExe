@@ -13,7 +13,7 @@ import type {
 import {
   fmtBytes, fmtTemp, fmtUptime, fmtSince, fmtPct,
   pct, barColor, gpuUtilColor, tempColor,
-  normalizeSpeedResult, histStats, ageColor,
+  normalizeSpeedResult, histStats, ageColor, withAlpha,
 } from "@/app/lib/formatters";
 import {
   cpuAlertLevel, memAlertLevel, diskAlertLevel, gpuTempAlertLevel,
@@ -650,7 +650,7 @@ export default function Dashboard() {
               truenas · :30104
             </span>
             {metrics?.uptime != null && (
-              <span className="hidden md:flex items-center gap-1.5 shrink-0" style={{ background: "var(--surface)", border: "1px solid var(--border-bright)", borderRadius: 6, padding: "3px 10px", fontSize: 11, color: "var(--text-secondary)" }}>
+              <span className="hidden md:flex items-center gap-1.5 shrink-0" style={{ background: "var(--surface)", border: "1px solid var(--border-bright)", borderRadius: 6, padding: "3px 10px", fontSize: 11, color: "var(--text-secondary)", fontVariantNumeric: "tabular-nums" }}>
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
                 </svg>
@@ -667,6 +667,7 @@ export default function Dashboard() {
                     display: "inline-flex", alignItems: "center", gap: 4,
                     background: "var(--surface)", border: "1px solid var(--border-bright)",
                     borderRadius: 6, padding: "3px 10px", fontSize: 11, color: "var(--text-secondary)",
+                    fontVariantNumeric: "tabular-nums",
                     cursor: weather.forecast?.length ? "default" : undefined,
                   }}
                 >
@@ -736,7 +737,7 @@ export default function Dashboard() {
                   background: alertCount > 0 ? "var(--critical)" : "transparent",
                   border: "none", borderRadius: 999,
                   padding: "2px 8px", cursor: "pointer",
-                  boxShadow: `0 0 8px ${alertCount > 0 ? "var(--critical)" : "transparent"}55`,
+                  boxShadow: `0 0 8px ${withAlpha(alertCount > 0 ? "var(--critical)" : "transparent", 33)}`,
                   transition: "background 0.2s",
                 }}
               >🔔 {alertCount}</button>
@@ -984,8 +985,8 @@ export default function Dashboard() {
                           <div className="rounded-full overflow-hidden" style={{ background: "var(--card-hover)", height: 6 }}>
                             <div className="h-full rounded-full transition-all duration-700" style={{
                               width: `${poolPct ?? 0}%`,
-                              background: `linear-gradient(90deg, ${poolColor}99, ${poolColor})`,
-                              boxShadow: `0 0 8px ${poolColor}55`,
+                              background: `linear-gradient(90deg, ${withAlpha(poolColor, 60)}, ${poolColor})`,
+                              boxShadow: `0 0 8px ${withAlpha(poolColor, 33)}`,
                             }} />
                           </div>
                         </div>
@@ -1016,7 +1017,7 @@ export default function Dashboard() {
                               </div>
                               <div className="rounded-full overflow-hidden" style={{ background: "var(--card-hover)", height: 4 }}>
                                 <div className="h-full rounded-full transition-all duration-700"
-                                  style={{ width: `${disk.usedPct}%`, background: barC, boxShadow: `0 0 4px ${barC}55` }} />
+                                  style={{ width: `${disk.usedPct}%`, background: barC, boxShadow: `0 0 4px ${withAlpha(barC, 33)}` }} />
                               </div>
                             </div>
                           );
@@ -1187,7 +1188,12 @@ export default function Dashboard() {
               <Card label="speedtest" accent="var(--accent-speedtest)" icon={<IconSpeedtest />}
                 animDelay={250} externalLink={`http://${clientConfig?.truenasIp ?? "192.168.88.196"}:${SVC_PORTS.speedtest}`}>
                 {speedtestLoading ? <Skeleton /> : !speedtestResults.length ? (
-                  <span className="text-xs" style={{ color: "var(--text-label)" }}>no data</span>
+                  <div className="flex flex-col items-center justify-center text-center gap-1.5" style={{ flex: 1, minHeight: 96, padding: "8px 0" }}>
+                    <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>No results from SpeedTracker yet</span>
+                    <span style={{ fontSize: 10, color: "var(--text-ghost)", maxWidth: 220, lineHeight: 1.5 }}>
+                      Tests run on SpeedTracker&apos;s own schedule. If this stays empty, check its URL and API token in Setup.
+                    </span>
+                  </div>
                 ) : (() => {
                   const latest = speedtestResults[0];
                   const ts   = latest.timestamp ?? latest.created_at;
@@ -1337,12 +1343,11 @@ export default function Dashboard() {
           </div>
 
           {/* ── Disk health (SMART) ── */}
+          {/* Draws its own card; collapses to a slim hint (or nothing) with no exporter. */}
           {isVisible("system") && (
-            <div style={{ background: "var(--card)", border: "1px solid var(--border-subtle)", borderRadius: 14, padding: "14px 18px" }}>
-              <ErrorBoundary name="Disk health">
-                <DiskHealthPanel />
-              </ErrorBoundary>
-            </div>
+            <ErrorBoundary name="Disk health">
+              <DiskHealthPanel />
+            </ErrorBoundary>
           )}
 
           {/* ── Custom cards (user-defined PromQL) ── */}

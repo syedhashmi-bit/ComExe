@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { ServiceResult, ClientConfig } from "@/app/lib/types";
 import { SVC_COLORS, SVC_ICONS, SVC_LABELS, SVC_PORTS } from "@/app/lib/constants";
-import { cleanTitle, fmtEtaShort, fmtSmoothAgo } from "@/app/lib/formatters";
+import { cleanTitle, fmtEtaShort, fmtSmoothAgo, withAlpha } from "@/app/lib/formatters";
 import { IconServices } from "@/app/components/icons";
 import {
   animatedLine, HeroStat, GaugeBar, Skeleton, ServiceIcon,
@@ -120,11 +120,11 @@ export function ServicesPanel({
             return (
               <div key={cat.id} className="flex flex-col gap-3">
                 <div className="flex items-center gap-3">
-                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: cat.accent, boxShadow: `0 0 6px ${cat.accent}88` }} />
+                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: cat.accent, boxShadow: `0 0 6px ${withAlpha(cat.accent, 53)}` }} />
                   <span className="text-[10px] uppercase" style={{ color: "var(--text-dim)", letterSpacing: "0.22em", fontWeight: 700 }}>
                     {cat.label}
                   </span>
-                  <span style={{ flex: 1, height: 1, background: `linear-gradient(to right, ${cat.accent}33, transparent 70%)` }} />
+                  <span style={{ flex: 1, height: 1, background: `linear-gradient(to right, ${withAlpha(cat.accent, 20)}, transparent 70%)` }} />
                   <span style={{ fontSize: 10, fontWeight: 600, color: allUp ? "#10b981" : "rgba(255,255,255,0.45)", fontVariantNumeric: "tabular-nums" }}>
                     {upCount}/{catCards.length}
                   </span>
@@ -156,7 +156,7 @@ export function ServicesPanel({
                         onMouseUp={e => (e.currentTarget.style.transform = "translateY(-3px)")}
                         style={{
                           background: up
-                            ? `radial-gradient(ellipse at top, ${color}1a 0%, transparent 55%), rgba(255,255,255,0.03)`
+                            ? `radial-gradient(ellipse at top, ${withAlpha(color, 10)} 0%, transparent 55%), rgba(255,255,255,0.03)`
                             : "rgba(255,255,255,0.03)",
                           border: "1px solid var(--border-subtle)",
                           borderRadius: 12, padding: 0, minHeight: 140,
@@ -171,8 +171,8 @@ export function ServicesPanel({
                         }}
                         onMouseEnter={e => {
                           e.currentTarget.style.transform = "translateY(-3px)";
-                          e.currentTarget.style.borderColor = up ? `${color}55` : "rgba(255,255,255,0.18)";
-                          if (up) e.currentTarget.style.boxShadow = `0 10px 30px ${color}33, 0 0 0 1px ${color}33 inset`;
+                          e.currentTarget.style.borderColor = up ? `${withAlpha(color, 33)}` : "rgba(255,255,255,0.18)";
+                          if (up) e.currentTarget.style.boxShadow = `0 10px 30px ${withAlpha(color, 20)}, 0 0 0 1px ${withAlpha(color, 20)} inset`;
                         }}
                         onMouseLeave={e => {
                           e.currentTarget.style.transform = "translateY(0)";
@@ -182,8 +182,8 @@ export function ServicesPanel({
                       >
                         <div style={{
                           height: 3,
-                          background: `linear-gradient(90deg, ${stripeColor} 0%, ${stripeColor}88 60%, ${stripeColor}33 100%)`,
-                          boxShadow: up ? `0 0 8px ${color}77` : "none",
+                          background: `linear-gradient(90deg, ${stripeColor} 0%, ${withAlpha(stripeColor, 53)} 60%, ${withAlpha(stripeColor, 20)} 100%)`,
+                          boxShadow: up ? `0 0 8px ${withAlpha(color, 47)}` : "none",
                         }} />
                         <div className="flex flex-col gap-2" style={{ padding: "13px 14px 14px" }}>
                           <div className="flex items-center justify-between gap-2">
@@ -198,7 +198,7 @@ export function ServicesPanel({
                                   borderRadius: 4, padding: "1px 5px", fontSize: 9,
                                   color: "var(--text-dim)", cursor: "pointer", lineHeight: 1.2,
                                 }}
-                                onMouseEnter={e => { e.currentTarget.style.color = color; e.currentTarget.style.borderColor = `${color}66`; }}
+                                onMouseEnter={e => { e.currentTarget.style.color = color; e.currentTarget.style.borderColor = `${withAlpha(color, 40)}`; }}
                                 onMouseLeave={e => { e.currentTarget.style.color = "var(--text-dim)"; e.currentTarget.style.borderColor = "var(--border)"; }}
                               >&rsaquo;</button>
                               {clientConfig?.dockerEnabled && (
@@ -235,7 +235,7 @@ export function ServicesPanel({
                                     title={tooltip}
                                     onClick={e => { e.stopPropagation(); }}
                                     style={{
-                                      background: `${accent}1a`, border: `1px solid ${accent}55`, color: accent,
+                                      background: `${withAlpha(accent, 10)}`, border: `1px solid ${withAlpha(accent, 33)}`, color: accent,
                                       borderRadius: 4, padding: "1px 5px", fontSize: 9, fontWeight: 700,
                                       textTransform: "uppercase", letterSpacing: "0.05em", fontVariantNumeric: "tabular-nums",
                                       cursor: "help",

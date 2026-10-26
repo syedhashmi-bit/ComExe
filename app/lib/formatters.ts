@@ -95,6 +95,14 @@ export function pct(used: number | null, total: number | null): number {
 
 // ── color helpers ────────────────────────────────────────────────────────────
 
+// Translucent version of any CSS colour. The old idiom appended a hex alpha
+// (`${accent}33`), which only works for #rrggbb — on a theme variable it gives
+// `var(--accent-cpu)33`, which is invalid CSS, so the browser dropped every
+// card's stripe, tint and glow once accents moved to variables.
+export function withAlpha(color: string, pct: number): string {
+  return `color-mix(in srgb, ${color} ${pct}%, transparent)`;
+}
+
 export function barColor(p: number): string {
   if (p >= 90) return "var(--critical)";
   if (p >= 75) return "var(--warn)";

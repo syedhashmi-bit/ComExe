@@ -6,7 +6,7 @@
 
 import React, { useEffect, useId, useRef, useState } from "react";
 import type { AlertLevel, DataUnit } from "@/app/lib/types";
-import { fmtBytes } from "@/app/lib/formatters";
+import { fmtBytes, withAlpha } from "@/app/lib/formatters";
 
 // ── AnimatedNumber ───────────────────────────────────────────────────────────
 // Interpolates between value changes (~600ms ease-out cubic). Preserves the
@@ -127,7 +127,7 @@ export function GaugeBar({ percent, color, thin = false, gradient }: { percent: 
     <div className="relative w-full rounded-full overflow-hidden" style={{ background: "var(--surface)", height: thin ? 3 : 5 }}>
       <div
         className="h-full rounded-full transition-all duration-700 ease-out"
-        style={{ width: `${percent}%`, background: gradient ?? color, boxShadow: `0 0 ${thin ? 3 : 6}px ${color}55` }}
+        style={{ width: `${percent}%`, background: gradient ?? color, boxShadow: `0 0 ${thin ? 3 : 6}px ${withAlpha(color, 33)}` }}
       />
     </div>
   );
@@ -197,7 +197,7 @@ export function RadialGauge({ percent, color, size = 88 }: { percent: number; co
         <circle cx="44" cy="44" r={r} fill="none" stroke="var(--gauge-track)" strokeWidth="6" />
         <circle cx="44" cy="44" r={r} fill="none" stroke={color} strokeWidth="6"
           strokeDasharray={`${filled.toFixed(2)} ${(circ - filled).toFixed(2)}`} strokeLinecap="round"
-          style={{ filter: `drop-shadow(0 0 5px ${color}66)`, transition: "stroke-dasharray 0.7s ease" }}
+          style={{ filter: `drop-shadow(0 0 5px ${withAlpha(color, 40)})`, transition: "stroke-dasharray 0.7s ease" }}
         />
       </svg>
     </div>
@@ -319,7 +319,7 @@ export function Card({
   const borderColor =
     alertLevel === "critical" ? "rgba(239,68,68,0.45)"
     : alertLevel === "warning" ? "rgba(245,158,11,0.4)"
-    : hov ? `${accent}55` : "rgba(255,255,255,0.08)";
+    : hov ? `${withAlpha(accent, 33)}` : "rgba(255,255,255,0.08)";
 
   const topColor =
     alertLevel === "critical" ? "#ef4444"
@@ -335,14 +335,14 @@ export function Card({
       onMouseLeave={() => setHov(false)}
       onClick={externalLink ? () => window.open(externalLink, "_blank") : onToggle}
       style={{
-        background: `radial-gradient(ellipse at top, ${topColor}14 0%, transparent 55%), rgba(255,255,255,0.04)`,
+        background: `radial-gradient(ellipse at top, ${withAlpha(topColor, 8)} 0%, transparent 55%), rgba(255,255,255,0.04)`,
         backdropFilter: "blur(6px)",
         WebkitBackdropFilter: "blur(6px)",
         border: `1px solid ${borderColor}`,
         borderRadius: 14,
         transform: hov ? "translateY(-3px)" : "translateY(0)",
         boxShadow: hov
-          ? `0 12px 36px ${topColor}33, 0 0 0 1px ${topColor}33 inset, 0 8px 32px rgba(0,0,0,0.35)`
+          ? `0 12px 36px ${withAlpha(topColor, 20)}, 0 0 0 1px ${withAlpha(topColor, 20)} inset, 0 8px 32px rgba(0,0,0,0.35)`
           : "none",
         transition: "border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease",
         animation: "fadeSlideIn 0.45s ease both",
@@ -351,8 +351,8 @@ export function Card({
     >
       <div style={{
         height: 3,
-        background: `linear-gradient(90deg, ${topColor} 0%, ${topColor}aa 60%, ${topColor}33 100%)`,
-        boxShadow: alertLevel ? `0 0 12px ${topColor}aa` : `0 0 8px ${topColor}66`,
+        background: `linear-gradient(90deg, ${topColor} 0%, ${withAlpha(topColor, 67)} 60%, ${withAlpha(topColor, 20)} 100%)`,
+        boxShadow: alertLevel ? `0 0 12px ${withAlpha(topColor, 67)}` : `0 0 8px ${withAlpha(topColor, 40)}`,
       }} />
       <div className="flex items-center gap-2 overflow-hidden px-[18px] pt-[18px] pb-0">
         {icon && <span style={{ color: accent, opacity: 0.7 }}>{icon}</span>}
@@ -456,7 +456,7 @@ export function BigValue({ value, loading }: { value: string; loading?: boolean 
     <span
       key={renderKey}
       className="text-3xl font-medium tracking-tight"
-      style={{ color: "var(--text)", display: "inline-block", animation: renderKey > 0 ? "valueIn 0.35s ease-out forwards" : "none" }}
+      style={{ color: "var(--text)", display: "inline-block", fontVariantNumeric: "tabular-nums", animation: renderKey > 0 ? "valueIn 0.35s ease-out forwards" : "none" }}
     >
       {value}
     </span>
@@ -488,7 +488,7 @@ export function ServiceIcon({ src, label, color }: { src: string; label: string;
   if (!src || err) {
     return (
       <span className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold shrink-0"
-        style={{ background: `${color}22`, color }}>
+        style={{ background: `${withAlpha(color, 13)}`, color }}>
         {label[0].toUpperCase()}
       </span>
     );

@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { usePollingInterval } from "@/app/hooks/usePolling";
 import { isDemoMode } from "@/app/lib/demo-data";
+import { withAlpha } from "@/app/lib/formatters";
 
 interface SmartDisk {
   device: string;
@@ -29,10 +30,37 @@ function tempColor(t: number): string {
   return "var(--ok)";
 }
 
+// Remembers "Hide" on the not-set-up hint. Only that hint: once the exporter
+// reports disks the panel shows again regardless.
+const HINT_KEY = "comexe:smart-hint-hidden";
+
+function readHintHidden(): boolean {
+  try { return typeof window !== "undefined" && localStorage.getItem(HINT_KEY) === "1"; }
+  catch { return false; }
+}
+
+// The panel draws its own card, so the not-set-up state can be a slim strip
+// (or nothing) instead of a full-width card announcing an absence.
+function Frame({ children }: { children: ReactNode }) {
+  return (
+    <div style={{ background: "var(--card)", border: "1px solid var(--border-subtle)", borderRadius: 14, padding: "14px 18px" }}>
+      {children}
+    </div>
+  );
+}
+
 export function DiskHealthPanel() {
   const [disks, setDisks] = useState<SmartDisk[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Safe to read in the initializer: the first render is always the loading
+  // state, which doesn't depend on it, so server and client markup match.
+  const [hintHidden, setHintHidden] = useState(readHintHidden);
+
+  function hideHint() {
+    setHintHidden(true);
+    try { localStorage.setItem(HINT_KEY, "1"); } catch { /* private mode etc. */ }
+  }
 
   const fetch_ = useCallback(async () => {
     try {
@@ -53,24 +81,34 @@ export function DiskHealthPanel() {
   // produced upstream traffic.
   usePollingInterval(fetch_, 60_000, { enabled: !isDemoMode() });
 
-  if (loading) {
-    return (
-      <div style={{ padding: 16, color: "var(--text-ghost)", fontSize: 11 }}>
-        Loading SMART data...
-      </div>
-    );
-  }
+  // Nothing while the first fetch runs: most installs have no exporter, and a
+  // card that appears only to shrink into a one-line hint is worse than a beat
+  // of empty space below the fold.
+  if (loading) return null;
 
   if (error || disks.length === 0) {
+    if (!error && hintHidden) return null;
     return (
-      <div className="flex flex-col gap-1" style={{ padding: "8px 0" }}>
-        <div className="flex items-center gap-2" style={{ fontSize: 10, color: "var(--text-ghost)" }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/>
-            <line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>
-          </svg>
-          <span>{error ? "SMART unavailable" : "No SMART data — smartmon exporter not detected"}</span>
-        </div>
+      <div className="flex items-center gap-2" style={{
+        border: "1px dashed var(--border)", borderRadius: 10, padding: "7px 14px",
+        fontSize: 11, color: "var(--text-label)", minWidth: 0,
+      }}>
+        <svg className="shrink-0" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/>
+          <line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>
+        </svg>
+        <span className="shrink-0" style={{ color: "var(--text-secondary)", fontWeight: 600 }}>Disk health</span>
+        <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--text-ghost)" }}>
+          {error
+            ? `unavailable · ${error}`
+            : "not set up · install the smartmon exporter to see disk temps and sector errors"}
+        </span>
+        {!error && (
+          <button onClick={hideHint} className="shrink-0" style={{
+            marginLeft: "auto", fontSize: 10, color: "var(--text-label)", background: "none",
+            border: "1px solid var(--border)", borderRadius: 5, padding: "2px 8px", cursor: "pointer",
+          }}>Hide</button>
+        )}
       </div>
     );
   }
@@ -78,6 +116,7 @@ export function DiskHealthPanel() {
   const allHealthy = disks.every(d => d.healthy);
 
   return (
+    <Frame>
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -107,7 +146,7 @@ export function DiskHealthPanel() {
               <span style={{
                 width: 6, height: 6, borderRadius: "50%",
                 background: disk.healthy ? "var(--ok)" : "var(--critical)",
-                boxShadow: `0 0 4px ${disk.healthy ? "var(--ok)" : "var(--critical)"}66`,
+                boxShadow: `0 0 4px ${withAlpha(disk.healthy ? "var(--ok)" : "var(--critical)", 40)}`,
               }} />
               <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text)", fontFamily: "monospace" }}>
                 {disk.device}
@@ -166,5 +205,6 @@ export function DiskHealthPanel() {
         ))}
       </div>
     </div>
+    </Frame>
   );
 }

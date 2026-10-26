@@ -33,6 +33,9 @@ export function MikrotikTab({ mikrotikUrl, refreshSec, demoMode = false }: {
   // it, `!data` was treated as failure, so the failure branch rendered on every
   // single page load — see the comment on that branch below.
   const [loading, setLoading] = useState(true);
+  // Why the last fetch failed, shown on the unreachable strip so a bad
+  // password and a router that's offline don't look the same.
+  const [error, setError] = useState<string | null>(null);
   const mikrotikHost = mikrotikUrl.replace(/^https?:\/\//, "").replace(/\/$/, "");
 
   useEffect(() => {
@@ -44,9 +47,10 @@ export function MikrotikTab({ mikrotikUrl, refreshSec, demoMode = false }: {
     async function load() {
       try {
         const res = await fetch("/api/mikrotik", { cache: "no-store" });
-        if (!res.ok) throw new Error("HTTP " + res.status);
-        const d = await res.json() as MtData & { error?: string };
-        if (d.error) throw new Error(d.error);
+        // Error responses carry the reason ("credentials not set", a refused
+        // connection, …) in the body; prefer it over the bare status code.
+        const d = await res.json().catch(() => ({})) as MtData & { error?: string };
+        if (!res.ok || d.error) throw new Error(d.error ?? "HTTP " + res.status);
         setData({
           board:    d.board,
           version:  d.version,
@@ -60,8 +64,10 @@ export function MikrotikTab({ mikrotikUrl, refreshSec, demoMode = false }: {
           temp:     d.temp,
         });
         setCorsBlocked(false);
-      } catch {
+        setError(null);
+      } catch (e) {
         setCorsBlocked(true);
+        setError((e as Error).message || null);
       } finally {
         setLoading(false);
       }
@@ -111,13 +117,6 @@ export function MikrotikTab({ mikrotikUrl, refreshSec, demoMode = false }: {
     return `${(b / 1e9).toFixed(1)} GB`;
   };
 
-  const staticSep = () => <span style={{ color: "var(--text-hidden)", fontSize: 14, userSelect: "none", flexShrink: 0 }}>|</span>;
-  const staticPill = (label: string, value: string) => (
-    <div className="flex items-center gap-1.5 shrink-0">
-      <span style={{ color: "var(--text-label)", fontSize: 10 }}>{label}</span>
-      <span style={{ color: "var(--text-secondary)", fontSize: 11, fontVariantNumeric: "tabular-nums" }}>{value}</span>
-    </div>
-  );
 
   // Shown while the first fetch is in flight, and when the router can't be
   // reached. It used to render hardcoded literals here — `"RouterOS 7.22.1"`
@@ -125,37 +124,35 @@ export function MikrotikTab({ mikrotikUrl, refreshSec, demoMode = false }: {
   // uptime on every page load before real data arrived, and permanently
   // whenever the router was unreachable. Values are only ever shown now if
   // they came from the router.
+  //
+  // It's a slim strip rather than the full stats bar: a failure state
+  // shouldn't take as much room as live data, but the reason belongs on it.
   if (corsBlocked || !data) {
+    const down = !loading;
     return (
       <a href={mikrotikUrl} target="_blank" rel="noopener noreferrer"
-        className="flex items-center gap-4 w-full overflow-x-auto"
+        className="flex items-center gap-2 w-full"
+        title={down && error ? `MikroTik: ${error}` : undefined}
         style={{
-          background: "var(--mt-bg)", border: "1px solid var(--border)",
-          borderRadius: 10, padding: "12px 20px",
-          textDecoration: "none", cursor: "pointer",
-          transition: "border-color 0.2s, background 0.2s",
+          border: "1px dashed var(--border)", borderRadius: 10, padding: "7px 14px",
+          textDecoration: "none", cursor: "pointer", minWidth: 0,
+          transition: "border-color 0.2s",
         }}
-        onMouseEnter={e => { e.currentTarget.style.borderColor = "var(--border-hover)"; e.currentTarget.style.background = "var(--mt-bg-hover)"; }}
-        onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.background = "var(--mt-bg)"; }}
+        onMouseEnter={e => { e.currentTarget.style.borderColor = "var(--border-hover)"; }}
+        onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--border)"; }}
       >
-        <div className="flex items-center gap-2 shrink-0">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ stroke: "var(--brand)" }} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="1" y="9" width="22" height="7" rx="2"/>
-            <line x1="5" y1="9" x2="5" y2="16"/><line x1="9" y1="9" x2="9" y2="16"/>
-            <circle cx="16.5" cy="12.5" r="1" style={{ fill: "var(--brand)" }} stroke="none"/>
-            <circle cx="19.5" cy="12.5" r="1" style={{ fill: "var(--brand)" }} stroke="none"/>
-            <line x1="7" y1="5" x2="7" y2="9"/><line x1="12" y1="3" x2="12" y2="9"/><line x1="17" y1="5" x2="17" y2="9"/>
-          </svg>
-          <span style={{ color: "var(--text)", fontWeight: 700, fontSize: 14 }}>MikroTik</span>
-          <span style={{ color: "var(--text-label)", fontSize: 11 }}>hAP ax³</span>
-        </div>
-        {staticSep()}
-        {staticPill("IP", mikrotikHost)}
-        {staticSep()}
-        {loading
-          ? <span style={{ color: "var(--text-label)", fontSize: 11, flexShrink: 0 }}>connecting&hellip;</span>
-          : <span style={{ color: "var(--warn)", fontSize: 11, flexShrink: 0 }}>unreachable</span>}
-        <span style={{ color: "var(--text-ghost)", fontSize: 10, marginLeft: "auto", flexShrink: 0 }}>tap to open ↗</span>
+        <span className="shrink-0" style={{ width: 6, height: 6, borderRadius: 3, background: down ? "var(--warn)" : "var(--text-ghost)" }} />
+        <span className="shrink-0" style={{ color: "var(--text-secondary)", fontWeight: 600, fontSize: 12 }}>MikroTik</span>
+        <span className="shrink-0 font-mono" style={{ color: "var(--text-label)", fontSize: 11, fontVariantNumeric: "tabular-nums" }}>{mikrotikHost}</span>
+        <span className="shrink-0" style={{ color: down ? "var(--warn)" : "var(--text-label)", fontSize: 11 }}>
+          {down ? "unreachable" : <>connecting&hellip;</>}
+        </span>
+        {down && error && (
+          <span style={{ color: "var(--text-ghost)", fontSize: 10, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            · {error}
+          </span>
+        )}
+        <span className="shrink-0" style={{ color: "var(--text-ghost)", fontSize: 10, marginLeft: "auto" }}>open ↗</span>
       </a>
     );
   }

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Sparkline, GaugeBar, BigValue } from "@/app/components/primitives";
 import { isDemoMode } from "@/app/lib/demo-data";
+import { withAlpha } from "@/app/lib/formatters";
 
 interface CustomCardDef {
   id:       string;
@@ -32,7 +33,7 @@ function CustomCardRenderer({ card, state }: { card: CustomCardDef; state: CardS
     }}>
       <div style={{
         position: "absolute", top: 0, left: 0, right: 0, height: 3,
-        background: `linear-gradient(90deg, ${card.color}, ${card.color}99, ${card.color}33)`,
+        background: `linear-gradient(90deg, ${card.color}, ${withAlpha(card.color, 60)}, ${withAlpha(card.color, 20)})`,
       }} />
       <div className="flex items-center gap-2">
         <span style={{ width: 6, height: 6, borderRadius: 3, background: card.color }} />

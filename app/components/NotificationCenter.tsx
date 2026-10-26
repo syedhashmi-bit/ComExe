@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { withAlpha } from "@/app/lib/formatters";
 
 interface AlertEvent {
   key: string;
@@ -96,7 +97,7 @@ export function NotificationCenter({ onClose }: { onClose: () => void }) {
                   <span className="shrink-0 mt-0.5" style={{
                     width: 8, height: 8, borderRadius: "50%",
                     background: accentColor,
-                    boxShadow: `0 0 6px ${accentColor}88`,
+                    boxShadow: `0 0 6px ${withAlpha(accentColor, 53)}`,
                   }} />
                   <div className="flex flex-col gap-0.5 min-w-0 flex-1">
                     <div className="flex items-center gap-2">
