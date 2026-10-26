@@ -161,7 +161,7 @@ export default function LogsPage() {
             value={selected}
             onChange={e => setSelected(e.target.value)}
             style={{
-              fontSize: 11, background: "var(--card)", color: "var(--text)",
+              fontSize: 12, background: "var(--card)", color: "var(--text)",
               border: "1px solid var(--border-mid)", borderRadius: 6,
               padding: "5px 10px", outline: "none", minWidth: 160,
             }}
@@ -188,7 +188,7 @@ export default function LogsPage() {
             value={tailCount}
             onChange={e => setTailCount(Number(e.target.value))}
             style={{
-              fontSize: 10, background: "var(--card)", color: "var(--text-dim)",
+              fontSize: 12, background: "var(--card)", color: "var(--text-dim)",
               border: "1px solid var(--border-mid)", borderRadius: 5,
               padding: "4px 8px", outline: "none",
             }}
@@ -205,7 +205,7 @@ export default function LogsPage() {
             <button
               onClick={() => setTailMode(t => !t)}
               style={{
-                fontSize: 10, padding: "4px 10px", borderRadius: 5, cursor: "pointer",
+                fontSize: 12, padding: "4px 10px", borderRadius: 5, cursor: "pointer",
                 background: tailMode ? "var(--brand)" : "var(--card)",
                 color: tailMode ? "var(--bg)" : "var(--text-dim)",
                 border: `1px solid ${tailMode ? "var(--brand)" : "var(--border)"}`,
@@ -218,7 +218,7 @@ export default function LogsPage() {
             <button
               onClick={() => setAutoScroll(a => !a)}
               style={{
-                fontSize: 10, padding: "4px 10px", borderRadius: 5, cursor: "pointer",
+                fontSize: 12, padding: "4px 10px", borderRadius: 5, cursor: "pointer",
                 background: autoScroll ? "rgba(16,185,129,0.15)" : "var(--card)",
                 color: autoScroll ? "var(--ok)" : "var(--text-dim)",
                 border: `1px solid ${autoScroll ? "rgba(16,185,129,0.3)" : "var(--border)"}`,
@@ -240,7 +240,7 @@ export default function LogsPage() {
               onChange={e => setSearch(e.target.value)}
               placeholder="Search logs... (regex supported)"
               style={{
-                width: "100%", fontSize: 11, background: "var(--card)",
+                width: "100%", fontSize: 12, background: "var(--card)",
                 color: "var(--text)", border: "1px solid var(--border-mid)",
                 borderRadius: 6, padding: "7px 12px 7px 30px", outline: "none",
                 fontFamily: "monospace",
@@ -262,7 +262,7 @@ export default function LogsPage() {
                   key={opt.key}
                   onClick={() => setLevelFilter(opt.key)}
                   style={{
-                    fontSize: 9, padding: "4px 8px", borderRadius: 4, cursor: "pointer",
+                    fontSize: 12, padding: "4px 8px", borderRadius: 4, cursor: "pointer",
                     background: active ? (opt.key === "error" ? "rgba(239,68,68,0.15)" : opt.key === "warn" ? "rgba(245,158,11,0.15)" : "var(--surface-bright)") : "var(--card)",
                     color: active ? (LEVEL_COLORS[opt.key === "all" ? "unknown" : opt.key] ?? "var(--text)") : "var(--text-ghost)",
                     border: `1px solid ${active ? (opt.key === "error" ? "rgba(239,68,68,0.3)" : opt.key === "warn" ? "rgba(245,158,11,0.3)" : "var(--border-mid)") : "var(--border-dim)"}`,
@@ -276,7 +276,7 @@ export default function LogsPage() {
             })}
           </div>
 
-          <span style={{ fontSize: 10, color: "var(--text-ghost)", fontVariantNumeric: "tabular-nums" }}>
+          <span style={{ fontSize: 12, color: "var(--text-ghost)", fontVariantNumeric: "tabular-nums" }}>
             {filtered.length} / {logs.length} lines
           </span>
         </div>
@@ -290,7 +290,7 @@ export default function LogsPage() {
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
             </svg>
             <span style={{ fontSize: 13 }}>Select a container to view logs</span>
-            <span style={{ fontSize: 11, maxWidth: 380, textAlign: "center", lineHeight: 1.6 }}>
+            <span style={{ fontSize: 12, maxWidth: 380, textAlign: "center", lineHeight: 1.6 }}>
               {containers.length === 0 && error
                 ? error
                 : `${containers.length} container${containers.length !== 1 ? "s" : ""} available`
@@ -312,10 +312,10 @@ export default function LogsPage() {
           }}>
             <div style={{
               maxHeight: "calc(100vh - 220px)", overflowY: "auto",
-              fontFamily: "'JetBrains Mono', monospace", fontSize: 11, lineHeight: 1.7,
+              fontFamily: "'JetBrains Mono', monospace", fontSize: 12, lineHeight: 1.7,
             }}>
               {filtered.length === 0 ? (
-                <div style={{ padding: "32px 16px", textAlign: "center", color: "var(--text-ghost)", fontSize: 11 }}>
+                <div style={{ padding: "32px 16px", textAlign: "center", color: "var(--text-ghost)", fontSize: 12 }}>
                   {search ? "No logs match your search" : "No log lines to display"}
                 </div>
               ) : (
@@ -335,7 +335,7 @@ export default function LogsPage() {
                         >
                           <td style={{
                             padding: "2px 8px", width: 36,
-                            color: "var(--text-ghost)", fontSize: 9, textAlign: "right",
+                            color: "var(--text-ghost)", fontSize: 12, textAlign: "right",
                             userSelect: "none", verticalAlign: "top",
                           }}>
                             {i + 1}
@@ -354,7 +354,7 @@ export default function LogsPage() {
                           {line.ts && (
                             <td style={{
                               padding: "2px 8px", whiteSpace: "nowrap",
-                              color: "var(--text-ghost)", fontSize: 10,
+                              color: "var(--text-ghost)", fontSize: 12,
                               verticalAlign: "top", fontVariantNumeric: "tabular-nums",
                             }}>
                               {line.ts}

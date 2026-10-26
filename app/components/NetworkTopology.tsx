@@ -130,7 +130,7 @@ export function NetworkTopology({ onClose }: { onClose: () => void }) {
           </svg>
         }
         titleExtra={
-          <span style={{ fontSize: 10, color: "var(--text-ghost)" }}>
+          <span style={{ fontSize: 12, color: "var(--text-ghost)" }}>
             {devices.length} device{devices.length !== 1 ? "s" : ""}
           </span>
         }
@@ -197,7 +197,7 @@ export function NetworkTopology({ onClose }: { onClose: () => void }) {
                       y={n.device.type === "router" ? 42 : 36}
                       textAnchor="middle"
                       style={{
-                        fontSize: 9, fontWeight: 600,
+                        fontSize: 12, fontWeight: 600,
                         fill: "var(--text-muted)",
                         fontFamily: "monospace",
                       }}
@@ -208,7 +208,7 @@ export function NetworkTopology({ onClose }: { onClose: () => void }) {
                       <text
                         y={n.device.type === "router" ? 52 : 46}
                         textAnchor="middle"
-                        style={{ fontSize: 8, fill: "var(--text-ghost)", fontFamily: "monospace" }}
+                        style={{ fontSize: 12, fill: "var(--text-ghost)", fontFamily: "monospace" }}
                       >
                         {n.device.ip}
                       </text>
@@ -220,7 +220,7 @@ export function NetworkTopology({ onClose }: { onClose: () => void }) {
           )}
         </div>
 
-        <div className="flex items-center justify-between px-4 py-2" style={{ borderTop: "1px solid var(--border-dim)", fontSize: 9, color: "var(--text-ghost)" }}>
+        <div className="flex items-center justify-between px-4 py-2" style={{ borderTop: "1px solid var(--border-dim)", fontSize: 12, color: "var(--text-ghost)" }}>
           <div className="flex items-center gap-4">
             <span className="flex items-center gap-1">
               <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--brand)" }} />

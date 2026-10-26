@@ -103,23 +103,27 @@ export function withAlpha(color: string, pct: number): string {
   return `color-mix(in srgb, ${color} ${pct}%, transparent)`;
 }
 
+// Below a threshold these return the neutral data colour, not green: colour
+// is reserved for "something needs attention", so a normal value stays quiet.
+
 export function barColor(p: number): string {
   if (p >= 90) return "var(--critical)";
   if (p >= 75) return "var(--warn)";
-  if (p >= 50) return "var(--brand)";
-  return "var(--ok)";
+  return "var(--data)";
 }
 
 export function gpuUtilColor(p: number): string {
   if (p >= 90) return "var(--critical)";
   if (p >= 70) return "var(--warn)";
-  return "var(--ok)";
+  return "var(--data)";
 }
 
+// Used for temperature text as well as lines, so the normal case is the
+// regular text colour rather than the dimmer data grey.
 export function tempColor(c: number): string {
   if (c >= 85) return "var(--critical)";
   if (c >= 70) return "var(--warn)";
-  return "var(--ok)";
+  return "var(--text)";
 }
 
 export function normalizeSpeedResult(r: import("@/app/lib/types").SpeedtestRaw): import("@/app/lib/types").SpeedtestResult {

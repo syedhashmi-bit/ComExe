@@ -111,7 +111,7 @@ export default function ForecastPage() {
             {RANGES.map(r => (
               <button key={r.key} onClick={() => setRange(r.key)}
                 style={{
-                  fontSize: 10, padding: "4px 10px", borderRadius: 5, cursor: "pointer",
+                  fontSize: 12, padding: "4px 10px", borderRadius: 5, cursor: "pointer",
                   background: range === r.key ? "var(--brand)" : "var(--card)",
                   color: range === r.key ? "var(--bg)" : "var(--text-dim)",
                   border: `1px solid ${range === r.key ? "var(--brand)" : "var(--border)"}`,
@@ -139,15 +139,15 @@ export default function ForecastPage() {
             {/* ── SLA Overview ── */}
             <div style={{ background: "var(--card)", border: "1px solid var(--border-subtle)", borderRadius: 12, padding: "20px 24px" }}>
               <div className="flex items-center gap-2 mb-4">
-                <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-dim)" }}>
+                <span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-dim)" }}>
                   SLA Report
                 </span>
-                <span style={{ fontSize: 9, color: "var(--text-ghost)" }}>last {range}</span>
+                <span style={{ fontSize: 12, color: "var(--text-ghost)" }}>last {range}</span>
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
                 <div className="flex flex-col gap-1">
-                  <span style={{ fontSize: 9, color: "var(--text-ghost)", textTransform: "uppercase" }}>Uptime</span>
+                  <span style={{ fontSize: 12, color: "var(--text-ghost)", textTransform: "uppercase" }}>Uptime</span>
                   <span style={{
                     fontSize: 28, fontWeight: 700, fontFamily: "monospace", fontVariantNumeric: "tabular-nums",
                     color: data.sla.uptimePct >= 99.9 ? "var(--ok)" : data.sla.uptimePct >= 99 ? "var(--warn)" : "var(--critical)",
@@ -156,19 +156,19 @@ export default function ForecastPage() {
                   </span>
                 </div>
                 <div className="flex flex-col gap-1">
-                  <span style={{ fontSize: 9, color: "var(--text-ghost)", textTransform: "uppercase" }}>Incidents</span>
+                  <span style={{ fontSize: 12, color: "var(--text-ghost)", textTransform: "uppercase" }}>Incidents</span>
                   <span style={{ fontSize: 28, fontWeight: 700, fontFamily: "monospace", color: data.sla.incidents.length > 0 ? "var(--warn)" : "var(--text-mid)" }}>
                     {data.sla.incidents.length}
                   </span>
                 </div>
                 <div className="flex flex-col gap-1">
-                  <span style={{ fontSize: 9, color: "var(--text-ghost)", textTransform: "uppercase" }}>MTTR</span>
+                  <span style={{ fontSize: 12, color: "var(--text-ghost)", textTransform: "uppercase" }}>MTTR</span>
                   <span style={{ fontSize: 20, fontWeight: 600, fontFamily: "monospace", color: "var(--text-mid)" }}>
                     {fmtDuration(data.sla.mttrMs)}
                   </span>
                 </div>
                 <div className="flex flex-col gap-1">
-                  <span style={{ fontSize: 9, color: "var(--text-ghost)", textTransform: "uppercase" }}>Longest outage</span>
+                  <span style={{ fontSize: 12, color: "var(--text-ghost)", textTransform: "uppercase" }}>Longest outage</span>
                   <span style={{ fontSize: 20, fontWeight: 600, fontFamily: "monospace", color: "var(--text-mid)" }}>
                     {fmtDuration(data.sla.longestOutageMs)}
                   </span>
@@ -177,9 +177,9 @@ export default function ForecastPage() {
 
               {data.sla.incidents.length > 0 && (
                 <div className="flex flex-col gap-1" style={{ borderTop: "1px solid var(--border-dim)", paddingTop: 12 }}>
-                  <span style={{ fontSize: 9, color: "var(--text-ghost)", textTransform: "uppercase", marginBottom: 4 }}>Incident timeline</span>
+                  <span style={{ fontSize: 12, color: "var(--text-ghost)", textTransform: "uppercase", marginBottom: 4 }}>Incident timeline</span>
                   {data.sla.incidents.slice(0, 10).map((inc, i) => (
-                    <div key={i} className="flex items-center gap-3" style={{ fontSize: 10 }}>
+                    <div key={i} className="flex items-center gap-3" style={{ fontSize: 12 }}>
                       <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--critical)", flexShrink: 0 }} />
                       <span style={{ color: "var(--text-muted)", fontFamily: "monospace", fontVariantNumeric: "tabular-nums" }}>
                         {fmtTime(inc.start)}
@@ -192,7 +192,7 @@ export default function ForecastPage() {
                 </div>
               )}
 
-              <div style={{ marginTop: 12, fontSize: 9, color: "var(--text-ghost)" }}>
+              <div style={{ marginTop: 12, fontSize: 12, color: "var(--text-ghost)" }}>
                 Based on {data.pointCount} data points over {range}
               </div>
             </div>
@@ -200,13 +200,13 @@ export default function ForecastPage() {
             {/* ── Predictions ── */}
             <div style={{ background: "var(--card)", border: "1px solid var(--border-subtle)", borderRadius: 12, padding: "20px 24px" }}>
               <div className="flex items-center gap-2 mb-4">
-                <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-dim)" }}>
+                <span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-dim)" }}>
                   Resource Forecasting
                 </span>
               </div>
 
               {data.predictions.length === 0 ? (
-                <div style={{ padding: "16px 0", color: "var(--text-ghost)", fontSize: 11 }}>
+                <div style={{ padding: "16px 0", color: "var(--text-ghost)", fontSize: 12 }}>
                   Not enough historical data for predictions yet.
                 </div>
               ) : (
@@ -220,7 +220,7 @@ export default function ForecastPage() {
                       }}>
                         <div className="flex items-center gap-2 mb-2">
                           <span style={{ width: 8, height: 8, borderRadius: "50%", background: info.color }} />
-                          <span style={{ fontSize: 10, fontWeight: 600, color: info.color, textTransform: "uppercase" }}>
+                          <span style={{ fontSize: 12, fontWeight: 600, color: info.color, textTransform: "uppercase" }}>
                             {info.label}
                           </span>
                           <TrendArrow trend={pred.trend} />
@@ -230,7 +230,7 @@ export default function ForecastPage() {
                             {pred.currentValue.toFixed(1)}{info.unit}
                           </span>
                         </div>
-                        <div className="flex flex-col gap-0.5" style={{ fontSize: 9, color: "var(--text-ghost)" }}>
+                        <div className="flex flex-col gap-0.5" style={{ fontSize: 12, color: "var(--text-ghost)" }}>
                           <span>
                             {pred.trend === "stable" ? "Stable" :
                               `${pred.trend === "rising" ? "+" : ""}${pred.ratePerDay.toFixed(2)}${info.unit}/day`
@@ -244,7 +244,7 @@ export default function ForecastPage() {
                         </div>
                         {pred.warning && (
                           <div style={{
-                            marginTop: 8, fontSize: 9, padding: "4px 8px", borderRadius: 4,
+                            marginTop: 8, fontSize: 12, padding: "4px 8px", borderRadius: 4,
                             background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.2)",
                             color: "var(--warn)",
                           }}>
@@ -261,11 +261,11 @@ export default function ForecastPage() {
             {/* ── Anomalies ── */}
             <div style={{ background: "var(--card)", border: "1px solid var(--border-subtle)", borderRadius: 12, padding: "20px 24px" }}>
               <div className="flex items-center gap-2 mb-4">
-                <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-dim)" }}>
+                <span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-dim)" }}>
                   Anomaly Detection
                 </span>
                 <span style={{
-                  fontSize: 9, padding: "2px 6px", borderRadius: 3,
+                  fontSize: 12, padding: "2px 6px", borderRadius: 3,
                   background: data.anomalies.length > 0 ? "rgba(239,68,68,0.1)" : "rgba(16,185,129,0.1)",
                   color: data.anomalies.length > 0 ? "var(--critical)" : "var(--ok)",
                   fontWeight: 600,
@@ -275,7 +275,7 @@ export default function ForecastPage() {
               </div>
 
               {data.anomalies.length === 0 ? (
-                <div className="flex items-center gap-2" style={{ padding: "12px 0", color: "var(--text-ghost)", fontSize: 11 }}>
+                <div className="flex items-center gap-2" style={{ padding: "12px 0", color: "var(--text-ghost)", fontSize: 12 }}>
                   <span style={{ fontSize: 16 }}>&#x2705;</span>
                   <span>All metrics within normal bounds (z-score &lt; 3)</span>
                 </div>
@@ -285,7 +285,7 @@ export default function ForecastPage() {
                     const info = METRIC_LABELS[a.metric] ?? { label: a.metric, color: "var(--text)", unit: "" };
                     return (
                       <div key={`${a.metric}-${a.ts}-${i}`} className="flex items-center gap-3"
-                        style={{ padding: "6px 8px", borderRadius: 4, fontSize: 10 }}
+                        style={{ padding: "6px 8px", borderRadius: 4, fontSize: 12 }}
                         onMouseEnter={e => (e.currentTarget.style.background = "var(--surface)")}
                         onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
                       >

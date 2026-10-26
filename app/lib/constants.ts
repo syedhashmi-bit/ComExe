@@ -4,7 +4,7 @@
 
 // ── Theme definitions ───────────────────────────────────────────────────────
 
-export type ThemeKey = "midnight" | "forge" | "forest" | "plum" | "paper";
+export type ThemeKey = "midnight" | "paper";
 
 export interface ThemeDef {
   key:   ThemeKey;
@@ -17,12 +17,16 @@ export interface ThemeDef {
 }
 
 export const THEMES: ThemeDef[] = [
-  { key: "midnight", label: "Midnight",  desc: "Dark blue-black with cyan accents",      bg: "#0a0c12", brand: "#06b6d4", card: "#0e1117", text: "#e2e8f0" },
-  { key: "forge",    label: "Forge",     desc: "Warm dark with amber accents",            bg: "#12100a", brand: "#f59e0b", card: "#1a1610", text: "#e2d9c5" },
-  { key: "forest",   label: "Forest",    desc: "Deep green-black with emerald accents",   bg: "#080f0a", brand: "#10b981", card: "#0e1610", text: "#c5e2d0" },
-  { key: "plum",     label: "Plum",      desc: "Purple-black with magenta accents",       bg: "#10081a", brand: "#d946ef", card: "#160e1e", text: "#d9c5e2" },
-  { key: "paper",    label: "Paper",     desc: "Light theme with slate accents",           bg: "#f8fafc", brand: "#0284c7", card: "#ffffff", text: "#1e293b" },
+  { key: "midnight", label: "Midnight",  desc: "Calm dark, neutral greys",  bg: "#0c0d10", brand: "#22b8cf", card: "#14161a", text: "#e6e8eb" },
+  { key: "paper",    label: "Paper",     desc: "Light",                     bg: "#f6f7f9", brand: "#0e7490", card: "#ffffff", text: "#16181d" },
 ];
+
+// Forge, Forest and Plum were retired in the calm redesign (Oct 2026). A value
+// saved in a browser, set via THEME, or written by the wizard that names one of
+// them falls back to Midnight rather than an unstyled theme class.
+export function normalizeTheme(t: unknown): ThemeKey {
+  return THEMES.some(th => th.key === t) ? (t as ThemeKey) : "midnight";
+}
 
 // ── Timezone list ───────────────────────────────────────────────────────────
 

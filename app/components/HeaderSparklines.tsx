@@ -32,7 +32,7 @@ export function HeaderSparklines({ cpuHistory, memHistory, rxHistory }: HeaderSp
     <div className="hidden lg:flex items-center gap-3" style={{ opacity: 0.85 }}>
       {cpuHistory.length > 1 && (
         <div className="flex items-center gap-1.5" title="CPU">
-          <span style={{ fontSize: 8, color: "var(--accent-cpu)", fontWeight: 600, fontVariantNumeric: "tabular-nums", minWidth: 28, textAlign: "right" }}>
+          <span style={{ fontSize: 12, color: "var(--accent-cpu)", fontWeight: 600, fontVariantNumeric: "tabular-nums", minWidth: 28, textAlign: "right" }}>
             {last(cpuHistory)?.toFixed(0)}%
           </span>
           <MiniSpark data={recent(cpuHistory)} color="var(--accent-cpu)" />
@@ -40,7 +40,7 @@ export function HeaderSparklines({ cpuHistory, memHistory, rxHistory }: HeaderSp
       )}
       {memHistory.length > 1 && (
         <div className="flex items-center gap-1.5" title="Memory">
-          <span style={{ fontSize: 8, color: "var(--accent-memory)", fontWeight: 600, fontVariantNumeric: "tabular-nums", minWidth: 28, textAlign: "right" }}>
+          <span style={{ fontSize: 12, color: "var(--accent-memory)", fontWeight: 600, fontVariantNumeric: "tabular-nums", minWidth: 28, textAlign: "right" }}>
             {last(memHistory)?.toFixed(0)}%
           </span>
           <MiniSpark data={recent(memHistory)} color="var(--accent-memory)" />

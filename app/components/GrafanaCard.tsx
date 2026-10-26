@@ -55,7 +55,7 @@ function GrafanaPanel({ url, label, height, baseUrl, tokenSet }: { url: string; 
           <div style={{
             position: "absolute", inset: 0, background: "var(--card-alt)",
             display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 11, color: "var(--text-ghost)",
+            fontSize: 12, color: "var(--text-ghost)",
           }}>rendering{label ? ` ${label}` : " panel"}…</div>
         )}
         {renderError ? (
@@ -80,7 +80,7 @@ function GrafanaPanel({ url, label, height, baseUrl, tokenSet }: { url: string; 
           background: "var(--card-alt)",
           display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4,
         }}>
-          <span className="text-[11px]" style={{ color: "var(--text-ghost)" }}>loading{label ? ` ${label}` : " panel"}…</span>
+          <span className="text-xs" style={{ color: "var(--text-ghost)" }}>loading{label ? ` ${label}` : " panel"}…</span>
         </div>
       )}
       <iframe
@@ -155,40 +155,40 @@ function GrafanaFallback({ height, probe, baseUrl, panelUrl }: { height: number;
     }}>
       <div className="flex items-center gap-2">
         <span style={{ width: 8, height: 8, borderRadius: 4, background: accent, flexShrink: 0 }} />
-        <span className="text-[11px] font-semibold" style={{ color: "var(--text)" }}>
+        <span className="text-xs font-semibold" style={{ color: "var(--text)" }}>
           {isAuth ? "Grafana embed blocked by auth" : isNotFound ? "Panel not found" : "Grafana unreachable"}
         </span>
-        <span className="text-[10px] ml-auto" style={{ color: "var(--text-ghost)" }}>HTTP {probe.status || "—"}</span>
+        <span className="text-xs ml-auto" style={{ color: "var(--text-ghost)" }}>HTTP {probe.status || "—"}</span>
       </div>
 
       {probe.hint && (
-        <div className="text-[10px]" style={{ color: "var(--text-dim)", lineHeight: 1.5 }}>{probe.hint}</div>
+        <div className="text-xs" style={{ color: "var(--text-dim)", lineHeight: 1.5 }}>{probe.hint}</div>
       )}
 
       {isAuth && (
         <>
-          <div className="text-[10px]" style={{ color: "var(--text-dim)", lineHeight: 1.6 }}>
+          <div className="text-xs" style={{ color: "var(--text-dim)", lineHeight: 1.6 }}>
             Iframes can&apos;t carry your Grafana session cookies cross-origin, so embeds only work when Grafana&apos;s anonymous viewer is enabled or you proxy with a service account token. Pick one:
           </div>
           <details style={{ background: "var(--card-alt)", borderRadius: 6, padding: "6px 10px" }}>
-            <summary style={{ fontSize: 10, cursor: "pointer", color: "var(--brand)", fontWeight: 600 }}>1. Enable Grafana anonymous viewer (one env var)</summary>
-            <div className="text-[10px] mt-2" style={{ color: "var(--text-dim)", lineHeight: 1.5 }}>
+            <summary style={{ fontSize: 12, cursor: "pointer", color: "var(--brand)", fontWeight: 600 }}>1. Enable Grafana anonymous viewer (one env var)</summary>
+            <div className="text-xs mt-2" style={{ color: "var(--text-dim)", lineHeight: 1.5 }}>
               On the Grafana container, set:
-              <pre style={{ fontFamily: "monospace", fontSize: 9, background: "var(--bg)", borderRadius: 4, padding: "6px 8px", marginTop: 4, overflowX: "auto" }}>{`GF_AUTH_ANONYMOUS_ENABLED=true
+              <pre style={{ fontFamily: "monospace", fontSize: 12, background: "var(--bg)", borderRadius: 4, padding: "6px 8px", marginTop: 4, overflowX: "auto" }}>{`GF_AUTH_ANONYMOUS_ENABLED=true
 GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
 GF_SECURITY_ALLOW_EMBEDDING=true`}</pre>
               Restart Grafana, refresh this page. Safest option for LAN-only homelabs.
             </div>
           </details>
           <details style={{ background: "var(--card-alt)", borderRadius: 6, padding: "6px 10px" }}>
-            <summary style={{ fontSize: 10, cursor: "pointer", color: "var(--brand)", fontWeight: 600 }}>2. Use a service-account API token</summary>
-            <div className="text-[10px] mt-2" style={{ color: "var(--text-dim)", lineHeight: 1.5 }}>
+            <summary style={{ fontSize: 12, cursor: "pointer", color: "var(--brand)", fontWeight: 600 }}>2. Use a service-account API token</summary>
+            <div className="text-xs mt-2" style={{ color: "var(--text-dim)", lineHeight: 1.5 }}>
               Grafana → Administration → Service accounts → Add → Viewer role → Add token. Then set <code style={{ fontFamily: "monospace" }}>GRAFANA_API_TOKEN</code> on the ComExe container. Coming in a future release: server-side <code style={{ fontFamily: "monospace" }}>/render</code> proxy that uses this.
             </div>
           </details>
           <details style={{ background: "var(--card-alt)", borderRadius: 6, padding: "6px 10px" }}>
-            <summary style={{ fontSize: 10, cursor: "pointer", color: "var(--brand)", fontWeight: 600 }}>3. Hide the Grafana card</summary>
-            <div className="text-[10px] mt-2" style={{ color: "var(--text-dim)", lineHeight: 1.5 }}>
+            <summary style={{ fontSize: 12, cursor: "pointer", color: "var(--brand)", fontWeight: 600 }}>3. Hide the Grafana card</summary>
+            <div className="text-xs mt-2" style={{ color: "var(--text-dim)", lineHeight: 1.5 }}>
               Settings → Visible cards → uncheck Grafana.
             </div>
           </details>
@@ -196,18 +196,18 @@ GF_SECURITY_ALLOW_EMBEDDING=true`}</pre>
       )}
 
       {isNotFound && (
-        <div className="text-[10px]" style={{ color: "var(--text-dim)", lineHeight: 1.5 }}>
+        <div className="text-xs" style={{ color: "var(--text-dim)", lineHeight: 1.5 }}>
           Double-check <code style={{ fontFamily: "monospace" }}>GRAFANA_DASHBOARD_UID</code>, <code style={{ fontFamily: "monospace" }}>GRAFANA_PANEL_ID</code>, and <code style={{ fontFamily: "monospace" }}>GRAFANA_DASHBOARD_SLUG</code>. The UID is the random string in the dashboard URL after <code style={{ fontFamily: "monospace" }}>/d/</code>.
         </div>
       )}
 
       <a href={baseUrl} target="_blank" rel="noopener noreferrer"
-        className="text-[10px] mt-auto"
+        className="text-xs mt-auto"
         style={{ color: accent, textDecoration: "none", alignSelf: "flex-start" }}>
         open Grafana ↗
       </a>
       <a href={panelUrl} target="_blank" rel="noopener noreferrer"
-        className="text-[10px]"
+        className="text-xs"
         style={{ color: "var(--text-faint)", textDecoration: "none", alignSelf: "flex-start" }}>
         try panel URL directly ↗
       </a>
@@ -233,13 +233,13 @@ export function GrafanaCard({ baseUrl, panelUrl, panels, tokenSet }: {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span style={{ color: "var(--accent-grafana)" }}><IconGrafana /></span>
-          <span className="text-[10px] uppercase tracking-widest font-semibold" style={{ color: "var(--text-label)", letterSpacing: "0.15em" }}>grafana</span>
+          <span className="text-xs uppercase tracking-widest font-semibold" style={{ color: "var(--text-label)", letterSpacing: "0.15em" }}>grafana</span>
           {hasAnyPanel && (
-            <span className="text-[9px]" style={{ color: "var(--text-ghost)" }}>{allPanels.length} panel{allPanels.length !== 1 ? "s" : ""}</span>
+            <span className="text-xs" style={{ color: "var(--text-ghost)" }}>{allPanels.length} panel{allPanels.length !== 1 ? "s" : ""}</span>
           )}
         </div>
         <a href={baseUrl} target="_blank" rel="noopener noreferrer"
-          className="text-[10px]"
+          className="text-xs"
           style={{ color: "var(--text-faint)", textDecoration: "none", transition: "color 0.15s" }}
           onMouseEnter={e => (e.currentTarget.style.color = "var(--accent-grafana)")}
           onMouseLeave={e => (e.currentTarget.style.color = "rgba(255,255,255,0.3)")}>
@@ -255,10 +255,10 @@ export function GrafanaCard({ baseUrl, panelUrl, panels, tokenSet }: {
           display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6,
           padding: 18, textAlign: "center",
         }}>
-          <span className="text-[11px]" style={{ color: "var(--text-label)" }}>
+          <span className="text-xs" style={{ color: "var(--text-label)" }}>
             Grafana embed not configured.
           </span>
-          <span className="text-[10px]" style={{ color: "var(--text-ghost)", maxWidth: 360, lineHeight: 1.5 }}>
+          <span className="text-xs" style={{ color: "var(--text-ghost)", maxWidth: 360, lineHeight: 1.5 }}>
             Set <code style={{ color: "var(--accent-grafana)" }}>GRAFANA_DASHBOARD_UID</code> and <code style={{ color: "var(--accent-grafana)" }}>GRAFANA_DATASOURCE_UID</code> env vars to render a panel here. Use the <a href="/setup" style={{ color: "var(--accent-grafana)" }}>setup wizard</a> to add multiple panels.
           </span>
         </div>
@@ -272,7 +272,7 @@ export function GrafanaCard({ baseUrl, panelUrl, panels, tokenSet }: {
             return (
               <div key={p.panelId + i} style={{ gridColumn: `span ${colSpan}` }}>
                 {allPanels.length > 1 && (
-                  <div className="text-[9px] uppercase tracking-widest mb-1" style={{ color: "var(--text-ghost)" }}>{p.label}</div>
+                  <div className="text-xs uppercase tracking-widest mb-1" style={{ color: "var(--text-ghost)" }}>{p.label}</div>
                 )}
                 <GrafanaPanel url={p.url} label={p.label} height={h} baseUrl={baseUrl} tokenSet={tokenSet} />
               </div>

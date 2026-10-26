@@ -41,7 +41,7 @@ export function Clock({ timezone }: { timezone?: string }) {
 
   return (
     <div className="flex flex-col items-end leading-tight">
-      <span className="hidden sm:block" style={{ fontSize: 10, color: "var(--text-faint)", fontFamily: "inherit" }}>{date}</span>
+      <span className="hidden sm:block" style={{ fontSize: 12, color: "var(--text-faint)", fontFamily: "inherit" }}>{date}</span>
       <span className="font-mono tabular-nums" style={{ fontSize: 12, color: "var(--text)", fontWeight: 600 }}>{time}</span>
     </div>
   );

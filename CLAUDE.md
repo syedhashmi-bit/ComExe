@@ -24,7 +24,7 @@ A single-user, LAN-only homelab dashboard for a TrueNAS Scale host. Next.js 16
 chart library. Every upstream service is reached through a server-side route so
 credentials never enter the browser bundle.
 
-**Scale:** ~15k lines of TS/TSX under `app/` — 33 API routes, 26 components,
+**Scale:** ~15k lines of TS/TSX under `app/` — 33 API routes, 28 components,
 26 lib modules, 7 pages.
 
 **Deployment posture:** one LAN, one user, never exposed to the internet. That
@@ -49,7 +49,7 @@ $env:PATH = "C:\Program Files\nodejs;" + $env:PATH
 npm run dev        # localhost:3000
 npm run build      # local sanity check; CI does the real build
 npm run lint
-npm test           # vitest, 257 unit tests
+npm test           # vitest, 263 unit tests
 npm run test:e2e   # playwright
 npm run storybook  # primitives sandbox on :6006
 ```
@@ -304,22 +304,31 @@ services are configured), `/login`, `/analytics` (interactive area charts over
   matches intent. Has a sanity guard: suppresses output when
   `|delta|/|current| > 5`, which catches unit-mismatch bugs (see `memory.md` →
   "Speedtest unit mismatch").
-- **`Card`** — gradient brand stripe, radial tint, hover lift, pulsing status dot
-  driven by `alertLevel`, optional ⓘ info popover from `CARD_INFO`.
+- **`Card`** — flat: `var(--card)`, 1px border, radius 10, no stripe/tint/glow/
+  lift. A warning/critical `alertLevel` tints the border and adds a labelled
+  dot. Keyboard-activatable (role="button"). Optional ⓘ popover from `CARD_INFO`.
 
-**Feature components:** `ServicesPanel`, `ServiceDetailSheet`, `BookmarksPanel`,
+**Feature components:** `StatusSummary`, `ServicesPanel`, `ServiceDetailSheet`, `BookmarksPanel`,
 `SettingsPanel`, `SearchBar`, `MikrotikTab`, `GrafanaCard`, `ActivityFeed`,
 `AreaChart`, `CommandPalette`, `KeyboardShortcuts`, `NotificationCenter`,
 `HeaderSparklines`, `UptimeTimeline`, `DiskHealthPanel`, `NetworkTopology`,
 `ServerFleetPanel`, `DependencyMap`, `CustomCards` + `CustomCardEditor`,
-`ContainerLogsSheet`, `DraggableCard`, `ErrorBoundary`, `Clock`, `icons`.
+`ContainerLogsSheet`, `DraggableCard`, `ErrorBoundary`, `Modal`, `Clock`, `icons`.
 
-**Services panel** renders two categories (`SVC_CATEGORIES` in
-`ServicesPanel.tsx`): *media stack* (radarr, sonarr, bazarr, tautulli,
-qbittorrent, overseerr, prowlarr) and *infrastructure* (pihole, nginx,
-uptimekuma). Cards sort by health priority — down → error → warning → active →
-idle — preserving route order within a tier. Click opens the service UI in a new
-tab; there's also a detail sheet, a restart button, and a logs sheet.
+**`StatusSummary`** is the first thing on the dashboard: "All systems normal", or
+a list of what needs attention — crossed thresholds (`healthIssues()` in
+`lib/alerts.ts`), down / auth-failed services, *arr health errors and warnings
+(grouped into one row across apps), stale data, Uptime Kuma monitors down,
+Prometheus exporters down. `collectIssues()` is pure and unit-tested.
+
+**Services panel** is a compact grouped list (`SVC_CATEGORIES` in
+`ServicesPanel.tsx`): *Media* (radarr, sonarr, bazarr, tautulli, qbittorrent,
+overseerr, prowlarr) and *Infrastructure* (pihole, nginx, uptimekuma). One row
+per service: status word + dot (the only colour), the app's full-colour icon and
+name (links to its UI in a new tab), key number, detail line, and details /
+logs / restart buttons. Queue items and Plex streams show as a sub-list. Rows
+sort by health priority — down/auth → error → warning/stale → busy → idle —
+preserving route order within a tier.
 
 **Client state** lives in `localStorage`, all under a `comexe:` prefix:
 
@@ -337,14 +346,21 @@ server-side `preferences` in `/api/config`.
 
 ### Theming
 
-Five themes — **Midnight** (cyan, default), **Forge** (amber), **Forest**
-(emerald), **Plum** (magenta), **Paper** (light) — defined in
-`lib/constants.ts` and implemented as `.theme-*` classes in `globals.css`.
+Two themes — **Midnight** (calm dark, default) and **Paper** (light) — defined
+in `lib/constants.ts` and implemented in `globals.css` (`:root` and
+`.theme-paper`). Forge, Forest and Plum were retired in the Oct 2026 "calm"
+redesign; `normalizeTheme()` maps any saved or configured value naming one of
+them to Midnight.
 
-Everything is driven by CSS custom properties on `:root`: `--bg`, `--card`,
-`--text*`, `--brand`, `--ok`/`--warn`/`--critical`, and per-card accents
-(`--accent-cpu`, `--accent-memory`, …). A ~250-color hardcode refactor produced
-this; **don't reintroduce literal hex colors** where a variable exists.
+**Colour means status, nothing else.** `--ok`/`--warn`/`--critical` appear only
+when something crossed a threshold or is broken. Bars, sparklines and charts
+use the neutral `--data` / `--data-strong`; `barColor`, `gpuUtilColor` and
+`tempColor` return those below their thresholds. `--brand` is for the logo,
+links and focus only. The `--accent-*` card variables still exist but are
+neutral on purpose. Every text shade down to `--text-ghost` passes 4.5:1 on
+`--card`. **Don't reintroduce literal hex colors** where a variable exists, and
+use `withAlpha()` (`lib/formatters.ts`, color-mix) for translucency — a hex
+suffix on a `var()` is invalid CSS and silently drops the whole declaration.
 
 `layout.tsx` runs an inline pre-hydration script that reads the saved theme from
 localStorage (falling back to `prefers-color-scheme`) and sets the class before
@@ -488,17 +504,17 @@ collector), `HISTORY_RETENTION_DAYS`, `HISTORY_MAX_SIZE_MB`,
 
 ## Styling conventions
 
-- Use CSS variables (`var(--brand)`, `var(--accent-cpu)`, …), not literal hex,
-  wherever one exists — otherwise the four non-default themes break.
-- Cards: `var(--card)` bg + radial brand tint, `border-radius: 14px`, padding 18px.
-- Card hover: `translateY(-3px)`, brand drop shadow, brand inner ring.
-- Card brand stripe: 3px gradient bar (full → 60% → 20%, with glow).
-- Severity: ok `--ok` `#10b981`, mid `#06b6d4`, warn `--warn` `#f59e0b`,
-  critical `--critical` `#ef4444`.
-- Card accent assignments — **don't change without reason**: CPU `--accent-cpu`,
-  Memory `--accent-memory`, Filesystems `--accent-fs`, Network `--accent-network`,
-  GPU `--accent-gpu` (dynamic via `gpuUtilColor`), Speedtest `--accent-speedtest`,
-  System `--accent-system`, Grafana `--accent-grafana`.
+- Use CSS variables (`var(--text-muted)`, `var(--data)`, …), not literal hex,
+  wherever one exists — otherwise Paper breaks.
+- Cards: `var(--card)` bg, 1px `var(--border)`, `border-radius: 10px`, padding
+  16px. Hover only brightens the border. No stripes, tints, glows, lifts or
+  pulsing dots.
+- Severity (Midnight): ok `--ok` `#3fb950`, warn `--warn` `#d29922`, critical
+  `--critical` `#f85149`. Pair colour with a word ("Down", "Warning") — never
+  colour alone.
+- Type: nothing under 12px. Roughly 12 (meta) / 13–14 (body) / 16–18
+  (headings) / 32+ (headline numbers).
+- Icons: line SVGs, never emoji. Service icons stay full colour (`SVC_ICONS`).
 - Fonts: Inter (UI), JetBrains Mono (numbers — `font-mono` or `var(--font-mono)`).
 - Inline `style` for colors/sizes; Tailwind for layout/spacing/flex. No CSS
   modules, no styled-components.
@@ -509,7 +525,7 @@ collector), `HISTORY_RETENTION_DAYS`, `HISTORY_MAX_SIZE_MB`,
 
 ## Testing
 
-- **Unit** — vitest, `tests/unit/`. 257 tests over 19 files covering `app/lib/*`
+- **Unit** — vitest, `tests/unit/`. 263 tests over 20 files covering `app/lib/*`
   plus `tests/unit/routes/` for API route handlers.
 - **E2E** — Playwright, `tests/e2e/smoke.spec.ts`, run by its own CI job.
 - **Storybook** — `stories/Primitives.stories.tsx`.

@@ -151,12 +151,12 @@ function deriveDefaultUrl(ip: string, port: number): string {
 function StatusPill({ status }: { status: TestStatus }) {
   if (status.state === "idle") return null;
   if (status.state === "testing") {
-    return <span className="text-[11px]" style={{ color: "var(--brand)" }}>testing…</span>;
+    return <span className="text-xs" style={{ color: "var(--brand)" }}>testing…</span>;
   }
   if (status.state === "ok") {
-    return <span className="text-[11px]" style={{ color: "var(--ok)" }}>✓ {status.msg}</span>;
+    return <span className="text-xs" style={{ color: "var(--ok)" }}>✓ {status.msg}</span>;
   }
-  return <span className="text-[11px]" style={{ color: "var(--critical)" }}>✗ {status.msg}</span>;
+  return <span className="text-xs" style={{ color: "var(--critical)" }}>✗ {status.msg}</span>;
 }
 
 function Field({ label, value, onChange, type = "text", placeholder, mono = false }: {
@@ -165,7 +165,7 @@ function Field({ label, value, onChange, type = "text", placeholder, mono = fals
 }) {
   return (
     <label className="flex flex-col gap-1">
-      <span className="text-[9px] uppercase tracking-widest" style={{ color: "var(--text-label)" }}>{label}</span>
+      <span className="text-xs uppercase tracking-widest" style={{ color: "var(--text-label)" }}>{label}</span>
       <input
         type={type}
         value={value}
@@ -206,7 +206,7 @@ function Btn({ children, onClick, variant = "secondary", disabled }: {
         border: variant === "primary" ? "none" : `1px solid ${variant === "danger" ? "rgba(239,68,68,0.35)" : "var(--border-mid)"}`,
         borderRadius: 6,
         padding: "6px 12px",
-        fontSize: 11,
+        fontSize: 12,
         fontWeight: 600,
         letterSpacing: "0.02em",
         cursor: disabled ? "not-allowed" : "pointer",
@@ -409,7 +409,7 @@ export default function SetupWizard() {
   return (
     <div className="setup-page" style={{ maxWidth: 1100, margin: "0 auto", padding: "32px 24px 80px" }}>
       <header style={{ marginBottom: 32 }}>
-        <Link href="/" style={{ fontSize: 11, color: "var(--text-ghost)", textDecoration: "none", display: "inline-block", marginBottom: 12 }}>
+        <Link href="/" style={{ fontSize: 12, color: "var(--text-ghost)", textDecoration: "none", display: "inline-block", marginBottom: 12 }}>
           &larr; Dashboard
         </Link>
         <h1 style={{ fontSize: 28, fontWeight: 700, color: "var(--text)", marginBottom: 8 }}>Setup</h1>
@@ -417,7 +417,7 @@ export default function SetupWizard() {
           Fill in the URL + credentials for each service you want to monitor, click <b style={{ color: "var(--brand)" }}>Test</b> to confirm
           the dashboard can reach it, then copy the generated config at the bottom into your <code style={{ color: "var(--brand-dim)" }}>docker-compose.yml</code> or <code style={{ color: "var(--brand-dim)" }}>docker run</code> command and redeploy.
         </p>
-        <p style={{ fontSize: 11, color: "var(--text-faint)", marginTop: 8 }}>
+        <p style={{ fontSize: 12, color: "var(--text-faint)", marginTop: 8 }}>
           Form state (including credentials) is stored in your browser&apos;s localStorage so a refresh doesn&apos;t lose progress. Click{" "}
           <span style={{ color: "var(--critical)", cursor: "pointer", textDecoration: "underline" }} onClick={clearEverything}>Clear everything</span>{" "}
           when you&apos;re done.
@@ -459,7 +459,7 @@ export default function SetupWizard() {
                     style={{ width: 14, height: 14, accentColor: "var(--brand)", cursor: "pointer" }}
                   />
                   <span style={{ fontSize: 13, fontWeight: 600, color: row.enabled ? "var(--text)" : "var(--text-dim)" }}>{svc.label}</span>
-                  <span style={{ fontSize: 11, color: "var(--text-faint)" }}>{svc.description}</span>
+                  <span style={{ fontSize: 12, color: "var(--text-faint)" }}>{svc.description}</span>
                   <div style={{ marginLeft: "auto" }}><StatusPill status={row.testStatus} /></div>
                 </div>
                 {row.enabled && (
@@ -491,15 +491,15 @@ export default function SetupWizard() {
                     </div>
                     {keyOrLogin(svc) && (
                       <div className="setup-grid" style={{ display: "grid", gridTemplateColumns: "minmax(280px, 2fr) 1fr 1fr auto", gap: 10, alignItems: "end" }}>
-                        <div style={{ fontSize: 11, color: "var(--text-faint)", paddingBottom: 8 }}>Or, without an API key, log in with:</div>
+                        <div style={{ fontSize: 12, color: "var(--text-faint)", paddingBottom: 8 }}>Or, without an API key, log in with:</div>
                         <Field label="Username" value={row.username} onChange={v => updateRow(svc.id, { username: v })} mono />
                         <Field label="Password" value={row.password} onChange={v => updateRow(svc.id, { password: v })} placeholder={keepHint(saved?.services[svc.id]?.hasPassword)} type={showPasswords ? "text" : "password"} mono />
                         <div />
                       </div>
                     )}
                     {svc.helpText && (
-                      <div style={{ fontSize: 10, color: "var(--text-faint)", display: "flex", alignItems: "center", gap: 4 }}>
-                        <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 14, height: 14, borderRadius: 7, border: "1px solid var(--border-bright)", fontSize: 9, color: "var(--text-label)", flexShrink: 0 }}>?</span>
+                      <div style={{ fontSize: 12, color: "var(--text-faint)", display: "flex", alignItems: "center", gap: 4 }}>
+                        <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 14, height: 14, borderRadius: 7, border: "1px solid var(--border-bright)", fontSize: 12, color: "var(--text-label)", flexShrink: 0 }}>?</span>
                         <span>Where to find it: <em>{svc.helpText}</em></span>
                       </div>
                     )}
@@ -569,12 +569,12 @@ export default function SetupWizard() {
               {/* Multi-panel support */}
               <div style={{ borderTop: "1px solid var(--border-dim)", paddingTop: 12 }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                  <span style={{ fontSize: 10, color: "var(--text-label)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Additional panels</span>
+                  <span style={{ fontSize: 12, color: "var(--text-label)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Additional panels</span>
                   <button onClick={() => {
                     const s = { ...state, grafana: { ...state.grafana, panels: [...state.grafana.panels, { panelId: "", label: "", size: "md" as const }] } };
                     setState(s); saveState(s);
                   }} style={{
-                    fontSize: 10, color: "#f97316", background: "rgba(249,115,22,0.08)",
+                    fontSize: 12, color: "#f97316", background: "rgba(249,115,22,0.08)",
                     border: "1px solid rgba(249,115,22,0.2)", borderRadius: 5,
                     padding: "3px 10px", cursor: "pointer",
                   }}>+ Add panel</button>
@@ -589,7 +589,7 @@ export default function SetupWizard() {
                       {(["sm", "md", "lg"] as const).map(sz => (
                         <button key={sz} onClick={() => { const s = { ...state, grafana: { ...state.grafana, panels: state.grafana.panels.map((p, i) => i === pi ? { ...p, size: sz } : p) } }; setState(s); saveState(s); }}
                           style={{
-                            fontSize: 9, padding: "4px 8px", borderRadius: 4, cursor: "pointer",
+                            fontSize: 12, padding: "4px 8px", borderRadius: 4, cursor: "pointer",
                             background: panel.size === sz ? "rgba(249,115,22,0.2)" : "var(--surface-dim)",
                             border: `1px solid ${panel.size === sz ? "rgba(249,115,22,0.4)" : "var(--border)"}`,
                             color: panel.size === sz ? "#f97316" : "var(--text-faint)",
@@ -598,11 +598,11 @@ export default function SetupWizard() {
                       ))}
                     </div>
                     <button onClick={() => { const s = { ...state, grafana: { ...state.grafana, panels: state.grafana.panels.filter((_, i) => i !== pi) } }; setState(s); saveState(s); }}
-                      style={{ fontSize: 11, color: "#ef4444", background: "none", border: "none", cursor: "pointer", padding: "4px 6px" }} title="Remove">×</button>
+                      style={{ fontSize: 12, color: "#ef4444", background: "none", border: "none", cursor: "pointer", padding: "4px 6px" }} title="Remove">×</button>
                   </div>
                 ))}
                 {state.grafana.panels.length === 0 && (
-                  <span style={{ fontSize: 10, color: "var(--text-ghost)", fontStyle: "italic" }}>
+                  <span style={{ fontSize: 12, color: "var(--text-ghost)", fontStyle: "italic" }}>
                     No extra panels. The default panel above will be shown. Click &quot;+ Add panel&quot; to embed more.
                   </span>
                 )}
@@ -615,7 +615,7 @@ export default function SetupWizard() {
       {/* ── Action bar ── */}
       <div style={{ display: "flex", gap: 10, alignItems: "center", margin: "32px 0 16px", flexWrap: "wrap" }}>
         <Btn variant="primary" onClick={testAll}>Test every enabled service</Btn>
-        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--text-label)", cursor: "pointer" }}>
+        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--text-label)", cursor: "pointer" }}>
           <input type="checkbox" checked={showPasswords} onChange={e => setShowPasswords(e.target.checked)} />
           show passwords
         </label>
@@ -633,7 +633,7 @@ export default function SetupWizard() {
           borderRadius: 10, padding: 16,
         }}>
           <div>
-            <label style={{ display: "block", fontSize: 10, color: "var(--text-faint)", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>Search Engine</label>
+            <label style={{ display: "block", fontSize: 12, color: "var(--text-faint)", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>Search Engine</label>
             <select
               value={state.preferences.searchEngine}
               onChange={e => { const s = { ...state, preferences: { ...state.preferences, searchEngine: e.target.value } }; setState(s); saveState(s); }}
@@ -646,7 +646,7 @@ export default function SetupWizard() {
             </select>
           </div>
           <div>
-            <label style={{ display: "block", fontSize: 10, color: "var(--text-faint)", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>Timezone</label>
+            <label style={{ display: "block", fontSize: 12, color: "var(--text-faint)", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>Timezone</label>
             <select
               value={state.preferences.timezone}
               onChange={e => { const s = { ...state, preferences: { ...state.preferences, timezone: e.target.value } }; setState(s); saveState(s); }}
@@ -659,7 +659,7 @@ export default function SetupWizard() {
             </select>
           </div>
           <div style={{ gridColumn: "1 / -1" }}>
-            <label style={{ display: "block", fontSize: 10, color: "var(--text-faint)", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>Theme</label>
+            <label style={{ display: "block", fontSize: 12, color: "var(--text-faint)", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>Theme</label>
             <div style={{ display: "flex", gap: 8 }}>
               {THEMES.map(t => {
                 const active = state.preferences.theme === t.key;
@@ -681,7 +681,7 @@ export default function SetupWizard() {
                     }}>
                       <div style={{ width: 12, height: 12, borderRadius: 6, background: t.brand }} />
                     </div>
-                    <span style={{ fontSize: 10, color: active ? "var(--text)" : "var(--text-dim)" }}>{t.label}</span>
+                    <span style={{ fontSize: 12, color: active ? "var(--text)" : "var(--text-dim)" }}>{t.label}</span>
                   </button>
                 );
               })}
@@ -703,10 +703,10 @@ export default function SetupWizard() {
               background: "rgba(245,158,11,0.08)",
               border: "1px solid rgba(245,158,11,0.3)",
               borderRadius: 6, padding: "10px 12px",
-              fontSize: 11, color: "#f59e0b", lineHeight: 1.6,
+              fontSize: 12, color: "#f59e0b", lineHeight: 1.6,
             }}>
               <strong>Writable data volume not mounted.</strong> Save & apply needs a writable directory at <code style={{ color: "#fde68a" }}>/app/data</code>. Add this to your <code style={{ color: "#fde68a" }}>docker-compose.yml</code>:
-              <pre style={{ marginTop: 8, padding: 8, background: "#1a1300", borderRadius: 4, fontSize: 10, color: "#fcd34d", whiteSpace: "pre-wrap" }}>{`services:
+              <pre style={{ marginTop: 8, padding: 8, background: "#1a1300", borderRadius: 4, fontSize: 12, color: "#fcd34d", whiteSpace: "pre-wrap" }}>{`services:
   comexe:
     volumes:
       - ./dashboard-data:/app/data`}</pre>
@@ -735,7 +735,7 @@ export default function SetupWizard() {
               onClick={() => setShowAdvanced(s => !s)}
               style={{
                 background: "none", border: "none", color: "var(--text-dim)",
-                fontSize: 11, cursor: "pointer", padding: 0, fontWeight: 500,
+                fontSize: 12, cursor: "pointer", padding: 0, fontWeight: 500,
               }}>
               {showAdvanced ? "▾" : "▸"} Or copy the generated config manually (for env-var-based deployments)
             </button>
@@ -750,7 +750,7 @@ export default function SetupWizard() {
                       background: outputTab === t ? "var(--settings-active-bg)" : "var(--surface-dim)",
                       border: `1px solid ${outputTab === t ? "var(--settings-active-border)" : "var(--border)"}`,
                       color: outputTab === t ? "var(--brand)" : "var(--text-muted)",
-                      padding: "6px 14px", borderRadius: 6, fontSize: 11, cursor: "pointer", fontWeight: 600,
+                      padding: "6px 14px", borderRadius: 6, fontSize: 12, cursor: "pointer", fontWeight: 600,
                     }}>
                     {t === "compose" ? "docker-compose.yml" : t === "run" ? "docker run" : ".env"}
                   </button>
@@ -763,7 +763,7 @@ export default function SetupWizard() {
                 background: "var(--bg)",
                 border: "1px solid var(--border)",
                 borderRadius: 8, padding: 16,
-                fontSize: 11, fontFamily: "monospace",
+                fontSize: 12, fontFamily: "monospace",
                 color: "var(--text-secondary)",
                 overflow: "auto",
                 maxHeight: 480,
@@ -779,7 +779,7 @@ export default function SetupWizard() {
       </Section>
 
       <footer style={{ marginTop: 40, paddingTop: 20, borderTop: "1px solid var(--border-dim)" }}>
-        <p style={{ fontSize: 11, color: "var(--text-faint)", lineHeight: 1.6 }}>
+        <p style={{ fontSize: 12, color: "var(--text-faint)", lineHeight: 1.6 }}>
           After applying the config and restarting the container, head back to{" "}
           <Link href="/" style={{ color: "var(--brand)" }}>the dashboard</Link> and check Settings → Connections to confirm everything&apos;s green.
         </p>
@@ -792,7 +792,7 @@ function Section({ title, subtitle, children }: { title: string; subtitle?: stri
   return (
     <section style={{ marginBottom: 28 }}>
       <h2 style={{ fontSize: 14, fontWeight: 700, color: "var(--text)", marginBottom: 4, letterSpacing: "0.02em" }}>{title}</h2>
-      {subtitle && <p style={{ fontSize: 11, color: "var(--text-label)", marginBottom: 14, lineHeight: 1.6 }}>{subtitle}</p>}
+      {subtitle && <p style={{ fontSize: 12, color: "var(--text-label)", marginBottom: 14, lineHeight: 1.6 }}>{subtitle}</p>}
       {children}
     </section>
   );

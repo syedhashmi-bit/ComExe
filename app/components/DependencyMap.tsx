@@ -147,7 +147,7 @@ export function DependencyMap({ onClose, services }: DependencyMapProps) {
         onClose={onClose}
         title="Dependency Map"
         titleExtra={
-          <span style={{ fontSize: 10, color: "var(--text-ghost)" }}>
+          <span style={{ fontSize: 12, color: "var(--text-ghost)" }}>
             {nodes.length} services, {deps.length} dependencies
           </span>
         }
@@ -160,7 +160,7 @@ export function DependencyMap({ onClose, services }: DependencyMapProps) {
           ) : error ? (
             <div style={{ padding: "40px 0", textAlign: "center", color: "var(--warn)", fontSize: 12 }}>
               Couldn&apos;t load the dependency graph
-              <div style={{ fontSize: 10, color: "var(--text-dim)", marginTop: 6 }}>
+              <div style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 6 }}>
                 /api/dependencies didn&apos;t respond — this isn&apos;t a report that none are configured.
               </div>
             </div>
@@ -202,7 +202,7 @@ export function DependencyMap({ onClose, services }: DependencyMapProps) {
                       <text
                         x={(fromPos.x + toPos.x) / 2 + 8}
                         y={(fromPos.y + toPos.y) / 2}
-                        style={{ fontSize: 8, fill: "var(--text-ghost)", fontFamily: "monospace" }}
+                        style={{ fontSize: 12, fill: "var(--text-ghost)", fontFamily: "monospace" }}
                       >
                         {d.label}
                       </text>
@@ -247,7 +247,7 @@ export function DependencyMap({ onClose, services }: DependencyMapProps) {
                     <text
                       textAnchor="middle" dominantBaseline="middle"
                       style={{
-                        fontSize: 8, fontWeight: 700, textTransform: "uppercase",
+                        fontSize: 12, fontWeight: 700, textTransform: "uppercase",
                         fill: isHovered ? "var(--bg)" : color,
                         letterSpacing: "0.03em",
                       }}
@@ -256,12 +256,12 @@ export function DependencyMap({ onClose, services }: DependencyMapProps) {
                     </text>
                     <text
                       y={32} textAnchor="middle"
-                      style={{ fontSize: 8, fill: "var(--text-ghost)", fontFamily: "monospace" }}
+                      style={{ fontSize: 12, fill: "var(--text-ghost)", fontFamily: "monospace" }}
                     >
                       {!isConfigured ? "not configured" : isUp ? "online" : "DOWN"}
                     </text>
                     {isImpacted && (
-                      <text y={42} textAnchor="middle" style={{ fontSize: 7, fill: "var(--warn)", fontWeight: 600 }}>
+                      <text y={42} textAnchor="middle" style={{ fontSize: 12, fill: "var(--warn)", fontWeight: 600 }}>
                         IMPACTED
                       </text>
                     )}
@@ -272,7 +272,7 @@ export function DependencyMap({ onClose, services }: DependencyMapProps) {
           )}
         </div>
 
-        <div className="flex items-center justify-between px-4 py-2" style={{ borderTop: "1px solid var(--border-dim)", fontSize: 9, color: "var(--text-ghost)" }}>
+        <div className="flex items-center justify-between px-4 py-2" style={{ borderTop: "1px solid var(--border-dim)", fontSize: 12, color: "var(--text-ghost)" }}>
           <span>Hover a down service to see impact chain</span>
           <span>Arrows show &quot;depends on&quot; direction</span>
         </div>

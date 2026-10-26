@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 // ── lib imports ──────────────────────────────────────────────────────────────
-import { THEMES, SVC_PORTS, type ThemeKey } from "@/app/lib/constants";
+import { THEMES, SVC_PORTS, normalizeTheme } from "@/app/lib/constants";
 import type {
   Metrics, Settings, SpeedtestResult, SpeedtestRaw,
   ServiceResult, ActivityEvent, ForecastDay, ClientConfig, SearchEngine,
@@ -17,7 +17,7 @@ import {
 } from "@/app/lib/formatters";
 import {
   cpuAlertLevel, memAlertLevel, diskAlertLevel, gpuTempAlertLevel,
-  worstAlert, computeHealth,
+  worstAlert,
 } from "@/app/lib/alerts";
 import { buildDemoMetrics, buildDemoServices } from "@/app/lib/demo-data";
 
@@ -30,7 +30,7 @@ import {
 import {
   AnimatedNumber, animatedLine, TrendDelta, HeroStat,
   GaugeBar, Sparkline, RadialGauge, ThreeSegmentDonut, LabeledBar,
-  Card, StatusBanner, Skeleton, BigValue, StatRow,
+  Card, Skeleton, BigValue, StatRow,
 } from "@/app/components/primitives";
 import { SearchBar } from "@/app/components/SearchBar";
 import { SettingsPanel } from "@/app/components/SettingsPanel";
@@ -49,6 +49,7 @@ import { HeaderSparklines } from "@/app/components/HeaderSparklines";
 import { UptimeTimeline } from "@/app/components/UptimeTimeline";
 import { CommandPalette, type CommandAction } from "@/app/components/CommandPalette";
 import { DiskHealthPanel } from "@/app/components/DiskHealthPanel";
+import { StatusSummary } from "@/app/components/StatusSummary";
 import { NetworkTopology } from "@/app/components/NetworkTopology";
 import { ServerFleetPanel } from "@/app/components/ServerFleetPanel";
 import { DependencyMap } from "@/app/components/DependencyMap";
@@ -83,7 +84,6 @@ export default function Dashboard() {
   const [showSettings,   setShowSettings]   = useState(false);
   const [expandedCard,   setExpandedCard]   = useState<string | null>(null);
   const [offline,        setOffline]        = useState(false);
-  const [showHealth,     setShowHealth]     = useState(true);
   const [showBookmarks,  setShowBookmarks]  = useState(true);
   const [alertsEnabled,  setAlertsEnabled]  = useState(false);
   const [alertCount,     setAlertCount]     = useState(0);   // session-level fire counter for the header pill
@@ -210,7 +210,7 @@ export default function Dashboard() {
       const saved = localStorage.getItem(SETTINGS_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        setSettings(s => ({ ...s, ...parsed }));
+        setSettings(s => ({ ...s, ...parsed, theme: normalizeTheme(parsed.theme ?? s.theme) }));
       }
     } catch { /* corrupt or empty — use defaults */ }
   }, []);
@@ -487,7 +487,7 @@ export default function Dashboard() {
               ...prev,
               searchEngine: hasSavedEngine ? prev.searchEngine : (cfg.preferences!.searchEngine as SearchEngine) || prev.searchEngine,
               timezone:     hasSavedTz     ? prev.timezone     : cfg.preferences!.timezone ?? prev.timezone,
-              theme:        hasSavedTheme  ? prev.theme        : (cfg.preferences!.theme as ThemeKey) || prev.theme,
+              theme:        hasSavedTheme  ? prev.theme        : normalizeTheme(cfg.preferences!.theme || prev.theme),
             };
           });
         }
@@ -537,13 +537,12 @@ export default function Dashboard() {
   const gpuUtil     = metrics?.gpu?.utilization ?? null;
   const gpuMemPct   = pct(metrics?.gpu?.memUsed ?? null, metrics?.gpu?.memTotal ?? null);
   const gpuPwrPct   = pct(metrics?.gpu?.powerDraw ?? null, metrics?.gpu?.powerLimit ?? null);
-  const gpuColor    = gpuUtil != null ? gpuUtilColor(gpuUtil) : "#ef4444";
+  const gpuColor    = gpuUtil != null ? gpuUtilColor(gpuUtil) : "var(--data)";
 
   const cpuAlert     = cpuAlertLevel(metrics?.cpu ?? null);
   const memAlert     = memAlertLevel(metrics?.memory.total ?? null, metrics?.memory.available ?? null, metrics?.memory.sReclaimable ?? null);
   const gpuTempAlert = gpuTempAlertLevel(metrics?.gpu?.temperature ?? null);
   const maxDiskAlert = worstAlert(metrics?.disks.map(d => diskAlertLevel(d.usedPct)) ?? []);
-  const health       = computeHealth(metrics);
 
   const isVisible  = (k: string) => settings.visibleCards[k] !== false;
   const toggleCard = (k: string) => setExpandedCard(e => e === k ? null : k);
@@ -583,18 +582,11 @@ export default function Dashboard() {
           opacity: (refreshing || loading) ? 1 : 0,
         }} />
       </div>
-      {/* healthy state line */}
-      {!loading && showHealth && health.status === "healthy" && mounted && (
-        <div className="fixed top-0 left-0 right-0 z-40" style={{
-          height: 2, background: "var(--brand)", boxShadow: "0 0 8px rgba(6,182,212,0.5)",
-        }} />
-      )}
-
       {/* Demo mode banner */}
       {demoMode && mounted && (
         <div className="fixed top-0 left-0 right-0 z-50 text-center" style={{
-          background: "linear-gradient(90deg, #f59e0b, #f97316)",
-          padding: "4px 0", fontSize: 11, fontWeight: 600, color: "#0a0c12",
+          background: "var(--warn)",
+          padding: "4px 0", fontSize: 12, fontWeight: 600, color: "#0a0c12",
           letterSpacing: "0.02em",
         }}>
           Demo mode — showing sample data.{" "}
@@ -614,8 +606,8 @@ export default function Dashboard() {
           showcase flow. */}
       {!demoMode && mounted && versionInfo?.hasUpdate && !updateDismissed && (
         <div className="fixed top-0 left-0 right-0 z-50 flex items-center justify-center gap-3" style={{
-          background: "linear-gradient(90deg, #06b6d4, #0ea5e9)",
-          padding: "4px 12px", fontSize: 11, fontWeight: 600, color: "#0a0c12",
+          background: "var(--brand)",
+          padding: "4px 12px", fontSize: 12, fontWeight: 600, color: "#0a0c12",
           letterSpacing: "0.02em",
         }}>
           <span>
@@ -642,8 +634,6 @@ export default function Dashboard() {
         <div className="header-inner max-w-5xl mx-auto px-6 sm:px-6 py-2.5 flex items-center justify-between gap-4">
           {/* Left */}
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-            <span className="block w-2 h-2 rounded-full shrink-0"
-              style={{ background: "var(--ok)", boxShadow: "0 0 6px #10b98166", animation: "pulseDot 2s ease-in-out infinite", "--dot-color": "#10b981" } as React.CSSProperties} />
             <Link href="/" className="flex items-center gap-2 shrink-0" style={{ textDecoration: "none" }}>
               <svg width="22" height="22" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
                 <path d="M14 8 A 8 8 0 1 0 14 24" style={{ stroke: "var(--brand)" }} strokeWidth="2.6" fill="none" strokeLinecap="round" />
@@ -656,17 +646,22 @@ export default function Dashboard() {
                 Com<span style={{ color: "var(--brand)" }}>Exe</span>
               </h1>
             </Link>
-            <span className="shrink-0 hidden sm:inline" style={{ background: "var(--surface)", border: "1px solid var(--border-bright)", borderRadius: 6, padding: "3px 10px", fontSize: 11, color: "var(--text-secondary)", letterSpacing: "0.04em" }}>
-              truenas · :30104
-            </span>
+            <nav aria-label="Pages" className="hidden md:flex items-center shrink-0" style={{ gap: 16, marginLeft: 12, fontSize: 13 }}>
+              <Link href="/" aria-current="page" style={{ color: "var(--text)", fontWeight: 500, textDecoration: "none" }}>Dashboard</Link>
+              {[["/analytics", "Analytics"], ["/forecast", "Forecast"], ["/logs", "Logs"]].map(([href, text]) => (
+                <Link key={href} href={href} style={{ color: "var(--text-muted)", textDecoration: "none" }}
+                  onMouseEnter={e => (e.currentTarget.style.color = "var(--text)")}
+                  onMouseLeave={e => (e.currentTarget.style.color = "var(--text-muted)")}>{text}</Link>
+              ))}
+            </nav>
             {metrics?.uptime != null && (
-              <span className="hidden md:flex items-center gap-1.5 shrink-0" style={{ background: "var(--surface)", border: "1px solid var(--border-bright)", borderRadius: 6, padding: "3px 10px", fontSize: 11, color: "var(--text-secondary)", fontVariantNumeric: "tabular-nums" }}>
+              <span className="hidden md:flex items-center gap-1.5 shrink-0" style={{ background: "var(--surface)", border: "1px solid var(--border-bright)", borderRadius: 6, padding: "3px 10px", fontSize: 12, color: "var(--text-secondary)", fontVariantNumeric: "tabular-nums" }}>
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
                 </svg>
                 {fmtUptime(metrics.uptime)}
                 <span style={{ color: "var(--text-faint)" }}>·</span>
-                <span style={{ color: "var(--text-label)", fontSize: 10 }}>{fmtSince(metrics.uptime)}</span>
+                <span style={{ color: "var(--text-label)", fontSize: 12 }}>{fmtSince(metrics.uptime)}</span>
               </span>
             )}
             {weather && (
@@ -676,7 +671,7 @@ export default function Dashboard() {
                   style={{
                     display: "inline-flex", alignItems: "center", gap: 4,
                     background: "var(--surface)", border: "1px solid var(--border-bright)",
-                    borderRadius: 6, padding: "3px 10px", fontSize: 11, color: "var(--text-secondary)",
+                    borderRadius: 6, padding: "3px 10px", fontSize: 12, color: "var(--text-secondary)",
                     fontVariantNumeric: "tabular-nums",
                     cursor: weather.forecast?.length ? "default" : undefined,
                   }}
@@ -699,13 +694,13 @@ export default function Dashboard() {
                       transition: "opacity 0.15s ease",
                     }}
                   >
-                    <div style={{ fontSize: 10, color: "var(--text-label)", marginBottom: 8, fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase" }}>3-Day Forecast</div>
+                    <div style={{ fontSize: 12, color: "var(--text-label)", marginBottom: 8, fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase" }}>3-Day Forecast</div>
                     <div className="flex flex-col gap-1.5">
                       {weather.forecast.map((d, i) => (
                         <div key={i} className="flex items-center justify-between gap-4" style={{ fontSize: 12 }}>
                           <span style={{ color: "var(--text-muted)", minWidth: 28 }}>{d.date}</span>
                           <span style={{ fontSize: 14 }}>{d.emoji}</span>
-                          <span className="flex-1" style={{ color: "var(--text-label)", fontSize: 10 }}>{d.condition}</span>
+                          <span className="flex-1" style={{ color: "var(--text-label)", fontSize: 12 }}>{d.condition}</span>
                           <span className="font-mono tabular-nums" style={{ color: "var(--text-secondary)" }}>
                             {tu === "F" ? `${Math.round(d.high * 9/5 + 32)}°` : `${d.high}°`}
                           </span>
@@ -725,15 +720,13 @@ export default function Dashboard() {
             <HeaderSparklines cpuHistory={cpuHistory} memHistory={memHistory} rxHistory={rxHistory} />
             <Clock timezone={settings.timezone} />
             {error && (
-              <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 4, background: "rgba(239,68,68,0.1)", color: "var(--critical)", border: "1px solid rgba(239,68,68,0.2)" }}>
+              <span style={{ fontSize: 12, padding: "2px 8px", borderRadius: 4, background: "color-mix(in srgb, var(--critical) 10%, transparent)", color: "var(--critical)", border: "1px solid color-mix(in srgb, var(--critical) 20%, transparent)" }}>
                 {error}
               </span>
             )}
             <span className="block w-1.5 h-1.5 rounded-full"
               style={{
-                background: error ? "#ef4444" : loading ? "rgba(255,255,255,0.2)" : "#10b981",
-                boxShadow: error ? "0 0 6px #ef444466" : !loading ? "0 0 6px #10b98166" : "none",
-                animation: !error && !loading ? "pulseDot 2s ease-in-out infinite" : "none",
+                background: error ? "var(--critical)" : loading ? "var(--text-hidden)" : "var(--ok)",
               }} />
             {alertsEnabled && alertCount > 0 && (
               <button
@@ -742,28 +735,30 @@ export default function Dashboard() {
                 onClick={() => { setShowNotifications(true); setAlertCount(0); }}
                 style={{
                   display: "flex", alignItems: "center", gap: 4,
-                  fontSize: 10, fontWeight: 600,
+                  fontSize: 12, fontWeight: 600,
                   color: "#fff",
                   background: alertCount > 0 ? "var(--critical)" : "transparent",
                   border: "none", borderRadius: 999,
                   padding: "2px 8px", cursor: "pointer",
-                  boxShadow: `0 0 8px ${withAlpha(alertCount > 0 ? "var(--critical)" : "transparent", 33)}`,
-                  transition: "background 0.2s",
+                  fontVariantNumeric: "tabular-nums",
                 }}
-              >🔔 {alertCount}</button>
+              >
+                <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+                {alertCount}
+              </button>
             )}
-            <Link href="/analytics" title="Analytics" aria-label="Open analytics"
-              style={{ color: "var(--text-ghost)", textDecoration: "none", fontSize: 11, fontWeight: 500, padding: "2px 6px", borderRadius: 4, transition: "color 0.2s" }}
-              onMouseEnter={e => (e.currentTarget.style.color = "var(--brand)")}
+            <Link href="/analytics" title="Analytics" aria-label="Open analytics" className="md:hidden flex items-center"
+              style={{ color: "var(--text-ghost)", textDecoration: "none", padding: 2, transition: "color 0.2s" }}
+              onMouseEnter={e => (e.currentTarget.style.color = "var(--text)")}
               onMouseLeave={e => (e.currentTarget.style.color = "var(--text-ghost)")}
-            >&#x1f4ca;</Link>
+            ><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 3v18h18"/><path d="M8 17v-5"/><path d="M13 17V8"/><path d="M18 17v-9"/></svg></Link>
             <button
               title="Open TrueNAS"
               aria-label="Open TrueNAS web UI"
               onClick={() => window.open(`http://${clientConfig?.truenasIp ?? "192.168.88.196"}`, "_blank")}
               style={{ color: "var(--text-ghost)", background: "none", border: "none", cursor: "pointer", padding: 2, transition: "color 0.2s" }}
-              onMouseEnter={e => (e.currentTarget.style.color = "#06b6d4")}
-              onMouseLeave={e => (e.currentTarget.style.color = "rgba(255,255,255,0.2)")}
+              onMouseEnter={e => (e.currentTarget.style.color = "var(--brand)")}
+              onMouseLeave={e => (e.currentTarget.style.color = "var(--text-ghost)")}
             ><IconTrueNAS /></button>
             <button
               title="Settings"
@@ -779,7 +774,6 @@ export default function Dashboard() {
         className="w-full min-h-screen"
         style={{
           background: "var(--bg)",
-          backgroundImage: "radial-gradient(ellipse at 50% 0%, var(--bg-gradient) 0%, transparent 65%)",
           fontFamily: "'Inter', system-ui, sans-serif",
           opacity: mounted ? 1 : 0,
           transition: "opacity 0.5s ease-out",
@@ -793,41 +787,17 @@ export default function Dashboard() {
           </ErrorBoundary>
           {offline && (
             <div className="flex items-center gap-2" style={{
-              background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.3)",
-              borderRadius: 8, padding: "8px 14px", fontSize: 11, color: "#f59e0b",
+              background: "color-mix(in srgb, var(--warn) 12%, transparent)", border: "1px solid color-mix(in srgb, var(--warn) 30%, transparent)",
+              borderRadius: 8, padding: "8px 14px", fontSize: 12, color: "var(--warn)",
             }}>
               <span style={{ fontSize: 14 }}>&#9888;</span>
               <span>You are offline — showing cached data. Updates will resume when connectivity returns.</span>
             </div>
           )}
-          {/* Prometheus is answering but one or more exporters aren't. Without
-              this the whole metric grid just renders "—" and the only way to
-              find out why is to query Prometheus by hand. */}
-          {!demoMode && metrics?.scrapeDegraded && (
-            <div className="flex items-start gap-2" style={{
-              background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.3)",
-              borderRadius: 8, padding: "8px 14px", fontSize: 11, color: "#f59e0b",
-            }}>
-              <span style={{ fontSize: 14, lineHeight: 1.2 }}>&#9888;</span>
-              <span>
-                <strong>
-                  {metrics.scrapeTargets!.filter(t => !t.up).length} of {metrics.scrapeTargets!.length} Prometheus
-                  {" "}scrape target{metrics.scrapeTargets!.length === 1 ? "" : "s"} down
-                </strong>
-                {" — "}
-                {metrics.scrapeTargets!.filter(t => !t.up).map(t => t.job).join(", ")}
-                {". Cards fed by "}
-                {metrics.scrapeTargets!.filter(t => !t.up).length === 1 ? "that exporter" : "those exporters"}
-                {" stay blank until "}
-                {metrics.scrapeTargets!.filter(t => !t.up).length === 1 ? "it is" : "they are"}
-                {" back — try "}
-                <code style={{ fontFamily: "monospace" }}>docker start &lt;exporter&gt;</code> on the host.
-              </span>
-            </div>
-          )}
-          {!loading && showHealth && health.status !== "healthy" && (
-            <StatusBanner result={health} visible={mounted} />
-          )}
+          {/* What needs attention, in one place: thresholds, down/auth/health
+              problems across services, stale data, Prometheus exporters. */}
+          <StatusSummary metrics={metrics} services={services} servicesUpdatedAt={servicesUpdatedAt}
+            clientConfig={clientConfig} demoMode={demoMode} />
 
           {/* First-run setup banner */}
           {services && (() => {
@@ -837,23 +807,23 @@ export default function Dashboard() {
             const missingCount = totalCount - configuredCount;
             return (
               <div className="flex items-center gap-3 flex-wrap" style={{
-                background: "rgba(6,182,212,0.05)",
-                border: "1px solid rgba(6,182,212,0.2)",
+                background: "var(--card)",
+                border: "1px solid var(--border)",
                 borderRadius: 10,
                 padding: "10px 14px",
               }}>
-                <span style={{ color: "var(--brand)", fontSize: 14 }}>👋</span>
+                
                 <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500 }}>
                   Welcome — {configuredCount === 0 ? "no services configured yet" : `only ${configuredCount} of ${totalCount} services configured`}.
                 </span>
-                <span style={{ fontSize: 11, color: "var(--text-dim)" }}>
+                <span style={{ fontSize: 12, color: "var(--text-dim)" }}>
                   {missingCount === 1 ? "1 service is" : `${missingCount} services are`} missing config. Try the{" "}
                   <a href="/setup" style={{ color: "var(--brand)", textDecoration: "underline", fontWeight: 600 }}>
                     setup wizard
                   </a>{" "}
                   to fill in URLs / API keys with live connection-testing, or check{" "}
                   <a href="https://github.com/syedhashmi-bit/ComExe/blob/main/INSTALL.md" target="_blank" rel="noopener noreferrer"
-                    style={{ color: "rgba(6,182,212,0.7)", textDecoration: "underline" }}>
+                    style={{ color: "var(--brand)", textDecoration: "underline" }}>
                     INSTALL.md
                   </a>.
                 </span>
@@ -882,24 +852,23 @@ export default function Dashboard() {
                     <div className="flex flex-wrap gap-1 mb-1 justify-end">
                       {metrics?.sysInfo?.cpuCores != null && (
                         <span className="tabular-nums" style={{
-                          background: "rgba(6,182,212,0.1)", border: "1px solid rgba(6,182,212,0.25)",
-                          borderRadius: 5, padding: "2px 7px", fontSize: 10, color: "var(--brand)",
+                          background: "var(--surface)", border: "1px solid var(--border)",
+                          borderRadius: 5, padding: "2px 7px", fontSize: 12, color: "var(--text-muted)",
                         }}>{metrics.sysInfo.cpuCores} cores</span>
                       )}
                       {metrics?.sysInfo?.cpuFreqGhz != null && (
                         <span className="tabular-nums font-mono" style={{
-                          background: "rgba(6,182,212,0.07)", border: "1px solid rgba(6,182,212,0.18)",
-                          borderRadius: 5, padding: "2px 7px", fontSize: 10, color: "rgba(6,182,212,0.8)",
+                          background: "var(--surface)", border: "1px solid var(--border)",
+                          borderRadius: 5, padding: "2px 7px", fontSize: 12, color: "var(--text-muted)",
                         }}>@ {metrics.sysInfo.cpuFreqGhz.toFixed(2)} GHz</span>
                       )}
                     </div>
                   )}
                 </div>
                 <Sparkline data={cpuHistory} color={barColor(cpuPct)} height={48} />
-                <GaugeBar percent={cpuPct} color={barColor(cpuPct)}
-                  gradient={`linear-gradient(90deg, #0891b2, #06b6d4 60%, ${barColor(cpuPct)})`} />
+                <GaugeBar percent={cpuPct} color={barColor(cpuPct)} />
                 {!loading && (metrics?.sysInfo?.load1 != null) && (
-                  <span className="text-[10px] tabular-nums font-mono" style={{ color: "var(--text-faint)" }}>
+                  <span className="text-xs tabular-nums font-mono" style={{ color: "var(--text-faint)" }}>
                     Load: {metrics.sysInfo.load1?.toFixed(2)} · {metrics.sysInfo.load5?.toFixed(2)} · {metrics.sysInfo.load15?.toFixed(2)}
                   </span>
                 )}
@@ -930,10 +899,11 @@ export default function Dashboard() {
                       freeBytes={metrics?.memory.available ?? 0}
                       totalBytes={memTotal ?? 0}
                       du={du}
+                      usedColor={memAlert === "critical" ? "var(--critical)" : memAlert === "warning" ? "var(--warn)" : undefined}
                     />
                     {realMemPct > 0 && (
                       <div className="flex items-center justify-center gap-2">
-                        <span className="text-[10px] tabular-nums" style={{ color: "var(--text-faint)" }}>
+                        <span className="text-xs tabular-nums" style={{ color: "var(--text-faint)" }}>
                           actual pressure: {realMemPct.toFixed(1)}%
                         </span>
                         <TrendDelta history={memHistory} current={realMemPct} goodDirection="down" suffix="%" />
@@ -966,13 +936,14 @@ export default function Dashboard() {
                 ) : (() => {
                   const PREFIX = "/mnt/Pool/Media/";
                   const folderName = (mp: string) => mp.startsWith(PREFIX) ? mp.slice(PREFIX.length) : (mp.split("/").pop() ?? mp);
-                  const fsBarColor = (p: number) => p > 85 ? "#ef4444" : p > 70 ? "#f59e0b" : "#10b981";
+                  // Documented disk thresholds: warn >85%, critical >95%. Neutral below.
+                  const fsBarColor = (p: number) => p > 95 ? "var(--critical)" : p > 85 ? "var(--warn)" : "var(--data)";
                   const sorted = [...metrics.disks].sort((a, b) => b.usedPct - a.usedPct);
                   const poolUsed  = metrics.pool?.used  ?? null;
                   const poolTotal = metrics.pool?.total ?? null;
                   const poolPct   = poolTotal != null && poolUsed != null && poolTotal > 0
                     ? (poolUsed / poolTotal) * 100 : null;
-                  const poolColor = poolPct == null ? "#666" : fsBarColor(poolPct);
+                  const poolColor = poolPct == null ? "var(--data)" : fsBarColor(poolPct);
                   return (
                     <div className="flex flex-col gap-3">
                       {poolTotal != null && poolUsed != null && (
@@ -982,7 +953,7 @@ export default function Dashboard() {
                               <span className="font-mono tabular-nums" style={{ fontSize: 26, fontWeight: 600, color: "var(--text)", lineHeight: 1.1, letterSpacing: "-0.01em" }}>
                                 {fmtBytes(poolUsed, 1, du)}
                               </span>
-                              <span className="text-[10px]" style={{ color: "var(--text-label)" }}>
+                              <span className="text-xs" style={{ color: "var(--text-label)" }}>
                                 of {fmtBytes(poolTotal, 1, du)}
                               </span>
                             </div>
@@ -1014,13 +985,13 @@ export default function Dashboard() {
                               <div className="flex items-center justify-between gap-2">
                                 <div className="flex items-center gap-1.5 min-w-0">
                                   <span style={{ color: "var(--warn)", opacity: 0.55, flexShrink: 0 }}><IconFolder /></span>
-                                  <span className="text-[11px] font-medium truncate" style={{ color: "var(--text-mid)" }}>{name}</span>
+                                  <span className="text-xs font-medium truncate" style={{ color: "var(--text-mid)" }}>{name}</span>
                                 </div>
                                 <div className="flex items-center gap-2 shrink-0">
-                                  <span className="text-[9px] tabular-nums font-mono" style={{ color: "var(--text-faint)" }}>
+                                  <span className="text-xs tabular-nums font-mono" style={{ color: "var(--text-faint)" }}>
                                     {fmtBytes(disk.used, 1, du)}
                                   </span>
-                                  <span className="tabular-nums font-mono font-semibold" style={{ fontSize: 10, color: barC, minWidth: "2.5ch", textAlign: "right" }}>
+                                  <span className="tabular-nums font-mono font-semibold" style={{ fontSize: 12, color: barC, minWidth: "2.5ch", textAlign: "right" }}>
                                     {disk.usedPct.toFixed(0)}%
                                   </span>
                                 </div>
@@ -1047,41 +1018,41 @@ export default function Dashboard() {
                 animDelay={150} expanded={expandedCard === "network"} onToggle={() => toggleCard("network")}>
                 {!loading && metrics?.network?.interfaceName && (
                   <span className="self-start font-mono" style={{
-                    background: "rgba(59,130,246,0.12)", border: "1px solid rgba(59,130,246,0.25)",
-                    borderRadius: 4, padding: "2px 7px", fontSize: 9, color: "var(--accent-network)",
+                    background: "var(--surface)", border: "1px solid var(--border)",
+                    borderRadius: 4, padding: "2px 7px", fontSize: 12, color: "var(--accent-network)",
                   }}>{metrics.network.interfaceName}</span>
                 )}
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center gap-2">
-                    <span className="text-[11px] font-bold" style={{ color: "var(--accent-network)" }}>↓</span>
-                    <span className="text-[10px] uppercase tracking-widest" style={{ color: "var(--text-faint)" }}>rx</span>
+                    <span className="text-xs font-bold" style={{ color: "var(--accent-network)" }}>↓</span>
+                    <span className="text-xs uppercase tracking-widest" style={{ color: "var(--text-faint)" }}>rx</span>
                     <span className="text-xs font-medium tabular-nums ml-auto font-mono" style={{ color: "var(--text-secondary)" }}>
                       {loading ? "—" : `${fmtBytes(metrics?.network.rxBytesPerSec ?? null, 1, du)}/s`}
                     </span>
                   </div>
-                  <Sparkline data={rxHistory} color="#3b82f6" autoMax height={50} />
-                  <span className="text-[10px] tabular-nums font-medium" style={{ color: "var(--text-faint)" }}>
+                  <Sparkline data={rxHistory} color="var(--data-strong)" autoMax height={50} />
+                  <span className="text-xs tabular-nums font-medium" style={{ color: "var(--text-faint)" }}>
                     ↓ {fmtBytes(metrics?.network.rxBytesTotal ?? null, 1, du)} total
                   </span>
                 </div>
                 <div style={{ height: 1, background: "var(--surface-bright)" }} />
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center gap-2">
-                    <span className="text-[11px] font-bold" style={{ color: "var(--warn)" }}>↑</span>
-                    <span className="text-[10px] uppercase tracking-widest" style={{ color: "var(--text-faint)" }}>tx</span>
+                    <span className="text-xs font-bold" style={{ color: "var(--warn)" }}>↑</span>
+                    <span className="text-xs uppercase tracking-widest" style={{ color: "var(--text-faint)" }}>tx</span>
                     <span className="text-xs font-medium tabular-nums ml-auto font-mono" style={{ color: "var(--text-secondary)" }}>
                       {loading ? "—" : `${fmtBytes(metrics?.network.txBytesPerSec ?? null, 1, du)}/s`}
                     </span>
                   </div>
-                  <Sparkline data={txHistory} color="#f59e0b" autoMax height={50} />
-                  <span className="text-[10px] tabular-nums font-medium" style={{ color: "var(--text-faint)" }}>
+                  <Sparkline data={txHistory} color="var(--data)" autoMax height={50} />
+                  <span className="text-xs tabular-nums font-medium" style={{ color: "var(--text-faint)" }}>
                     ↑ {fmtBytes(metrics?.network.txBytesTotal ?? null, 1, du)} total
                   </span>
                 </div>
                 {!loading && metrics?.sysInfo?.tcpEstab != null && (
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] uppercase tracking-widest" style={{ color: "var(--text-faint)" }}>tcp</span>
-                    <span className="text-[11px] tabular-nums font-mono font-medium" style={{ color: "var(--text-muted)" }}>
+                    <span className="text-xs uppercase tracking-widest" style={{ color: "var(--text-faint)" }}>tcp</span>
+                    <span className="text-xs tabular-nums font-mono font-medium" style={{ color: "var(--text-muted)" }}>
                       {metrics.sysInfo.tcpEstab} established
                     </span>
                   </div>
@@ -1110,12 +1081,12 @@ export default function Dashboard() {
                           <span className="font-medium tabular-nums font-mono" style={{ fontSize: 22, lineHeight: 1, color: "var(--text)" }}>
                             {gpuUtil != null ? gpuUtil.toFixed(0) : "—"}
                           </span>
-                          <span className="text-[9px] uppercase tracking-widest" style={{ color: "var(--text-faint)" }}>%</span>
+                          <span className="text-xs uppercase tracking-widest" style={{ color: "var(--text-faint)" }}>%</span>
                         </div>
                       </div>
                       <div className="flex flex-col gap-1 min-w-0">
                         {metrics?.gpu?.name && (
-                          <span className="text-[10px] font-medium truncate" style={{ color: "var(--brand)" }}>{metrics.gpu.name}</span>
+                          <span className="text-xs font-medium truncate" style={{ color: "var(--text-secondary)" }}>{metrics.gpu.name}</span>
                         )}
                         {metrics?.gpu?.temperature != null && (
                           <div className="flex items-baseline gap-2">
@@ -1127,17 +1098,17 @@ export default function Dashboard() {
                           </div>
                         )}
                         {metrics?.gpu?.powerDraw != null && (
-                          <span className="text-[10px] tabular-nums" style={{ color: "var(--text-label)" }}>
+                          <span className="text-xs tabular-nums" style={{ color: "var(--text-label)" }}>
                             {metrics.gpu.powerDraw.toFixed(1)} W
                           </span>
                         )}
                       </div>
                     </div>
                     <LabeledBar label="vram" right={`${fmtBytes(metrics?.gpu?.memUsed ?? null, 1, du)} / ${fmtBytes(metrics?.gpu?.memTotal ?? null, 1, du)}`}
-                      percent={gpuMemPct} color="#a855f7" gradient="linear-gradient(90deg, var(--accent-speedtest), #a855f7)" />
+                      percent={gpuMemPct} color="var(--data)" />
                     {metrics?.gpu?.powerDraw != null && metrics?.gpu?.powerLimit != null && (
                       <LabeledBar label="power" right={`${metrics.gpu.powerDraw.toFixed(1)} / ${metrics.gpu.powerLimit.toFixed(0)} W`}
-                        percent={gpuPwrPct} color="#f59e0b" gradient="linear-gradient(90deg, #ea580c, var(--warn))" />
+                        percent={gpuPwrPct} color="var(--data)" />
                     )}
                     {(() => {
                       const tertiaryItems: { label: string; value: string }[] = [];
@@ -1156,7 +1127,7 @@ export default function Dashboard() {
                           {tertiaryItems.map(item => (
                             <span key={item.label} className="tabular-nums font-mono" style={{
                               background: "var(--card)", border: "1px solid var(--border)",
-                              borderRadius: 4, padding: "2px 7px", fontSize: 9, color: "var(--text-dim)", letterSpacing: "0.01em",
+                              borderRadius: 4, padding: "2px 7px", fontSize: 12, color: "var(--text-dim)", letterSpacing: "0.01em",
                             }}>
                               <span style={{ color: "var(--text-faint)", marginRight: 4 }}>{item.label}</span>
                               {item.value}
@@ -1168,9 +1139,9 @@ export default function Dashboard() {
                     {gpuTempHistory.length >= 2 && (
                       <div className="flex flex-col gap-1.5">
                         <div className="flex justify-between items-center">
-                          <span className="text-[10px] uppercase tracking-widest" style={{ color: "var(--text-ghost)" }}>temp history</span>
+                          <span className="text-xs uppercase tracking-widest" style={{ color: "var(--text-ghost)" }}>temp history</span>
                         </div>
-                        <Sparkline data={gpuTempHistory} color={metrics?.gpu?.temperature != null ? tempColor(metrics.gpu.temperature) : "#555"} autoMax height={28} />
+                        <Sparkline data={gpuTempHistory} color={metrics?.gpu?.temperature != null ? tempColor(metrics.gpu.temperature) : "var(--data)"} autoMax height={28} />
                       </div>
                     )}
                     {expandedCard === "gpu" && (() => {
@@ -1200,7 +1171,7 @@ export default function Dashboard() {
                 {speedtestLoading ? <Skeleton /> : !speedtestResults.length ? (
                   <div className="flex flex-col items-center justify-center text-center gap-1.5" style={{ flex: 1, minHeight: 96, padding: "8px 0" }}>
                     <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>No results from SpeedTracker yet</span>
-                    <span style={{ fontSize: 10, color: "var(--text-ghost)", maxWidth: 220, lineHeight: 1.5 }}>
+                    <span style={{ fontSize: 12, color: "var(--text-ghost)", maxWidth: 220, lineHeight: 1.5 }}>
                       Tests run on SpeedTracker&apos;s own schedule. If this stays empty, check its URL and API token in Setup.
                     </span>
                   </div>
@@ -1220,20 +1191,20 @@ export default function Dashboard() {
                   const isStale = diff != null && diff > 7 * 86400;
                   const dl = latest.download;
                   const quality = dl == null ? null
-                    : dl >= 500 ? { label: "Excellent", color: "var(--ok)", bg: "rgba(16,185,129,0.12)", border: "rgba(16,185,129,0.3)" }
-                    : dl >= 200 ? { label: "Good",      color: "var(--brand)", bg: "rgba(6,182,212,0.12)",  border: "rgba(6,182,212,0.3)"  }
-                    : dl >= 50  ? { label: "Fair",      color: "var(--warn)", bg: "rgba(245,158,11,0.12)", border: "rgba(245,158,11,0.3)" }
-                    :             { label: "Poor",      color: "var(--critical)", bg: "rgba(239,68,68,0.12)",  border: "rgba(239,68,68,0.3)"  };
+                    : dl >= 500 ? { label: "Excellent", color: "var(--text-muted)", bg: "var(--surface)", border: "var(--border)" }
+                    : dl >= 200 ? { label: "Good",      color: "var(--text-muted)", bg: "var(--surface)", border: "var(--border)" }
+                    : dl >= 50  ? { label: "Fair",      color: "var(--warn)", bg: "color-mix(in srgb, var(--warn) 12%, transparent)", border: "color-mix(in srgb, var(--warn) 30%, transparent)" }
+                    :             { label: "Poor",      color: "var(--critical)", bg: "color-mix(in srgb, var(--critical) 12%, transparent)", border: "color-mix(in srgb, var(--critical) 30%, transparent)" };
                   return (
                     <div className="flex flex-col gap-2.5">
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex flex-col gap-0.5">
                           {latest.isp && <span className="text-[12px] font-semibold" style={{ color: "var(--text-mid)" }}>{latest.isp}</span>}
-                          {latest.serverLocation && <span className="text-[10px]" style={{ color: "var(--text-label)" }}>{latest.serverLocation}</span>}
-                          {latest.serverHost && <span title={latest.serverHost} className="text-[9px] font-mono truncate" style={{ color: "var(--text-ghost)", maxWidth: 160 }}>{latest.serverHost}</span>}
+                          {latest.serverLocation && <span className="text-xs" style={{ color: "var(--text-label)" }}>{latest.serverLocation}</span>}
+                          {latest.serverHost && <span title={latest.serverHost} className="text-xs font-mono truncate" style={{ color: "var(--text-ghost)", maxWidth: 160 }}>{latest.serverHost}</span>}
                         </div>
                         {quality && (
-                          <span className="text-[9px] font-semibold uppercase tracking-wider shrink-0 mt-0.5"
+                          <span className="text-xs font-semibold uppercase tracking-wider shrink-0 mt-0.5"
                             style={{ color: quality.color, background: quality.bg, border: `1px solid ${quality.border}`, borderRadius: 5, padding: "2px 7px" }}>
                             {quality.label}
                           </span>
@@ -1241,57 +1212,57 @@ export default function Dashboard() {
                       </div>
                       <div className="flex items-end gap-4">
                         <div className="flex flex-col">
-                          <span className="font-medium tabular-nums font-mono" style={{ fontSize: 44, lineHeight: 1, color: "var(--brand)" }}>
+                          <span className="font-medium tabular-nums font-mono" style={{ fontSize: 44, lineHeight: 1, color: "var(--text)" }}>
                             {dl != null ? dl.toFixed(0) : "—"}
                           </span>
-                          <span className="text-[9px] uppercase tracking-widest mt-0.5" style={{ color: "var(--text-faint)" }}>Mbps ↓</span>
+                          <span className="text-xs uppercase tracking-widest mt-0.5" style={{ color: "var(--text-faint)" }}>Mbps ↓</span>
                         </div>
                         <div className="flex flex-col mb-[4px]">
-                          <span className="font-medium tabular-nums font-mono" style={{ fontSize: 28, lineHeight: 1, color: "var(--warn)" }}>
+                          <span className="font-medium tabular-nums font-mono" style={{ fontSize: 28, lineHeight: 1, color: "var(--text-secondary)" }}>
                             {latest.upload != null ? latest.upload.toFixed(0) : "—"}
                           </span>
-                          <span className="text-[9px] uppercase tracking-widest mt-0.5" style={{ color: "var(--text-faint)" }}>Mbps ↑</span>
+                          <span className="text-xs uppercase tracking-widest mt-0.5" style={{ color: "var(--text-faint)" }}>Mbps ↑</span>
                         </div>
                       </div>
                       {(latest.ping != null || latest.jitter != null) && (
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "var(--ok)", boxShadow: "0 0 4px #10b98166" }} />
+                          <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "var(--text-ghost)" }} />
                           {latest.ping != null && (
                             <>
-                              <span className="text-[11px] tabular-nums font-medium font-mono" style={{ color: "var(--ok)" }}>
+                              <span className="text-xs tabular-nums font-medium font-mono" style={{ color: "var(--ok)" }}>
                                 {latest.ping < 10 ? latest.ping.toFixed(1) : latest.ping.toFixed(0)} ms
                               </span>
-                              <span className="text-[9px] uppercase tracking-widest" style={{ color: "var(--text-ghost)" }}>ping</span>
+                              <span className="text-xs uppercase tracking-widest" style={{ color: "var(--text-ghost)" }}>ping</span>
                             </>
                           )}
                           {latest.jitter != null && (
                             <>
-                              <span style={{ color: "var(--text-ghost)", fontSize: 9 }}>·</span>
-                              <span className="text-[11px] tabular-nums font-medium font-mono" style={{ color: "var(--text-label)" }}>
+                              <span style={{ color: "var(--text-ghost)", fontSize: 12 }}>·</span>
+                              <span className="text-xs tabular-nums font-medium font-mono" style={{ color: "var(--text-label)" }}>
                                 {latest.jitter < 10 ? latest.jitter.toFixed(1) : latest.jitter.toFixed(0)} ms
                               </span>
-                              <span className="text-[9px] uppercase tracking-widest" style={{ color: "var(--text-ghost)" }}>jitter</span>
+                              <span className="text-xs uppercase tracking-widest" style={{ color: "var(--text-ghost)" }}>jitter</span>
                             </>
                           )}
                         </div>
                       )}
                       {speedtestHistory.length >= 2 && (
                         <div className="flex flex-col gap-1">
-                          <span className="text-[9px] uppercase tracking-widest" style={{ color: "var(--text-ghost)" }}>download history</span>
-                          <Sparkline data={speedtestHistory} color="#8b5cf6" height={40} />
+                          <span className="text-xs uppercase tracking-widest" style={{ color: "var(--text-ghost)" }}>download history</span>
+                          <Sparkline data={speedtestHistory} color="var(--data)" height={40} />
                         </div>
                       )}
                       <div className="flex items-center justify-between flex-wrap gap-1">
                         {rel && (
                           <span
                             title={tsMs ? new Date(tsMs).toLocaleString() : undefined}
-                            className="text-[9px] tabular-nums"
+                            className="text-xs tabular-nums"
                             style={{ color: relColor, fontWeight: isStale ? 600 : 400 }}>
                             {isStale ? "⚠ " : ""}auto-tested · {rel}
                           </span>
                         )}
                         {speedtestTotalTests != null && (
-                          <span className="text-[9px] tabular-nums" style={{ color: "var(--text-ghost)" }}>
+                          <span className="text-xs tabular-nums" style={{ color: "var(--text-ghost)" }}>
                             {speedtestTotalTests.toLocaleString()} tests recorded
                           </span>
                         )}
@@ -1322,8 +1293,8 @@ export default function Dashboard() {
                           <div key={label}>
                             <div className="flex items-center gap-2 py-2">
                               <span style={{ fontSize: 13, width: 18, textAlign: "center", flexShrink: 0 }}>{emoji}</span>
-                              <span className="text-[10px] uppercase tracking-widest shrink-0" style={{ color: "var(--text-faint)", minWidth: 46 }}>{label}</span>
-                              <span className={`text-[11px] font-medium ml-auto truncate${mono ? " font-mono" : ""}`}
+                              <span className="text-xs uppercase tracking-widest shrink-0" style={{ color: "var(--text-faint)", minWidth: 46 }}>{label}</span>
+                              <span className={`text-xs font-medium ml-auto truncate${mono ? " font-mono" : ""}`}
                                 style={{ color: "var(--text-mid)" }}>{value}</span>
                             </div>
                             {i < arr.length - 1 && <div style={{ height: 1, background: "var(--surface-bright)" }} />}
@@ -1372,15 +1343,14 @@ export default function Dashboard() {
             if (!streams.length) return null;
             return (
               <div style={{
-                background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.25)",
+                background: "var(--card)", border: "1px solid var(--border)",
                 borderRadius: 14, padding: "14px 20px",
               }}>
                 <div className="flex items-center gap-3 mb-3">
                   <span style={{
                     width: 8, height: 8, borderRadius: "50%", background: "var(--critical)", flexShrink: 0,
-                    boxShadow: "0 0 6px #ef4444", animation: "pulseDot 1.5s ease-in-out infinite",
                   }} />
-                  <span className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: "var(--accent-speedtest)" }}>
+                  <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--accent-speedtest)" }}>
                     Now Playing · {streams.length} stream{streams.length !== 1 ? "s" : ""}
                   </span>
                 </div>
@@ -1389,19 +1359,19 @@ export default function Dashboard() {
                     <div key={i} className="flex flex-col gap-1.5">
                       <div className="flex items-baseline justify-between gap-2">
                         <span className="text-[12px] font-medium truncate" style={{ color: "var(--text-secondary)" }}>{st.title}</span>
-                        {st.posStr && <span className="text-[10px] tabular-nums font-mono shrink-0" style={{ color: "var(--text-faint)" }}>{st.posStr}</span>}
+                        {st.posStr && <span className="text-xs tabular-nums font-mono shrink-0" style={{ color: "var(--text-faint)" }}>{st.posStr}</span>}
                       </div>
                       <div className="flex items-center gap-1">
                         <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--text-faint)", flexShrink: 0 }}>
                           <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
                         </svg>
-                        <span style={{ fontSize: 11, color: "var(--text-label)" }}>{st.user}</span>
+                        <span style={{ fontSize: 12, color: "var(--text-label)" }}>{st.user}</span>
                       </div>
                       <div style={{ height: 3, background: "var(--border-subtle)", borderRadius: 2 }}>
                         <div style={{
                           height: "100%", borderRadius: 2,
                           width: `${Math.min(100, st.progress)}%`,
-                          background: "linear-gradient(90deg, var(--accent-speedtest), #a78bfa)",
+                          background: "var(--data-strong)",
                         }} />
                       </div>
                     </div>
@@ -1447,14 +1417,14 @@ export default function Dashboard() {
           {/* ── footer ── */}
           <div className="flex items-center justify-between flex-wrap gap-3" style={{ borderTop: "1px solid var(--border-dim)", paddingTop: 12 }}>
             <div className="flex items-center gap-2">
-              <span className="flex items-center justify-center rounded" style={{ width: 16, height: 16, background: "rgba(251,146,60,0.2)", border: "1px solid rgba(251,146,60,0.3)", fontSize: 9, fontWeight: 700, color: "#fb923c" }}>C</span>
-              <span style={{ fontSize: 11, color: "var(--text-ghost)" }}>built with claude code</span>
+              <span className="flex items-center justify-center rounded" style={{ width: 16, height: 16, background: "var(--surface)", border: "1px solid var(--border)", fontSize: 12, fontWeight: 700, color: "var(--text-label)" }}>C</span>
+              <span style={{ fontSize: 12, color: "var(--text-ghost)" }}>built with claude code</span>
             </div>
-            <span style={{ fontSize: 11, color: "var(--text-ghost)" }}>
+            <span style={{ fontSize: 12, color: "var(--text-ghost)" }}>
               tracking {services?.length ?? 0} services · G search · R refresh · H bookmarks · Ctrl+K palette · ? shortcuts
             </span>
             <a href={`http://${clientConfig?.truenasIp ?? "192.168.88.196"}:${SVC_PORTS.prometheus}`} target="_blank" rel="noopener noreferrer"
-              style={{ fontSize: 11, color: "var(--text-ghost)", textDecoration: "none", transition: "color 0.15s" }}
+              style={{ fontSize: 12, color: "var(--text-ghost)", textDecoration: "none", transition: "color 0.15s" }}
               onMouseEnter={e => (e.currentTarget.style.color = "rgba(255,255,255,0.55)")}
               onMouseLeave={e => (e.currentTarget.style.color = "rgba(255,255,255,0.25)")}>
               prometheus ↗
@@ -1517,8 +1487,8 @@ export default function Dashboard() {
 
       {restartMsg && (
         <div className="fixed bottom-6 right-6 z-50" style={{
-          background: restartMsg.ok ? "rgba(16,185,129,0.95)" : "rgba(239,68,68,0.95)",
-          color: "#0a0c12", fontSize: 11, fontWeight: 600,
+          background: restartMsg.ok ? "var(--ok)" : "var(--critical)",
+          color: "#0a0c12", fontSize: 12, fontWeight: 600,
           padding: "8px 14px", borderRadius: 8,
           boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
         }}>

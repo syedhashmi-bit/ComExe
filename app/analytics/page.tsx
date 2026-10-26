@@ -87,7 +87,7 @@ export default function AnalyticsPage() {
             {RANGES.map(r => (
               <button key={r.key} onClick={() => changeRange(r.key)}
                 style={{
-                  fontSize: 10, padding: "4px 10px", borderRadius: 5, cursor: "pointer",
+                  fontSize: 12, padding: "4px 10px", borderRadius: 5, cursor: "pointer",
                   background: range === r.key ? "var(--brand)" : "var(--card)",
                   color: range === r.key ? "var(--bg)" : "var(--text-dim)",
                   border: `1px solid ${range === r.key ? "var(--brand)" : "var(--border)"}`,
@@ -118,7 +118,7 @@ export default function AnalyticsPage() {
           <div className="flex flex-col items-center justify-center gap-3" style={{ height: 400, color: "var(--text-ghost)" }}>
             <span style={{ fontSize: 32 }}>&#x1f4ca;</span>
             <span style={{ fontSize: 13 }}>No historical data yet</span>
-            <span style={{ fontSize: 11, maxWidth: 360, textAlign: "center", lineHeight: 1.6 }}>
+            <span style={{ fontSize: 12, maxWidth: 360, textAlign: "center", lineHeight: 1.6 }}>
               Metrics are recorded every poll cycle. Data will appear here after a few minutes of dashboard operation.
             </span>
           </div>
@@ -132,7 +132,7 @@ export default function AnalyticsPage() {
                 const fmtVal = m.fmt ?? ((v: number) => `${v.toFixed(1)}${m.unit}`);
                 return (
                   <div key={m.key} style={{ background: "var(--card)", border: "1px solid var(--border-subtle)", borderRadius: 10, padding: "12px 14px" }}>
-                    <div style={{ fontSize: 9, color: m.color, textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 600, marginBottom: 8 }}>
+                    <div style={{ fontSize: 12, color: m.color, textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 600, marginBottom: 8 }}>
                       {m.label}
                     </div>
                     <div className="flex flex-col gap-1">
@@ -141,7 +141,7 @@ export default function AnalyticsPage() {
                           <div style={{ fontSize: 20, fontWeight: 700, fontVariantNumeric: "tabular-nums", fontFamily: "monospace", color: "var(--text)" }}>
                             {fmtVal(stats.current)}
                           </div>
-                          <div className="flex gap-3" style={{ fontSize: 9, color: "var(--text-ghost)" }}>
+                          <div className="flex gap-3" style={{ fontSize: 12, color: "var(--text-ghost)" }}>
                             <span>avg {fmtVal(stats.avg!)}</span>
                             <span>max {fmtVal(stats.max!)}</span>
                           </div>
@@ -176,7 +176,7 @@ export default function AnalyticsPage() {
             </div>
 
             {/* Data info footer */}
-            <div className="flex items-center justify-between" style={{ fontSize: 10, color: "var(--text-ghost)", padding: "4px 0" }}>
+            <div className="flex items-center justify-between" style={{ fontSize: 12, color: "var(--text-ghost)", padding: "4px 0" }}>
               <span>{points.length} data points over {range}</span>
               {points.length > 0 && (
                 <span>

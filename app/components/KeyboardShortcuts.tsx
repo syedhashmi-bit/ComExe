@@ -29,9 +29,9 @@ export function KeyboardShortcuts({ onClose }: { onClose: () => void }) {
         <div className="flex flex-col gap-2">
           {SHORTCUTS.map(s => (
             <div key={s.key} className="flex items-center justify-between gap-4" style={{ padding: "4px 0" }}>
-              <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{s.desc}</span>
+              <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{s.desc}</span>
               <kbd style={{
-                fontSize: 10, fontFamily: "monospace", fontWeight: 600,
+                fontSize: 12, fontFamily: "monospace", fontWeight: 600,
                 background: "var(--surface)", border: "1px solid var(--border-mid)",
                 borderRadius: 4, padding: "2px 8px", color: "var(--text-bright)",
                 whiteSpace: "nowrap",
@@ -39,8 +39,8 @@ export function KeyboardShortcuts({ onClose }: { onClose: () => void }) {
             </div>
           ))}
         </div>
-        <div style={{ marginTop: 16, fontSize: 9, color: "var(--text-ghost)", textAlign: "center" }}>
-          Press <kbd style={{ fontFamily: "monospace", fontSize: 9 }}>?</kbd> or <kbd style={{ fontFamily: "monospace", fontSize: 9 }}>Esc</kbd> to close
+        <div style={{ marginTop: 16, fontSize: 12, color: "var(--text-ghost)", textAlign: "center" }}>
+          Press <kbd style={{ fontFamily: "monospace", fontSize: 12 }}>?</kbd> or <kbd style={{ fontFamily: "monospace", fontSize: 12 }}>Esc</kbd> to close
         </div>
       </div>
     </>

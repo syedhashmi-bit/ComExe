@@ -120,7 +120,7 @@ function LoginForm() {
           {loading ? "Signing in…" : "Sign in"}
         </button>
 
-        <div style={{ fontSize: 10, color: "var(--text-ghost, #555)", textAlign: "center", lineHeight: 1.5 }}>
+        <div style={{ fontSize: 12, color: "var(--text-ghost, #555)", textAlign: "center", lineHeight: 1.5 }}>
           Set <code style={{ color: "var(--brand, #06b6d4)" }}>DASHBOARD_PASSWORD</code> env
           var on the container to enable this lock screen.
         </div>

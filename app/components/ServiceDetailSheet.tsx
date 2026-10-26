@@ -69,14 +69,14 @@ export function ServiceDetailSheet({
                 background: service.stale ? "#f59e0b" : service.up ? "#10b981" : "#ef4444",
                 boxShadow: `0 0 6px ${service.stale ? "#f59e0baa" : service.up ? "#10b981aa" : "#ef444455"}`,
               }} />
-              <span style={{ fontSize: 9, color: "var(--text-ghost)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+              <span style={{ fontSize: 12, color: "var(--text-ghost)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
                 {service.stale ? "stale" : service.up ? "online" : "offline"}
               </span>
               {service.authError && (
                 <span style={{
                   background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.4)",
                   color: "#ef4444", borderRadius: 4, padding: "1px 5px",
-                  fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em",
+                  fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em",
                 }}>AUTH</span>
               )}
             </div>
@@ -85,7 +85,7 @@ export function ServiceDetailSheet({
                 href={resolvedUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                style={{ fontSize: 10, color: "var(--text-ghost)", fontFamily: "monospace", textDecoration: "none" }}
+                style={{ fontSize: 12, color: "var(--text-ghost)", fontFamily: "monospace", textDecoration: "none" }}
                 onMouseEnter={e => e.currentTarget.style.color = "var(--brand)"}
                 onMouseLeave={e => e.currentTarget.style.color = "var(--text-ghost)"}
               >{resolvedUrl.replace(/^https?:\/\//, "")} ↗</a>
@@ -103,7 +103,7 @@ export function ServiceDetailSheet({
           {/* Stats lines */}
           {service.lines.length > 0 && (
             <section className="flex flex-col gap-2">
-              <span style={{ fontSize: 9, color: "var(--text-ghost)", textTransform: "uppercase", letterSpacing: "0.15em", fontWeight: 700 }}>
+              <span style={{ fontSize: 12, color: "var(--text-ghost)", textTransform: "uppercase", letterSpacing: "0.15em", fontWeight: 700 }}>
                 Stats
               </span>
               {service.lines.map((line, i) => (
@@ -120,7 +120,7 @@ export function ServiceDetailSheet({
           {service.stale && service.staleSince && (
             <div style={{
               background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.25)",
-              borderRadius: 8, padding: "8px 12px", fontSize: 10, color: "var(--warn)",
+              borderRadius: 8, padding: "8px 12px", fontSize: 12, color: "var(--warn)",
             }}>
               Showing cached data from {fmtSmoothAgo(service.staleSince)}. A background refresh is in progress.
             </div>
@@ -129,14 +129,14 @@ export function ServiceDetailSheet({
           {/* Health messages */}
           {service.health && (service.health.error > 0 || service.health.warning > 0) && (
             <section className="flex flex-col gap-2">
-              <span style={{ fontSize: 9, color: "var(--text-ghost)", textTransform: "uppercase", letterSpacing: "0.15em", fontWeight: 700 }}>
+              <span style={{ fontSize: 12, color: "var(--text-ghost)", textTransform: "uppercase", letterSpacing: "0.15em", fontWeight: 700 }}>
                 Health · {service.health.error} error{service.health.error === 1 ? "" : "s"} · {service.health.warning} warning{service.health.warning === 1 ? "" : "s"}
               </span>
               {service.health.messages && service.health.messages.length > 0 ? (
                 <div className="flex flex-col gap-1">
                   {service.health.messages.map((msg, i) => (
                     <div key={i} className="flex items-start gap-2" style={{
-                      fontSize: 11, lineHeight: 1.5, color: "var(--text-mid)",
+                      fontSize: 12, lineHeight: 1.5, color: "var(--text-mid)",
                     }}>
                       <span style={{ color: "#ef4444", flexShrink: 0, marginTop: 2 }}>•</span>
                       <span style={{ wordBreak: "break-word" }}>{msg}</span>
@@ -144,7 +144,7 @@ export function ServiceDetailSheet({
                   ))}
                 </div>
               ) : (
-                <span style={{ fontSize: 11, color: "var(--text-ghost)", fontStyle: "italic" }}>
+                <span style={{ fontSize: 12, color: "var(--text-ghost)", fontStyle: "italic" }}>
                   Open the service to see the full health report.
                 </span>
               )}
@@ -154,7 +154,7 @@ export function ServiceDetailSheet({
           {/* Queue items */}
           {queueItems.length > 0 && (
             <section className="flex flex-col gap-2">
-              <span style={{ fontSize: 9, color: "var(--text-ghost)", textTransform: "uppercase", letterSpacing: "0.15em", fontWeight: 700 }}>
+              <span style={{ fontSize: 12, color: "var(--text-ghost)", textTransform: "uppercase", letterSpacing: "0.15em", fontWeight: 700 }}>
                 Active queue · {queueItems.length} item{queueItems.length === 1 ? "" : "s"}
               </span>
               <div className="flex flex-col gap-2">
@@ -164,16 +164,16 @@ export function ServiceDetailSheet({
                   }}>
                     <div className="flex items-center gap-2">
                       <span title={q.title} style={{
-                        fontSize: 11, color: color, fontWeight: 500,
+                        fontSize: 12, color: color, fontWeight: 500,
                         flex: 1, minWidth: 0,
                         overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                       }}>{cleanTitle(q.title)}</span>
                       {fmtEtaShort(q.etaSec) && (
-                        <span style={{ fontSize: 9, color: "var(--text-label)", fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>
+                        <span style={{ fontSize: 12, color: "var(--text-label)", fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>
                           {fmtEtaShort(q.etaSec)}
                         </span>
                       )}
-                      <span style={{ fontSize: 9, color: "var(--text-ghost)", fontVariantNumeric: "tabular-nums", flexShrink: 0, minWidth: 32, textAlign: "right" }}>
+                      <span style={{ fontSize: 12, color: "var(--text-ghost)", fontVariantNumeric: "tabular-nums", flexShrink: 0, minWidth: 32, textAlign: "right" }}>
                         {q.pct}%
                       </span>
                     </div>
@@ -187,7 +187,7 @@ export function ServiceDetailSheet({
           {/* Active streams */}
           {streams.length > 0 && (
             <section className="flex flex-col gap-2">
-              <span style={{ fontSize: 9, color: "var(--text-ghost)", textTransform: "uppercase", letterSpacing: "0.15em", fontWeight: 700 }}>
+              <span style={{ fontSize: 12, color: "var(--text-ghost)", textTransform: "uppercase", letterSpacing: "0.15em", fontWeight: 700 }}>
                 Active streams · {streams.length}
               </span>
               <div className="flex flex-col gap-2">
@@ -197,14 +197,14 @@ export function ServiceDetailSheet({
                   }}>
                     <div className="flex items-center justify-between gap-2">
                       <span title={s.title} style={{
-                        fontSize: 11, color: "var(--text-mid)", fontStyle: "italic", fontWeight: 500,
+                        fontSize: 12, color: "var(--text-mid)", fontStyle: "italic", fontWeight: 500,
                         flex: 1, minWidth: 0,
                         overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                       }}>{s.title}</span>
-                      <span style={{ fontSize: 9, color: "var(--text-ghost)", flexShrink: 0 }}>{s.user}</span>
+                      <span style={{ fontSize: 12, color: "var(--text-ghost)", flexShrink: 0 }}>{s.user}</span>
                     </div>
                     {s.posStr && (
-                      <span style={{ fontSize: 9, color: "var(--text-ghost)", fontFamily: "monospace" }}>
+                      <span style={{ fontSize: 12, color: "var(--text-ghost)", fontFamily: "monospace" }}>
                         {s.posStr}
                       </span>
                     )}
@@ -226,7 +226,7 @@ export function ServiceDetailSheet({
             && !(service.health && (service.health.error > 0 || service.health.warning > 0)) && (
               <div style={{
                 padding: "24px 0", textAlign: "center", color: "var(--text-ghost)",
-                fontSize: 11, fontStyle: "italic",
+                fontSize: 12, fontStyle: "italic",
               }}>
                 {service.up
                   ? "No additional detail available for this service yet."
@@ -245,7 +245,7 @@ export function ServiceDetailSheet({
                 style={{
                   background: "var(--card-alt)", border: "1px solid var(--border)",
                   borderRadius: 5, padding: "4px 10px",
-                  fontSize: 10, color: "var(--text-dim)", cursor: "pointer",
+                  fontSize: 12, color: "var(--text-dim)", cursor: "pointer",
                 }}>View logs</button>
             )}
             {dockerEnabled && onRestart && (
@@ -256,7 +256,7 @@ export function ServiceDetailSheet({
                 style={{
                   background: "var(--card-alt)", border: "1px solid var(--border)",
                   borderRadius: 5, padding: "4px 10px",
-                  fontSize: 10, color: "var(--text-dim)", cursor: "pointer",
+                  fontSize: 12, color: "var(--text-dim)", cursor: "pointer",
                 }}>↻ Restart</button>
             )}
           </div>
@@ -267,7 +267,7 @@ export function ServiceDetailSheet({
               rel="noopener noreferrer"
               style={{
                 background: color, color: "var(--bg)", borderRadius: 5,
-                padding: "4px 10px", fontSize: 10, fontWeight: 600,
+                padding: "4px 10px", fontSize: 12, fontWeight: 600,
                 textDecoration: "none",
               }}>Open {label} ↗</a>
           )}

@@ -24,26 +24,26 @@ function ActivityEventPill({ ev }: { ev: ActivityEvent }) {
       <span className="w-1.5 h-1.5 rounded-full shrink-0"
         style={{ background: color, boxShadow: `0 0 5px ${withAlpha(color, 67)}` }} />
       <span style={{
-        color, fontSize: 9, fontWeight: 700,
+        color, fontSize: 12, fontWeight: 700,
         textTransform: "uppercase", letterSpacing: "0.1em",
       }}>{ev.source}</span>
-      <span style={{ color: "var(--text-faint)", fontSize: 10 }}>{verb}</span>
+      <span style={{ color: "var(--text-faint)", fontSize: 12 }}>{verb}</span>
       <span
         title={`${ev.title}${ev.subtitle ? ` · ${ev.subtitle}` : ""} — ${new Date(ev.timestamp).toLocaleString()}`}
         style={{
-          color: "var(--text-secondary)", fontSize: 11, fontWeight: 500,
+          color: "var(--text-secondary)", fontSize: 12, fontWeight: 500,
           maxWidth: 280, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
         }}>{ev.title}</span>
       {ev.subtitle && (
         <span
           title={ev.subtitle}
           style={{
-            color: "var(--text-faint)", fontSize: 10,
+            color: "var(--text-faint)", fontSize: 12,
             maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
           }}>· {ev.subtitle}</span>
       )}
       <span style={{
-        color: "var(--text-ghost)", fontSize: 9,
+        color: "var(--text-ghost)", fontSize: 12,
         fontVariantNumeric: "tabular-nums",
       }}>· {relativeAgo(ev.timestamp)}</span>
     </span>
@@ -65,7 +65,7 @@ export function ActivityFeed({ events, loading }: { events: ActivityEvent[]; loa
         border: "1px solid var(--border-dim)", borderRadius: 10,
         display: "flex", alignItems: "center", padding: "0 14px",
       }}>
-        <span className="text-[10px] uppercase" style={{ color: "var(--text-ghost)", letterSpacing: "0.18em" }}>
+        <span className="text-xs uppercase" style={{ color: "var(--text-ghost)", letterSpacing: "0.18em" }}>
           loading activity…
         </span>
       </div>
@@ -92,7 +92,7 @@ export function ActivityFeed({ events, loading }: { events: ActivityEvent[]; loa
           minWidth: 110,
           background: "linear-gradient(to right, var(--fade-to) 70%, transparent)",
         }}>
-        <span className="text-[9px] uppercase" style={{
+        <span className="text-xs uppercase" style={{
           color: "var(--text-label)", letterSpacing: "0.22em", fontWeight: 700,
         }}>
           activity

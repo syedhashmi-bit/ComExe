@@ -46,7 +46,7 @@ export function UptimeTimeline({ history, height = 32 }: UptimeTimelineProps) {
 
   if (segments.length === 0) {
     return (
-      <div className="flex items-center justify-center" style={{ height, color: "var(--text-ghost)", fontSize: 11 }}>
+      <div className="flex items-center justify-center" style={{ height, color: "var(--text-ghost)", fontSize: 12 }}>
         No uptime data available
       </div>
     );
@@ -64,17 +64,17 @@ export function UptimeTimeline({ history, height = 32 }: UptimeTimelineProps) {
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between">
-        <span style={{ fontSize: 10, color: "var(--text-dim)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+        <span style={{ fontSize: 12, color: "var(--text-dim)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em" }}>
           Uptime Timeline
         </span>
         <div className="flex items-center gap-3">
           {downSegments.length > 0 && (
-            <span style={{ fontSize: 10, color: "var(--critical)", fontVariantNumeric: "tabular-nums" }}>
+            <span style={{ fontSize: 12, color: "var(--critical)", fontVariantNumeric: "tabular-nums" }}>
               {downSegments.length} outage{downSegments.length > 1 ? "s" : ""}
             </span>
           )}
           <span style={{
-            fontSize: 11, fontWeight: 700, fontVariantNumeric: "tabular-nums", fontFamily: "monospace",
+            fontSize: 12, fontWeight: 700, fontVariantNumeric: "tabular-nums", fontFamily: "monospace",
             color: uptimePct >= 99.9 ? "var(--ok)" : uptimePct >= 99 ? "var(--warn)" : "var(--critical)",
           }}>
             {uptimePct.toFixed(2)}%
@@ -105,7 +105,7 @@ export function UptimeTimeline({ history, height = 32 }: UptimeTimelineProps) {
         })}
       </div>
 
-      <div className="flex items-center justify-between" style={{ fontSize: 9, color: "var(--text-ghost)", fontVariantNumeric: "tabular-nums" }}>
+      <div className="flex items-center justify-between" style={{ fontSize: 12, color: "var(--text-ghost)", fontVariantNumeric: "tabular-nums" }}>
         <span>{fmtTime(totalStart)}</span>
         <span>last {fmtDuration(totalSpan)}</span>
         <span>{fmtTime(totalEnd)}</span>

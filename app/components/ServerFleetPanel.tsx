@@ -27,13 +27,13 @@ function fmtUptime(sec: number | null): string {
 }
 
 function MiniBar({ value, color }: { value: number | null; color: string }) {
-  if (value == null) return <span style={{ fontSize: 10, color: "var(--text-ghost)" }}>—</span>;
+  if (value == null) return <span style={{ fontSize: 12, color: "var(--text-ghost)" }}>—</span>;
   return (
     <div className="flex items-center gap-1.5" style={{ minWidth: 60 }}>
       <div style={{ flex: 1, height: 4, background: "var(--border-dim)", borderRadius: 2, overflow: "hidden" }}>
         <div style={{ width: `${Math.min(100, value)}%`, height: "100%", background: color, borderRadius: 2, transition: "width 0.3s" }} />
       </div>
-      <span style={{ fontSize: 9, fontFamily: "monospace", fontVariantNumeric: "tabular-nums", color, fontWeight: 600, minWidth: 24, textAlign: "right" }}>
+      <span style={{ fontSize: 12, fontFamily: "monospace", fontVariantNumeric: "tabular-nums", color, fontWeight: 600, minWidth: 24, textAlign: "right" }}>
         {value.toFixed(0)}%
       </span>
     </div>
@@ -100,7 +100,7 @@ export function ServerFleetPanel({ onClose }: { onClose: () => void }) {
   }
 
   const inputStyle: React.CSSProperties = {
-    fontSize: 10, background: "var(--surface)", color: "var(--text)",
+    fontSize: 12, background: "var(--surface)", color: "var(--text)",
     border: "1px solid var(--border-mid)", borderRadius: 4, padding: "6px 10px",
     outline: "none", width: "100%", fontFamily: "monospace",
   };
@@ -118,14 +118,14 @@ export function ServerFleetPanel({ onClose }: { onClose: () => void }) {
           </svg>
         }
         titleExtra={
-          <span style={{ fontSize: 10, color: "var(--text-ghost)" }}>
+          <span style={{ fontSize: 12, color: "var(--text-ghost)" }}>
             {servers.filter(s => s.reachable).length}/{servers.length} online
           </span>
         }
         headerAction={
           <button onClick={() => setShowAdd(v => !v)}
             aria-expanded={showAdd}
-            style={{ fontSize: 10, padding: "3px 8px", borderRadius: 4, background: "var(--surface)", color: "var(--brand)", border: "1px solid var(--border-mid)", cursor: "pointer", fontWeight: 600 }}>
+            style={{ fontSize: 12, padding: "3px 8px", borderRadius: 4, background: "var(--surface)", color: "var(--brand)", border: "1px solid var(--border-mid)", cursor: "pointer", fontWeight: 600 }}>
             + Add
           </button>
         }
@@ -138,11 +138,11 @@ export function ServerFleetPanel({ onClose }: { onClose: () => void }) {
               <input value={newUrl} onChange={e => setNewUrl(e.target.value)} placeholder="http://192.168.x.x:9090" style={inputStyle} />
               <div className="flex gap-2">
                 <button onClick={addServer} disabled={adding || !newName.trim() || !newUrl.trim()}
-                  style={{ fontSize: 10, padding: "4px 12px", borderRadius: 4, background: "var(--brand)", color: "var(--bg)", border: "none", cursor: "pointer", fontWeight: 600, opacity: adding ? 0.5 : 1 }}>
+                  style={{ fontSize: 12, padding: "4px 12px", borderRadius: 4, background: "var(--brand)", color: "var(--bg)", border: "none", cursor: "pointer", fontWeight: 600, opacity: adding ? 0.5 : 1 }}>
                   {adding ? "Adding..." : "Add server"}
                 </button>
                 <button onClick={() => setShowAdd(false)}
-                  style={{ fontSize: 10, padding: "4px 12px", borderRadius: 4, background: "var(--surface)", color: "var(--text-dim)", border: "1px solid var(--border-mid)", cursor: "pointer" }}>
+                  style={{ fontSize: 12, padding: "4px 12px", borderRadius: 4, background: "var(--surface)", color: "var(--text-dim)", border: "1px solid var(--border-mid)", cursor: "pointer" }}>
                   Cancel
                 </button>
               </div>
@@ -150,13 +150,13 @@ export function ServerFleetPanel({ onClose }: { onClose: () => void }) {
           )}
 
           {loading ? (
-            <div style={{ padding: "24px 0", textAlign: "center", color: "var(--text-ghost)", fontSize: 11 }}>
+            <div style={{ padding: "24px 0", textAlign: "center", color: "var(--text-ghost)", fontSize: 12 }}>
               Loading fleet status...
             </div>
           ) : error ? (
             <div className="flex flex-col items-center gap-2 py-8" style={{ color: "var(--warn)" }}>
               <span style={{ fontSize: 12 }}>Couldn&apos;t load the server list</span>
-              <span style={{ fontSize: 10, maxWidth: 280, textAlign: "center", lineHeight: 1.6, color: "var(--text-dim)" }}>
+              <span style={{ fontSize: 12, maxWidth: 280, textAlign: "center", lineHeight: 1.6, color: "var(--text-dim)" }}>
                 /api/servers didn&apos;t respond. This is a dashboard problem, not a
                 report that you have no servers — retrying automatically.
               </span>
@@ -168,7 +168,7 @@ export function ServerFleetPanel({ onClose }: { onClose: () => void }) {
                 <line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>
               </svg>
               <span style={{ fontSize: 12 }}>No additional servers configured</span>
-              <span style={{ fontSize: 10, maxWidth: 280, textAlign: "center", lineHeight: 1.6 }}>
+              <span style={{ fontSize: 12, maxWidth: 280, textAlign: "center", lineHeight: 1.6 }}>
                 Add Prometheus endpoints from other servers to monitor their CPU, memory, and uptime from this dashboard.
               </span>
             </div>
@@ -187,28 +187,28 @@ export function ServerFleetPanel({ onClose }: { onClose: () => void }) {
                   }} />
                   <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text)", flex: 1 }}>{srv.name}</span>
                   <button onClick={() => toggleServer(srv.id, !srv.enabled)}
-                    style={{ fontSize: 9, padding: "2px 6px", borderRadius: 3, background: "transparent", color: "var(--text-ghost)", border: "1px solid var(--border-dim)", cursor: "pointer" }}>
+                    style={{ fontSize: 12, padding: "2px 6px", borderRadius: 3, background: "transparent", color: "var(--text-ghost)", border: "1px solid var(--border-dim)", cursor: "pointer" }}>
                     {srv.enabled ? "Disable" : "Enable"}
                   </button>
                   <button onClick={() => removeServer(srv.id)}
-                    style={{ fontSize: 11, padding: "0 4px", background: "transparent", color: "var(--text-ghost)", border: "none", cursor: "pointer" }}>
+                    style={{ fontSize: 12, padding: "0 4px", background: "transparent", color: "var(--text-ghost)", border: "none", cursor: "pointer" }}>
                     &times;
                   </button>
                 </div>
 
                 {srv.enabled && srv.reachable && (
-                  <div className="flex gap-4 flex-wrap" style={{ fontSize: 10 }}>
+                  <div className="flex gap-4 flex-wrap" style={{ fontSize: 12 }}>
                     <div className="flex flex-col gap-1">
-                      <span style={{ color: "var(--text-ghost)", fontSize: 9 }}>CPU</span>
+                      <span style={{ color: "var(--text-ghost)", fontSize: 12 }}>CPU</span>
                       <MiniBar value={srv.cpu} color="var(--accent-cpu)" />
                     </div>
                     <div className="flex flex-col gap-1">
-                      <span style={{ color: "var(--text-ghost)", fontSize: 9 }}>MEM</span>
+                      <span style={{ color: "var(--text-ghost)", fontSize: 12 }}>MEM</span>
                       <MiniBar value={srv.memPct} color="var(--accent-memory)" />
                     </div>
                     <div className="flex flex-col gap-1">
-                      <span style={{ color: "var(--text-ghost)", fontSize: 9 }}>UPTIME</span>
-                      <span style={{ fontFamily: "monospace", fontVariantNumeric: "tabular-nums", color: "var(--text-mid)", fontSize: 10 }}>
+                      <span style={{ color: "var(--text-ghost)", fontSize: 12 }}>UPTIME</span>
+                      <span style={{ fontFamily: "monospace", fontVariantNumeric: "tabular-nums", color: "var(--text-mid)", fontSize: 12 }}>
                         {fmtUptime(srv.uptime)}
                       </span>
                     </div>
@@ -216,10 +216,10 @@ export function ServerFleetPanel({ onClose }: { onClose: () => void }) {
                 )}
 
                 {srv.enabled && !srv.reachable && (
-                  <span style={{ fontSize: 10, color: "var(--critical)" }}>Unreachable</span>
+                  <span style={{ fontSize: 12, color: "var(--critical)" }}>Unreachable</span>
                 )}
 
-                <div style={{ fontSize: 8, color: "var(--text-ghost)", marginTop: 6, fontFamily: "monospace" }}>
+                <div style={{ fontSize: 12, color: "var(--text-ghost)", marginTop: 6, fontFamily: "monospace" }}>
                   {srv.prometheusUrl}
                 </div>
               </div>

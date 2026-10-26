@@ -37,7 +37,8 @@ const themeScript = `
     var s = localStorage.getItem("comexe:settings");
     if (s) {
       var t = JSON.parse(s).theme;
-      if (t && t !== "midnight") document.documentElement.classList.add("theme-" + t);
+      // Paper is the only non-default theme; retired ones fall back to Midnight.
+      if (t === "paper") document.documentElement.classList.add("theme-paper");
     } else if (window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches) {
       document.documentElement.classList.add("theme-paper");
     }

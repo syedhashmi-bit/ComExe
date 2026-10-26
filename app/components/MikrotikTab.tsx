@@ -97,8 +97,8 @@ export function MikrotikTab({ mikrotikUrl, refreshSec, demoMode = false }: {
     const tempColor = tempVal == null ? null : tempVal > 80 ? "var(--critical)" : tempVal > 60 ? "var(--warn)" : "var(--ok)";
     return (
       <div key={label} className="flex items-center gap-2 shrink-0">
-        <span style={{ color: "var(--text-label)", fontSize: 10 }}>{label}</span>
-        <span style={{ color: tempColor ?? "rgba(255,255,255,0.9)", fontSize: 11, fontVariantNumeric: "tabular-nums" }}>{value}</span>
+        <span style={{ color: "var(--text-label)", fontSize: 12 }}>{label}</span>
+        <span style={{ color: tempColor ?? "rgba(255,255,255,0.9)", fontSize: 12, fontVariantNumeric: "tabular-nums" }}>{value}</span>
         {pctVal != null && (
           <div style={{ width: 36, height: 3, background: "var(--border-mid)", borderRadius: 2, overflow: "hidden" }}>
             <div style={{ width: `${pctVal}%`, height: "100%", background: pctVal > 85 ? "var(--critical)" : pctVal > 65 ? "var(--warn)" : "var(--settings-active)", borderRadius: 2 }} />
@@ -131,9 +131,10 @@ export function MikrotikTab({ mikrotikUrl, refreshSec, demoMode = false }: {
     const down = !loading;
     return (
       <a href={mikrotikUrl} target="_blank" rel="noopener noreferrer"
-        className="flex items-center gap-2 w-full"
+        className="flex flex-wrap items-center w-full"
         title={down && error ? `MikroTik: ${error}` : undefined}
         style={{
+          columnGap: 8, rowGap: 4,
           border: "1px dashed var(--border)", borderRadius: 10, padding: "7px 14px",
           textDecoration: "none", cursor: "pointer", minWidth: 0,
           transition: "border-color 0.2s",
@@ -143,16 +144,16 @@ export function MikrotikTab({ mikrotikUrl, refreshSec, demoMode = false }: {
       >
         <span className="shrink-0" style={{ width: 6, height: 6, borderRadius: 3, background: down ? "var(--warn)" : "var(--text-ghost)" }} />
         <span className="shrink-0" style={{ color: "var(--text-secondary)", fontWeight: 600, fontSize: 12 }}>MikroTik</span>
-        <span className="shrink-0 font-mono" style={{ color: "var(--text-label)", fontSize: 11, fontVariantNumeric: "tabular-nums" }}>{mikrotikHost}</span>
-        <span className="shrink-0" style={{ color: down ? "var(--warn)" : "var(--text-label)", fontSize: 11 }}>
+        <span className="shrink-0 font-mono" style={{ color: "var(--text-label)", fontSize: 12, fontVariantNumeric: "tabular-nums" }}>{mikrotikHost}</span>
+        <span className="shrink-0" style={{ color: down ? "var(--warn)" : "var(--text-label)", fontSize: 12 }}>
           {down ? "unreachable" : <>connecting&hellip;</>}
         </span>
         {down && error && (
-          <span style={{ color: "var(--text-ghost)", fontSize: 10, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          <span style={{ color: "var(--text-ghost)", fontSize: 12, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             · {error}
           </span>
         )}
-        <span className="shrink-0" style={{ color: "var(--text-ghost)", fontSize: 10, marginLeft: "auto" }}>open ↗</span>
+        <span className="shrink-0" style={{ color: "var(--text-ghost)", fontSize: 12, marginLeft: "auto" }}>open ↗</span>
       </a>
     );
   }
@@ -190,7 +191,7 @@ export function MikrotikTab({ mikrotikUrl, refreshSec, demoMode = false }: {
       {data.hddTotal != null && <>{sep()}{pill("Storage", `${fmtMtBytes(data.hddUsed)} / ${fmtMtBytes(data.hddTotal)}`, hddPct)}</>}
       {data.uptime && <>{sep()}{pill("Uptime", data.uptime)}</>}
       {data.temp != null && <>{sep()}{pill("Temp", `${data.temp}°C`, undefined, data.temp)}</>}
-      <span style={{ color: "var(--text-ghost)", fontSize: 10, marginLeft: "auto", flexShrink: 0 }}>tap to open ↗</span>
+      <span style={{ color: "var(--text-ghost)", fontSize: 12, marginLeft: "auto", flexShrink: 0 }}>tap to open ↗</span>
     </a>
   );
 }

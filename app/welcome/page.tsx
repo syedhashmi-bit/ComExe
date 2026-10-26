@@ -123,7 +123,7 @@ export default function WelcomePage() {
                   width: 24, height: 24, borderRadius: 12,
                   background: `${isPaper ? "rgba(2,132,199,0.1)" : "rgba(6,182,212,0.12)"}`,
                   color: "var(--brand)",
-                  fontSize: 11, fontWeight: 700,
+                  fontSize: 12, fontWeight: 700,
                   display: "flex", alignItems: "center", justifyContent: "center",
                   flexShrink: 0,
                 }}>{item.icon}</span>
@@ -151,7 +151,7 @@ export default function WelcomePage() {
           </button>
 
           <div style={{ marginTop: 16 }}>
-            <Link href="/" onClick={markDone} style={{ fontSize: 11, color: "var(--text-dim)", textDecoration: "none" }}>
+            <Link href="/" onClick={markDone} style={{ fontSize: 12, color: "var(--text-dim)", textDecoration: "none" }}>
               Skip — I&apos;ll configure later
             </Link>
           </div>
@@ -211,10 +211,10 @@ export default function WelcomePage() {
                     }} />
                   </div>
                   <div>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: active ? t.brand : "var(--text-secondary)" }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: active ? t.brand : "var(--text-secondary)" }}>
                       {t.label}
                     </div>
-                    <div style={{ fontSize: 9, color: "var(--text-dim)", marginTop: 2 }}>
+                    <div style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 2 }}>
                       {t.desc}
                     </div>
                   </div>
@@ -285,7 +285,7 @@ export default function WelcomePage() {
           <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: "0 0 8px", lineHeight: 1.7 }}>
             The setup wizard lets you connect Radarr, Sonarr, Pi-hole, and more with live connection testing. Takes about a minute.
           </p>
-          <p style={{ fontSize: 11, color: "var(--text-dim)", margin: "0 0 28px" }}>
+          <p style={{ fontSize: 12, color: "var(--text-dim)", margin: "0 0 28px" }}>
             You can also skip this and add services later from the dashboard settings or by setting environment variables.
           </p>
 

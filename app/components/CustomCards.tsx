@@ -37,13 +37,13 @@ function CustomCardRenderer({ card, state }: { card: CustomCardDef; state: CardS
       }} />
       <div className="flex items-center gap-2">
         <span style={{ width: 6, height: 6, borderRadius: 3, background: card.color }} />
-        <span className="text-[10px] uppercase tracking-widest font-semibold" style={{ color: "var(--text-label)" }}>
+        <span className="text-xs uppercase tracking-widest font-semibold" style={{ color: "var(--text-label)" }}>
           {card.label}
         </span>
       </div>
 
       {state.error ? (
-        <div className="text-[10px]" style={{ color: "var(--critical)" }}>{state.error}</div>
+        <div className="text-xs" style={{ color: "var(--critical)" }}>{state.error}</div>
       ) : card.viz === "number" ? (
         <div style={{ color: card.color }}>
           <BigValue value={fmt(state.value)} />

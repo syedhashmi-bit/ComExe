@@ -78,10 +78,11 @@ export function TrendDelta({
   if (current !== 0 && Math.abs(delta) / Math.abs(current) > 5) return null;
   const isUp = delta > 0;
   const isGood = (isUp && goodDirection === "up") || (!isUp && goodDirection === "down");
-  const color = isGood ? "#10b981" : "#ef4444";
+  // Neutral: a few points of drift isn't something that needs colour. Whether
+  // it moved the right way is still there, in the tooltip.
   return (
-    <span style={{
-      fontSize: 11, color, opacity: 0.9, fontWeight: 600,
+    <span title={isGood ? "Improving" : "Worsening"} style={{
+      fontSize: 12, color: "var(--text-label)", fontWeight: 500,
       fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap",
       letterSpacing: "0.01em",
     }}>
@@ -103,7 +104,7 @@ export function HeroStat({ line, keyPrefix }: { line: string; keyPrefix: string 
   const value     = parseFloat(numStr.replace(/,/g, ""));
   return (
     <div className="flex items-baseline gap-1.5 flex-wrap">
-      {prefix && <span style={{ fontSize: 11, color: "var(--text-label)" }}>{prefix.trim()}</span>}
+      {prefix && <span style={{ fontSize: 12, color: "var(--text-label)" }}>{prefix.trim()}</span>}
       <span style={{
         fontSize: 19, fontWeight: 700, color: "var(--text)",
         fontVariantNumeric: "tabular-nums", letterSpacing: "-0.01em", lineHeight: 1.1,
@@ -113,7 +114,7 @@ export function HeroStat({ line, keyPrefix }: { line: string; keyPrefix: string 
       {rest && <span
         title={rest}
         style={{
-          fontSize: 11, color: "var(--text-dim)",
+          fontSize: 12, color: "var(--text-dim)",
           overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
         }}>{animatedLine(rest, `${keyPrefix}-rest`)}</span>}
     </div>
@@ -148,7 +149,7 @@ export function Sparkline({ data, color, autoMax = false, height = 32 }: {
       <div
         style={{
           height, display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: 9, color: "var(--text-ghost)", fontStyle: "italic",
+          fontSize: 12, color: "var(--text-ghost)", fontStyle: "italic",
           letterSpacing: "0.05em",
           background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.025) 50%, transparent 100%)",
           backgroundSize: "200% 100%",
@@ -206,8 +207,10 @@ export function RadialGauge({ percent, color, size = 88 }: { percent: number; co
 
 // ── ThreeSegmentDonut ────────────────────────────────────────────────────────
 
-export function ThreeSegmentDonut({ usedBytes, cacheBytes, freeBytes, totalBytes, du }: {
-  usedBytes: number; cacheBytes: number; freeBytes: number; totalBytes: number; du: DataUnit;
+// Neutral by default: "used" only takes a status colour when the caller says
+// memory is actually in warning/critical (usedColor). Free is plain track.
+export function ThreeSegmentDonut({ usedBytes, cacheBytes, freeBytes, totalBytes, du, usedColor = "var(--data-strong)" }: {
+  usedBytes: number; cacheBytes: number; freeBytes: number; totalBytes: number; du: DataUnit; usedColor?: string;
 }) {
   const r = 36, circ = 2 * Math.PI * r;
   const safe = (v: number) => (isNaN(v) ? 0 : Math.max(0, v));
@@ -227,24 +230,24 @@ export function ThreeSegmentDonut({ usedBytes, cacheBytes, freeBytes, totalBytes
         <svg width={size} height={size} viewBox="0 0 88 88" style={{ transform: "rotate(-90deg)" }}>
           <circle cx="44" cy="44" r={r} fill="none" stroke="var(--donut-bg)" strokeWidth="9" />
           {usedLen > 0.1 && (
-            <circle cx="44" cy="44" r={r} fill="none" stroke="var(--critical)" strokeWidth="9"
+            <circle cx="44" cy="44" r={r} fill="none" stroke={usedColor} strokeWidth="9"
               strokeDasharray={`${usedLen.toFixed(2)} ${circ.toFixed(2)}`}
               strokeDashoffset={0}
-              style={{ filter: "drop-shadow(0 0 3px var(--critical)44)", transition: "stroke-dasharray 0.7s ease" }}
+              style={{ transition: "stroke-dasharray 0.7s ease" }}
             />
           )}
           {cacheLen > 0.1 && (
-            <circle cx="44" cy="44" r={r} fill="none" stroke="var(--settings-label)" strokeWidth="9"
+            <circle cx="44" cy="44" r={r} fill="none" stroke="var(--data)" strokeWidth="9"
               strokeDasharray={`${cacheLen.toFixed(2)} ${circ.toFixed(2)}`}
               strokeDashoffset={(-usedLen).toFixed(2)}
               style={{ transition: "stroke-dasharray 0.7s ease" }}
             />
           )}
           {freeLen > 0.1 && (
-            <circle cx="44" cy="44" r={r} fill="none" stroke="var(--ok)" strokeWidth="9"
+            <circle cx="44" cy="44" r={r} fill="none" stroke="var(--gauge-track)" strokeWidth="9"
               strokeDasharray={`${freeLen.toFixed(2)} ${circ.toFixed(2)}`}
               strokeDashoffset={(-(usedLen + cacheLen)).toFixed(2)}
-              style={{ filter: "drop-shadow(0 0 3px #00c85333)", transition: "stroke-dasharray 0.7s ease" }}
+              style={{ transition: "stroke-dasharray 0.7s ease" }}
             />
           )}
         </svg>
@@ -252,21 +255,21 @@ export function ThreeSegmentDonut({ usedBytes, cacheBytes, freeBytes, totalBytes
           <span className="text-xs font-medium tabular-nums" style={{ color: "var(--text-secondary)" }}>
             {total > 0 ? `${usedPct.toFixed(0)}%` : "—"}
           </span>
-          <span className="text-[9px]" style={{ color: "var(--settings-text-dim)" }}>used</span>
+          <span className="text-xs" style={{ color: "var(--settings-text-dim)" }}>used</span>
         </div>
       </div>
       <div className="flex flex-col gap-1.5 w-full">
         {[
-          { label: "used",      color: "var(--critical)", bytes: used  },
-          { label: "zfs cache", color: "var(--settings-label)", bytes: cache },
-          { label: "free",      color: "var(--ok)", bytes: free  },
+          { label: "Used",      color: usedColor,           bytes: used  },
+          { label: "ZFS cache", color: "var(--data)",        bytes: cache },
+          { label: "Free",      color: "var(--gauge-track)", bytes: free  },
         ].map(({ label, color, bytes }) => (
           <div key={label} className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-sm shrink-0" style={{ background: color }} />
-              <span className="text-[10px] uppercase tracking-widest" style={{ color: "var(--text-label)" }}>{label}</span>
+              <span className="text-xs" style={{ color: "var(--text-label)" }}>{label}</span>
             </div>
-            <span className="text-[10px] tabular-nums font-medium" style={{ color: "var(--text-muted)" }}>
+            <span className="text-xs tabular-nums font-medium" style={{ color: "var(--text-muted)" }}>
               {fmtBytes(bytes, 1, du)}
             </span>
           </div>
@@ -284,7 +287,7 @@ export function LabeledBar({ label, right, percent, color, gradient }: {
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex justify-between items-center">
-        <span className="text-[10px] uppercase tracking-widest" style={{ color: "var(--text-label)" }}>{label}</span>
+        <span className="text-xs uppercase tracking-widest" style={{ color: "var(--text-label)" }}>{label}</span>
         <span className="text-xs font-medium tabular-nums" style={{ color: "var(--text-muted)" }}>{right}</span>
       </div>
       <GaugeBar percent={percent} color={color} gradient={gradient} />
@@ -305,9 +308,20 @@ export const CARD_INFO: Record<string, string> = {
   grafana:     "Embedded Grafana panel. Configure GRAFANA_DASHBOARD_UID and GRAFANA_DATASOURCE_UID to enable.",
 };
 
+// Card titles as people write them ("CPU", not "Cpu"); anything else gets a
+// capitalised first letter.
+const CARD_TITLES: Record<string, string> = {
+  cpu: "CPU", gpu: "GPU", memory: "Memory", filesystems: "Filesystems",
+  network: "Network", speedtest: "Speedtest", system: "System", grafana: "Grafana",
+};
+
+// Calm card: flat surface, 1px border, no per-card colour. Colour appears only
+// for status — a warning/critical card gets a tinted border and a labelled dot.
+// `accent` and `animDelay` are still accepted so callers needn't change, but no
+// longer paint anything.
 export function Card({
-  label, subtitle, children, accent = "#06b6d4", alertLevel = null,
-  icon, expanded = false, onToggle, externalLink, animDelay = 0, info,
+  label, subtitle, children, alertLevel = null,
+  icon, expanded = false, onToggle, externalLink, info,
 }: {
   label: string; subtitle?: string; children: React.ReactNode; accent?: string;
   alertLevel?: AlertLevel; icon?: React.ReactNode; expanded?: boolean; onToggle?: () => void;
@@ -316,48 +330,45 @@ export function Card({
   const [hov, setHov] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
 
-  const borderColor =
-    alertLevel === "critical" ? "rgba(239,68,68,0.45)"
-    : alertLevel === "warning" ? "rgba(245,158,11,0.4)"
-    : hov ? `${withAlpha(accent, 33)}` : "rgba(255,255,255,0.08)";
+  const statusColor =
+    alertLevel === "critical" ? "var(--critical)"
+    : alertLevel === "warning" ? "var(--warn)"
+    : null;
 
-  const topColor =
-    alertLevel === "critical" ? "#ef4444"
-    : alertLevel === "warning" ? "#f59e0b"
-    : accent;
+  const borderColor = statusColor ? withAlpha(statusColor, 45)
+    : hov ? "var(--border-hover)" : "var(--border)";
 
   const infoText = info ?? CARD_INFO[label.toLowerCase()] ?? null;
+  const title = CARD_TITLES[label.toLowerCase()] ?? label.charAt(0).toUpperCase() + label.slice(1);
+  const activate = externalLink ? () => window.open(externalLink, "_blank", "noopener,noreferrer") : onToggle;
 
   return (
     <div
       className="flex flex-col cursor-pointer h-full relative overflow-hidden"
+      role="button"
+      tabIndex={0}
+      aria-label={externalLink ? `${title} (opens in a new tab)` : title}
+      aria-expanded={externalLink ? undefined : expanded}
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
-      onClick={externalLink ? () => window.open(externalLink, "_blank") : onToggle}
+      onClick={activate}
+      onKeyDown={e => {
+        // Only the card itself: Enter/Space on a control inside it is that control's.
+        if (e.target !== e.currentTarget || (e.key !== "Enter" && e.key !== " ")) return;
+        e.preventDefault();
+        activate?.();
+      }}
       style={{
-        background: `radial-gradient(ellipse at top, ${withAlpha(topColor, 8)} 0%, transparent 55%), rgba(255,255,255,0.04)`,
-        backdropFilter: "blur(6px)",
-        WebkitBackdropFilter: "blur(6px)",
+        background: "var(--card)",
         border: `1px solid ${borderColor}`,
-        borderRadius: 14,
-        transform: hov ? "translateY(-3px)" : "translateY(0)",
-        boxShadow: hov
-          ? `0 12px 36px ${withAlpha(topColor, 20)}, 0 0 0 1px ${withAlpha(topColor, 20)} inset, 0 8px 32px rgba(0,0,0,0.35)`
-          : "none",
-        transition: "border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease",
-        animation: "fadeSlideIn 0.45s ease both",
-        animationDelay: `${animDelay}ms`,
+        borderRadius: 10,
+        transition: "border-color 0.15s ease",
       }}
     >
-      <div style={{
-        height: 3,
-        background: `linear-gradient(90deg, ${topColor} 0%, ${withAlpha(topColor, 67)} 60%, ${withAlpha(topColor, 20)} 100%)`,
-        boxShadow: alertLevel ? `0 0 12px ${withAlpha(topColor, 67)}` : `0 0 8px ${withAlpha(topColor, 40)}`,
-      }} />
-      <div className="flex items-center gap-2 overflow-hidden px-[18px] pt-[18px] pb-0">
-        {icon && <span style={{ color: accent, opacity: 0.7 }}>{icon}</span>}
-        <span className="text-[10px] uppercase shrink-0" style={{ color: "var(--text-label)", letterSpacing: "0.12em" }}>{label}</span>
-        {subtitle && <span title={subtitle} className="text-[10px] truncate" style={{ color: "var(--text-faint)" }}>{subtitle}</span>}
+      <div className="flex items-center gap-2 overflow-hidden px-4 pt-4 pb-0">
+        {icon && <span aria-hidden="true" style={{ color: "var(--text-label)", display: "inline-flex" }}>{icon}</span>}
+        <span className="shrink-0" style={{ fontSize: 13, color: "var(--text-muted)" }}>{title}</span>
+        {subtitle && <span title={subtitle} className="truncate" style={{ fontSize: 12, color: "var(--text-faint)" }}>{subtitle}</span>}
         {infoText && (
           <span className="relative shrink-0" style={{ lineHeight: 1 }}
             onMouseEnter={e => { e.stopPropagation(); setShowInfo(true); }}
@@ -365,34 +376,34 @@ export function Card({
             onClick={e => { e.stopPropagation(); setShowInfo(v => !v); }}>
             <span style={{
               display: "inline-flex", alignItems: "center", justifyContent: "center",
-              width: 14, height: 14, borderRadius: 7,
-              border: "1px solid var(--border)",
-              fontSize: 8, color: "var(--text-ghost)", cursor: "help",
+              width: 16, height: 16, borderRadius: 8,
+              border: "1px solid var(--border-mid)",
+              fontSize: 12, color: "var(--text-ghost)", cursor: "help",
               transition: "color 0.15s, border-color 0.15s",
-              ...(showInfo ? { color: accent, borderColor: accent } : {}),
+              ...(showInfo ? { color: "var(--text)", borderColor: "var(--border-hover)" } : {}),
             }}>i</span>
             {showInfo && (
               <div style={{
                 position: "absolute", top: "100%", left: "50%", transform: "translateX(-50%)",
-                marginTop: 6, width: 220, padding: "8px 10px",
-                background: "var(--card)", border: "1px solid var(--border)",
-                borderRadius: 8, boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
-                fontSize: 10, lineHeight: 1.5, color: "var(--text-secondary)",
+                marginTop: 6, width: 240, padding: "8px 10px",
+                background: "var(--surface-bright)", border: "1px solid var(--border-mid)",
+                borderRadius: 8, boxShadow: "0 8px 24px rgba(0,0,0,0.35)",
+                fontSize: 12, lineHeight: 1.5, color: "var(--text-secondary)",
                 zIndex: 50, pointerEvents: "none",
               }}>{infoText}</div>
             )}
           </span>
         )}
-        <span className="ml-auto w-1.5 h-1.5 rounded-full shrink-0" style={{
-          background: alertLevel === "critical" ? "#ef4444" : alertLevel === "warning" ? "#f59e0b" : "#10b981",
-          boxShadow: alertLevel === "critical" ? "0 0 7px #ef4444aa"
-                   : alertLevel === "warning"  ? "0 0 6px #f59e0baa"
-                                               : "0 0 5px #10b98166",
-          animation: "pulseDot 2s ease-in-out infinite",
-        }} />
-        <span className="text-[9px]" style={{ color: "var(--text-hidden)" }}>{externalLink ? "↗" : expanded ? "▲" : "▼"}</span>
+        <span className="ml-auto" />
+        {statusColor && (
+          <span className="flex items-center gap-1.5 shrink-0" style={{ fontSize: 12, fontWeight: 600, color: statusColor }}>
+            <span aria-hidden="true" className="w-1.5 h-1.5 rounded-full" style={{ background: statusColor }} />
+            {alertLevel === "critical" ? "Critical" : "Warning"}
+          </span>
+        )}
+        <span aria-hidden="true" style={{ fontSize: 12, color: "var(--text-ghost)" }}>{externalLink ? "↗" : expanded ? "▲" : "▼"}</span>
       </div>
-      <div className="px-[18px] pt-3 pb-[18px] flex flex-col gap-4">
+      <div className="px-4 pt-3 pb-4 flex flex-col gap-4">
         {children}
       </div>
     </div>
@@ -411,9 +422,9 @@ export function StatusBanner({ result, visible }: { result: import("@/app/lib/ty
           height: 36, opacity: visible ? 1 : 0, transition: "opacity 0.4s ease",
         }}>
         <span className="block shrink-0 w-1.5 h-1.5 rounded-full"
-          style={{ background: "var(--warn)", boxShadow: "0 0 6px #f59e0b66", animation: "pulseDot 2s ease-in-out infinite" }} />
-        <span className="text-[10px] tracking-[0.2em] font-semibold uppercase" style={{ color: "var(--warn)" }}>WARNING</span>
-        {reason && <span className="text-[10px]" style={{ color: "rgba(245,158,11,0.7)" }}>· {reason}</span>}
+          style={{ background: "var(--warn)" }} />
+        <span className="text-xs tracking-[0.2em] font-semibold uppercase" style={{ color: "var(--warn)" }}>WARNING</span>
+        {reason && <span className="text-xs" style={{ color: "rgba(245,158,11,0.7)" }}>· {reason}</span>}
       </div>
     );
   }
@@ -426,9 +437,9 @@ export function StatusBanner({ result, visible }: { result: import("@/app/lib/ty
         }}>
         <span className="text-sm font-bold leading-none" style={{ color: "var(--critical)" }}>✕</span>
         <span className="block shrink-0 w-1.5 h-1.5 rounded-full"
-          style={{ background: "var(--critical)", boxShadow: "0 0 8px #ef444466", animation: "pulseDot 2s ease-in-out infinite" }} />
-        <span className="text-[10px] tracking-[0.2em] font-semibold uppercase" style={{ color: "var(--critical)" }}>CRITICAL</span>
-        {reason && <span className="text-[10px]" style={{ color: "rgba(239,68,68,0.7)" }}>· {reason}</span>}
+          style={{ background: "var(--critical)" }} />
+        <span className="text-xs tracking-[0.2em] font-semibold uppercase" style={{ color: "var(--critical)" }}>CRITICAL</span>
+        {reason && <span className="text-xs" style={{ color: "rgba(239,68,68,0.7)" }}>· {reason}</span>}
       </div>
     );
   }
@@ -475,8 +486,8 @@ export function SubRow({ label, value, valueColor }: { label: string; value: str
 export function StatRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between items-center py-0.5">
-      <span className="text-[10px] uppercase tracking-widest" style={{ color: "var(--text-label)" }}>{label}</span>
-      <span className="text-[10px] tabular-nums font-medium" style={{ color: "var(--text-muted)" }}>{value}</span>
+      <span className="text-xs uppercase tracking-widest" style={{ color: "var(--text-label)" }}>{label}</span>
+      <span className="text-xs tabular-nums font-medium" style={{ color: "var(--text-muted)" }}>{value}</span>
     </div>
   );
 }
@@ -531,7 +542,7 @@ export function BookmarkItem({ name, url, icon }: { name: string; url: string; i
         />
       ) : (
         <span className="rounded flex items-center justify-center font-bold shrink-0"
-          style={{ background: "var(--card-hover)", color: "var(--text-label)", width: 18, height: 18, fontSize: 9 }}>
+          style={{ background: "var(--card-hover)", color: "var(--text-label)", width: 18, height: 18, fontSize: 12 }}>
           {name[0].toUpperCase()}
         </span>
       )}

@@ -91,7 +91,7 @@ export function DiskHealthPanel() {
     return (
       <div className="flex items-center gap-2" style={{
         border: "1px dashed var(--border)", borderRadius: 10, padding: "7px 14px",
-        fontSize: 11, color: "var(--text-label)", minWidth: 0,
+        fontSize: 12, color: "var(--text-label)", minWidth: 0,
       }}>
         <svg className="shrink-0" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/>
@@ -105,7 +105,7 @@ export function DiskHealthPanel() {
         </span>
         {!error && (
           <button onClick={hideHint} className="shrink-0" style={{
-            marginLeft: "auto", fontSize: 10, color: "var(--text-label)", background: "none",
+            marginLeft: "auto", fontSize: 12, color: "var(--text-label)", background: "none",
             border: "1px solid var(--border)", borderRadius: 5, padding: "2px 8px", cursor: "pointer",
           }}>Hide</button>
         )}
@@ -124,12 +124,12 @@ export function DiskHealthPanel() {
             <rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/>
             <line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>
           </svg>
-          <span style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-dim)" }}>
+          <span style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-dim)" }}>
             Disk Health
           </span>
         </div>
         <span style={{
-          fontSize: 10, fontWeight: 600,
+          fontSize: 12, fontWeight: 600,
           color: allHealthy ? "var(--ok)" : "var(--critical)",
         }}>
           {allHealthy ? "All healthy" : "Issues detected"}
@@ -148,15 +148,15 @@ export function DiskHealthPanel() {
                 background: disk.healthy ? "var(--ok)" : "var(--critical)",
                 boxShadow: `0 0 4px ${withAlpha(disk.healthy ? "var(--ok)" : "var(--critical)", 40)}`,
               }} />
-              <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text)", fontFamily: "monospace" }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text)", fontFamily: "monospace" }}>
                 {disk.device}
               </span>
-              <span title={disk.model} style={{ fontSize: 9, color: "var(--text-ghost)", marginLeft: "auto", maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <span title={disk.model} style={{ fontSize: 12, color: "var(--text-ghost)", marginLeft: "auto", maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {disk.model}
               </span>
             </div>
 
-            <div className="flex gap-3 flex-wrap" style={{ fontSize: 10 }}>
+            <div className="flex gap-3 flex-wrap" style={{ fontSize: 12 }}>
               {disk.temperature != null && (
                 <div className="flex items-center gap-1">
                   <span style={{ color: "var(--text-ghost)" }}>Temp</span>

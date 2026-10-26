@@ -65,7 +65,7 @@ Live status pills for **Radarr · Sonarr · Bazarr · Tautulli · qBittorrent ·
 
 ### And more (all shipped)
 
-Five themes (Midnight / Forge / Forest / Plum / Paper) · command palette (`Ctrl+K`) ·
+Two themes (Midnight / Paper) · command palette (`Ctrl+K`) ·
 `/analytics`, `/forecast`, and `/logs` pages · alerts with webhooks (Discord / ntfy / Slack /
 Gotify) + quiet hours · Docker container actions (restart / logs / pull-and-restart, opt-in) ·
 SMART disk health · network topology map · MikroTik device list + Wake-on-LAN · multi-server
@@ -79,7 +79,7 @@ and SLA reports.
 
 | Layer | Choice |
 |---|---|
-| Framework | Next.js 16 (App Router — 7 route-segment pages, 26 components) |
+| Framework | Next.js 16 (App Router — 7 route-segment pages, 28 components) |
 | Language | TypeScript 6 |
 | Styling | Tailwind CSS 3 + inline `style` for dynamic colours |
 | Charts | Canvas API + inline SVG, **zero chart libraries** |

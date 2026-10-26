@@ -41,7 +41,7 @@ const inputStyle: React.CSSProperties = {
 };
 
 const labelStyle: React.CSSProperties = {
-  fontSize: 10, color: "var(--text-label)", textTransform: "uppercase",
+  fontSize: 12, color: "var(--text-label)", textTransform: "uppercase",
   letterSpacing: "0.08em", fontWeight: 600, marginBottom: 4,
 };
 
@@ -121,7 +121,7 @@ export function CustomCardEditor({ onClose }: { onClose: () => void }) {
       display: "flex", flexDirection: "column", gap: 14,
     }}>
       <div className="flex items-center justify-between">
-        <span className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: "var(--text-label)" }}>
+        <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--text-label)" }}>
           Custom Cards
         </span>
         <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text-ghost)", cursor: "pointer", fontSize: 14 }}>✕</button>
@@ -130,7 +130,7 @@ export function CustomCardEditor({ onClose }: { onClose: () => void }) {
       {!editing ? (
         <>
           {cards.length === 0 && (
-            <div className="text-[11px]" style={{ color: "var(--text-dim)" }}>
+            <div className="text-xs" style={{ color: "var(--text-dim)" }}>
               No custom cards yet. Add one to display a PromQL query on the dashboard.
             </div>
           )}
@@ -139,18 +139,18 @@ export function CustomCardEditor({ onClose }: { onClose: () => void }) {
               background: "var(--surface-dim)", borderRadius: 8, padding: "8px 12px",
             }}>
               <span style={{ width: 8, height: 8, borderRadius: 4, background: c.color }} />
-              <span className="text-[11px] font-medium" style={{ color: "var(--text)", flex: 1 }}>{c.label}</span>
-              <span className="text-[9px]" style={{ color: "var(--text-ghost)" }}>{c.viz}</span>
-              <button onClick={() => setEditing({ ...c })} style={{ background: "none", border: "none", color: "var(--brand)", cursor: "pointer", fontSize: 10 }}>edit</button>
-              <button onClick={() => removeCard(c.id)} style={{ background: "none", border: "none", color: "var(--critical)", cursor: "pointer", fontSize: 10 }}>remove</button>
+              <span className="text-xs font-medium" style={{ color: "var(--text)", flex: 1 }}>{c.label}</span>
+              <span className="text-xs" style={{ color: "var(--text-ghost)" }}>{c.viz}</span>
+              <button onClick={() => setEditing({ ...c })} style={{ background: "none", border: "none", color: "var(--brand)", cursor: "pointer", fontSize: 12 }}>edit</button>
+              <button onClick={() => removeCard(c.id)} style={{ background: "none", border: "none", color: "var(--critical)", cursor: "pointer", fontSize: 12 }}>remove</button>
             </div>
           ))}
           <button onClick={addCard} style={{
             background: "var(--brand)", color: "#000", border: "none",
-            borderRadius: 6, padding: "8px 0", fontSize: 11, fontWeight: 600,
+            borderRadius: 6, padding: "8px 0", fontSize: 12, fontWeight: 600,
             cursor: "pointer",
           }}>+ Add card</button>
-          {msg && <div className="text-[10px]" style={{ color: msg === "Saved" ? "var(--ok)" : "var(--critical)" }}>{msg}</div>}
+          {msg && <div className="text-xs" style={{ color: msg === "Saved" ? "var(--ok)" : "var(--critical)" }}>{msg}</div>}
         </>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -161,10 +161,10 @@ export function CustomCardEditor({ onClose }: { onClose: () => void }) {
           <div>
             <div style={labelStyle}>PromQL Query</div>
             <input value={editing.query} onChange={e => setEditing({ ...editing, query: e.target.value })} placeholder="e.g. node_memory_MemFree_bytes / 1e9" style={{ ...inputStyle, fontFamily: "monospace" }} />
-            <button onClick={() => testQuery(editing.query)} style={{ background: "none", border: "none", color: "var(--brand)", cursor: "pointer", fontSize: 10, marginTop: 4 }}>
+            <button onClick={() => testQuery(editing.query)} style={{ background: "none", border: "none", color: "var(--brand)", cursor: "pointer", fontSize: 12, marginTop: 4 }}>
               Test query
             </button>
-            {testResult && <div className="text-[10px] mt-1" style={{ color: testResult.startsWith("Error") ? "var(--critical)" : "var(--ok)" }}>{testResult}</div>}
+            {testResult && <div className="text-xs mt-1" style={{ color: testResult.startsWith("Error") ? "var(--critical)" : "var(--ok)" }}>{testResult}</div>}
           </div>
           <div>
             <div style={labelStyle}>Visualization</div>
@@ -174,7 +174,7 @@ export function CustomCardEditor({ onClose }: { onClose: () => void }) {
                   background: editing.viz === v.key ? "var(--brand)" : "var(--surface-dim)",
                   color: editing.viz === v.key ? "#000" : "var(--text-dim)",
                   border: "none", borderRadius: 4, padding: "5px 10px",
-                  fontSize: 10, fontWeight: 600, cursor: "pointer",
+                  fontSize: 12, fontWeight: 600, cursor: "pointer",
                 }}>{v.label}</button>
               ))}
             </div>
@@ -197,12 +197,12 @@ export function CustomCardEditor({ onClose }: { onClose: () => void }) {
           <div className="flex gap-2">
             <button onClick={saveEditing} disabled={!editing.label || !editing.query || saving} style={{
               background: "var(--brand)", color: "#000", border: "none",
-              borderRadius: 6, padding: "8px 16px", fontSize: 11, fontWeight: 600,
+              borderRadius: 6, padding: "8px 16px", fontSize: 12, fontWeight: 600,
               cursor: "pointer", opacity: !editing.label || !editing.query ? 0.5 : 1,
             }}>{saving ? "Saving…" : "Save card"}</button>
             <button onClick={() => { setEditing(null); setTestResult(null); }} style={{
               background: "var(--surface-dim)", color: "var(--text-dim)", border: "none",
-              borderRadius: 6, padding: "8px 16px", fontSize: 11, cursor: "pointer",
+              borderRadius: 6, padding: "8px 16px", fontSize: 12, cursor: "pointer",
             }}>Cancel</button>
           </div>
         </div>

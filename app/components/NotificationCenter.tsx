@@ -49,7 +49,7 @@ export function NotificationCenter({ onClose }: { onClose: () => void }) {
         }}
       >
         <div className="flex items-center justify-between p-4 pb-2">
-          <span className="text-[11px] tracking-widest uppercase" style={{ color: "var(--text-dim)", fontWeight: 600 }}>
+          <span className="text-xs tracking-widest uppercase" style={{ color: "var(--text-dim)", fontWeight: 600 }}>
             Notifications
           </span>
           <button onClick={onClose} style={{ color: "var(--text-dim)", background: "none", border: "none", cursor: "pointer", fontSize: 12 }}>
@@ -59,16 +59,16 @@ export function NotificationCenter({ onClose }: { onClose: () => void }) {
 
         <div className="flex flex-col gap-0 flex-1 p-2">
           {loading ? (
-            <div className="flex items-center justify-center py-12" style={{ color: "var(--text-ghost)", fontSize: 11 }}>
+            <div className="flex items-center justify-center py-12" style={{ color: "var(--text-ghost)", fontSize: 12 }}>
               Loading...
             </div>
           ) : error ? (
             <div className="flex flex-col items-center justify-center py-16 gap-2" style={{ color: "var(--text-ghost)" }}>
               <span style={{ fontSize: 24 }}>&#x26a0;&#xfe0f;</span>
-              <span style={{ fontSize: 11 }}>Couldn&apos;t load alerts</span>
+              <span style={{ fontSize: 12 }}>Couldn&apos;t load alerts</span>
               <button onClick={() => { setError(false); setLoading(true); setAttempt(a => a + 1); }}
                 style={{
-                  fontSize: 10, fontWeight: 600, color: "var(--text-dim)", cursor: "pointer",
+                  fontSize: 12, fontWeight: 600, color: "var(--text-dim)", cursor: "pointer",
                   background: "var(--card-alt)", border: "1px solid var(--border-mid)",
                   borderRadius: 6, padding: "4px 12px", marginTop: 4,
                 }}>
@@ -78,7 +78,7 @@ export function NotificationCenter({ onClose }: { onClose: () => void }) {
           ) : events.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 gap-2" style={{ color: "var(--text-ghost)" }}>
               <span style={{ fontSize: 24 }}>&#x2705;</span>
-              <span style={{ fontSize: 11 }}>No alerts — all clear</span>
+              <span style={{ fontSize: 12 }}>No alerts — all clear</span>
             </div>
           ) : (
             events.map((evt, i) => {
@@ -102,17 +102,17 @@ export function NotificationCenter({ onClose }: { onClose: () => void }) {
                   <div className="flex flex-col gap-0.5 min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span style={{
-                        fontSize: 9, fontWeight: 700, textTransform: "uppercase",
+                        fontSize: 12, fontWeight: 700, textTransform: "uppercase",
                         color: accentColor, letterSpacing: "0.05em",
                       }}>
                         {evt.level}
                       </span>
-                      <span style={{ fontSize: 9, color: "var(--text-ghost)", marginLeft: "auto", fontVariantNumeric: "tabular-nums" }}>
+                      <span style={{ fontSize: 12, color: "var(--text-ghost)", marginLeft: "auto", fontVariantNumeric: "tabular-nums" }}>
                         {relativeTime(evt.ts)}
                       </span>
                     </div>
-                    <span style={{ fontSize: 11, color: "var(--text-muted)", lineHeight: 1.4 }}>{evt.msg}</span>
-                    <span style={{ fontSize: 9, color: "var(--text-ghost)", fontFamily: "monospace" }}>{evt.key}</span>
+                    <span style={{ fontSize: 12, color: "var(--text-muted)", lineHeight: 1.4 }}>{evt.msg}</span>
+                    <span style={{ fontSize: 12, color: "var(--text-ghost)", fontFamily: "monospace" }}>{evt.key}</span>
                   </div>
                 </div>
               );

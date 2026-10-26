@@ -103,9 +103,9 @@ export function AreaChart({ data, color, height = 180, label, unit = "", formatV
     <div className="flex flex-col gap-1 relative">
       {label && (
         <div className="flex items-center justify-between">
-          <span style={{ fontSize: 11, color: color, fontWeight: 600, letterSpacing: "0.02em" }}>{label}</span>
+          <span style={{ fontSize: 12, color: color, fontWeight: 600, letterSpacing: "0.02em" }}>{label}</span>
           {hoveredPoint && (
-            <span style={{ fontSize: 11, color: "var(--text-muted)", fontVariantNumeric: "tabular-nums", fontFamily: "monospace" }}>
+            <span style={{ fontSize: 12, color: "var(--text-muted)", fontVariantNumeric: "tabular-nums", fontFamily: "monospace" }}>
               {fmt(hoveredPoint.value)}{unit} at {fmtTime(hoveredPoint.ts)}
             </span>
           )}
@@ -155,7 +155,7 @@ export function AreaChart({ data, color, height = 180, label, unit = "", formatV
         {/* Y-axis labels */}
         <div className="absolute left-1 top-0 bottom-0 flex flex-col justify-between pointer-events-none" style={{ paddingTop: 6, paddingBottom: 6 }}>
           {yLabels.map((v, i) => (
-            <span key={i} style={{ fontSize: 9, color: "var(--text-ghost)", fontFamily: "monospace", fontVariantNumeric: "tabular-nums" }}>
+            <span key={i} style={{ fontSize: 12, color: "var(--text-ghost)", fontFamily: "monospace", fontVariantNumeric: "tabular-nums" }}>
               {fmt(v)}{unit}
             </span>
           ))}
@@ -165,7 +165,7 @@ export function AreaChart({ data, color, height = 180, label, unit = "", formatV
       {/* X-axis labels */}
       <div className="flex justify-between" style={{ paddingLeft: 4, paddingRight: 4 }}>
         {xLabels.map((l, i) => (
-          <span key={i} style={{ fontSize: 9, color: "var(--text-ghost)", fontFamily: "monospace" }}>{l.label}</span>
+          <span key={i} style={{ fontSize: 12, color: "var(--text-ghost)", fontFamily: "monospace" }}>{l.label}</span>
         ))}
       </div>
     </div>

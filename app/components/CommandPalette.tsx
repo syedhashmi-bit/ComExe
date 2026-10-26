@@ -116,7 +116,7 @@ export function CommandPalette({ onClose, actions }: CommandPaletteProps) {
               return Array.from(grouped.entries()).map(([section, items]) => (
                 <div key={section}>
                   <div style={{
-                    padding: "8px 16px 4px", fontSize: 9, fontWeight: 600,
+                    padding: "8px 16px 4px", fontSize: 12, fontWeight: 600,
                     textTransform: "uppercase", letterSpacing: "0.08em",
                     color: "var(--text-ghost)",
                   }}>
@@ -142,7 +142,7 @@ export function CommandPalette({ onClose, actions }: CommandPaletteProps) {
                         <span style={{ fontSize: 12, color: "var(--text)", flex: 1 }}>{item.label}</span>
                         {item.shortcut && (
                           <kbd style={{
-                            fontSize: 10, fontFamily: "monospace", fontWeight: 600,
+                            fontSize: 12, fontFamily: "monospace", fontWeight: 600,
                             background: "var(--surface)", border: "1px solid var(--border-mid)",
                             borderRadius: 4, padding: "2px 6px", color: "var(--text-dim)",
                           }}>{item.shortcut}</kbd>
@@ -158,7 +158,7 @@ export function CommandPalette({ onClose, actions }: CommandPaletteProps) {
 
         <div style={{
           padding: "8px 16px", borderTop: "1px solid var(--border-dim)",
-          fontSize: 9, color: "var(--text-ghost)", display: "flex", gap: 12,
+          fontSize: 12, color: "var(--text-ghost)", display: "flex", gap: 12,
         }}>
           <span><kbd style={{ fontFamily: "monospace" }}>↑↓</kbd> navigate</span>
           <span><kbd style={{ fontFamily: "monospace" }}>↵</kbd> select</span>
