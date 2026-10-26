@@ -100,8 +100,12 @@ docker run -d \
   --network host \
   --env "PORT=$CANDIDATE_PORT" \
   "${ENV_ARGS[@]}" \
+  --env "COMEXE_COLLECTOR=0" \
   ${MOUNT_ARGS[@]+"${MOUNT_ARGS[@]}"} \
   "$IMAGE" >/dev/null
+# COMEXE_COLLECTOR=0 comes after ENV_ARGS so it wins: the candidate only has
+# to prove it serves. Its own collector would poll every upstream a second
+# time and race the running container on the shared data/ mount.
 
 log "Waiting up to ${HEALTH_TIMEOUT}s for the candidate to become healthy"
 deadline=$(( SECONDS + HEALTH_TIMEOUT ))
