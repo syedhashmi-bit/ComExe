@@ -279,4 +279,5 @@ If you're using `network_mode: host`, services on the same host work directly. I
 
 - All credentials are read **server-side only**. Nothing in the env-var list above is ever exposed to the browser bundle.
 - `/api/config` exposes only non-secret runtime config (URLs, panel IDs, bookmarks). The dashboard isn't designed for the public internet — keep it behind a reverse proxy with auth, or only expose it on your LAN.
-- Default behavior allows anonymous read-only access to the dashboard itself. There's no login flow.
+- Default behavior allows anonymous access to the dashboard itself. Set `DASHBOARD_PASSWORD` for a login page, or `AUTH_PROXY_HEADER` if a reverse proxy (Authelia, Authentik, …) already authenticates.
+- The dashboard only answers to hostnames a web page can't hijack: IP addresses, `localhost`, single-word names like `truenas`, and names ending in `.local`, `.lan`, `.home.arpa` or `.internal`. Anything else gets a 403. This blocks DNS rebinding, where a page you visit points its own domain at your LAN IP and then reads `/api/backup` through your browser. If you reach the dashboard by another name (e.g. a reverse-proxy domain), list it: `-e COMEXE_ALLOWED_HOSTS=dashboard.example.com` (comma-separated).

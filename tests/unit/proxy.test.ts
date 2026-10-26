@@ -95,3 +95,46 @@ describe("proxy — reverse-proxy header mode", () => {
     expect(proxy(req("/api/metrics")).status).toBe(401);
   });
 });
+
+describe("proxy — DNS-rebinding guard", () => {
+  // A rebinding page reaches the dashboard under the attacker's own hostname.
+  // With auth off it would otherwise read /api/backup (every saved key).
+  const hostReq = (host: string, extra: Record<string, string> = {}) =>
+    new NextRequest("http://localhost:3000/api/backup", { headers: { host, ...extra } });
+
+  it("refuses an unrecognised hostname even with auth off", () => {
+    const res = proxy(hostReq("evil.example:3000"));
+    expect(res.status).toBe(403);
+  });
+
+  it("ignores X-Forwarded-Host, which page script can set", () => {
+    const res = proxy(hostReq("evil.example:3000", { "x-forwarded-host": "192.168.88.196:3000" }));
+    expect(res.status).toBe(403);
+  });
+
+  it("allows the LAN IP, localhost and names listed in COMEXE_ALLOWED_HOSTS", () => {
+    expect(allowed(proxy(hostReq("192.168.88.196:3000")))).toBe(true);
+    expect(allowed(proxy(hostReq("localhost:3000")))).toBe(true);
+    process.env.COMEXE_ALLOWED_HOSTS = "dash.example.com";
+    expect(allowed(proxy(hostReq("dash.example.com")))).toBe(true);
+  });
+});
+
+describe("isAllowedHost", () => {
+  it("allows IP literals, single-label and non-public names", async () => {
+    const { isAllowedHost } = await import("@/app/lib/host-guard");
+    for (const h of ["192.168.88.196:3000", "10.0.0.5", "[::1]:3000", "localhost", "truenas:3000",
+                     "truenas.local", "dash.lan:3000", "nas.home.arpa", "x.internal", "app.localhost"]) {
+      expect(isAllowedHost(h), h).toBe(true);
+    }
+  });
+
+  it("refuses public-looking names unless listed exactly", async () => {
+    const { isAllowedHost } = await import("@/app/lib/host-guard");
+    for (const h of ["evil.example:3000", "192.168.88.196.evil.example", "evil.example.", "lan.evil.example", ""]) {
+      expect(isAllowedHost(h), h).toBe(false);
+    }
+    expect(isAllowedHost("dash.example.com:3000", " other.org , dash.example.com:443 ")).toBe(true);
+    expect(isAllowedHost("evil.dash.example.com", "dash.example.com")).toBe(false);
+  });
+});

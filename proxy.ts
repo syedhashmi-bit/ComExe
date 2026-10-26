@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { SESSION_COOKIE, validateSessionToken } from "@/app/lib/session-token";
+import { isAllowedHost } from "@/app/lib/host-guard";
 
 // Renamed from middleware.ts for Next 16 (the `middleware` convention is
 // deprecated in favour of `proxy`, which runs on the nodejs runtime).
@@ -42,6 +43,19 @@ function isPublicPath(pathname: string): boolean {
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // Runs before the auth check, so it protects the auth-off default too. Read
+  // the raw Host header: browsers set it and page script can't, whereas
+  // nextUrl may reflect X-Forwarded-Host, which script CAN set. The fallback
+  // only applies to callers with no Host at all (unit tests) — every browser
+  // request carries one.
+  const host = request.headers.get("host") ?? request.nextUrl.host;
+  if (!isAllowedHost(host, process.env.COMEXE_ALLOWED_HOSTS ?? "")) {
+    return new NextResponse(
+      `Unrecognised hostname "${host}". To reach the dashboard by this name, add it to COMEXE_ALLOWED_HOSTS.`,
+      { status: 403, headers: { "Content-Type": "text/plain; charset=utf-8" } },
+    );
+  }
 
   // Check if auth is enabled via env vars
   const password = (process.env.DASHBOARD_PASSWORD ?? "").trim();
