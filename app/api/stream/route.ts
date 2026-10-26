@@ -1,4 +1,8 @@
 import { NextRequest } from "next/server";
+import {
+  collectorEvents, streamClientConnected, streamClientDisconnected,
+} from "@/app/lib/collector";
+import type { AlertFire } from "@/app/lib/alert-events";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -65,7 +69,16 @@ export async function GET(req: NextRequest) {
         alive = false;
         for (const t of timers) clearInterval(t);
         req.signal.removeEventListener("abort", cleanup);
+        collectorEvents.off("alert", onAlert);
+        collectorEvents.off("shutdown", cleanup);
+        streamClientDisconnected();
         try { controller.close(); } catch { /* already closed/cancelled */ }
+      }
+
+      // Alerts are evaluated by the background collector, not by this stream;
+      // it just relays new fires so the tab can raise a browser notification.
+      function onAlert(fires: AlertFire[]) {
+        send("alert", { fires });
       }
 
       function send(event: string, data: unknown) {
@@ -102,6 +115,14 @@ export async function GET(req: NextRequest) {
           send(key, data);
         } catch { /* upstream down — skip this tick */ }
       }
+
+      // Registered before the first send so cleanup() always has something to
+      // undo: the counter moves the collector to its active cadence, and
+      // "shutdown" closes this stream on SIGTERM instead of holding Next's
+      // in-flight drain open until Docker's SIGKILL.
+      streamClientConnected();
+      collectorEvents.on("alert", onAlert);
+      collectorEvents.on("shutdown", cleanup);
 
       send("connected", { ts: Date.now() });
 

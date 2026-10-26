@@ -25,7 +25,7 @@ chart library. Every upstream service is reached through a server-side route so
 credentials never enter the browser bundle.
 
 **Scale:** ~15k lines of TS/TSX under `app/` — 33 API routes, 26 components,
-21 lib modules, 7 pages.
+26 lib modules, 7 pages.
 
 **Deployment posture:** one LAN, one user, never exposed to the internet. That
 decision is why auth is optional, why RBAC/multi-user was dropped, and why the
@@ -49,7 +49,7 @@ $env:PATH = "C:\Program Files\nodejs;" + $env:PATH
 npm run dev        # localhost:3000
 npm run build      # local sanity check; CI does the real build
 npm run lint
-npm test           # vitest, 229 unit tests
+npm test           # vitest, 257 unit tests
 npm run test:e2e   # playwright
 npm run storybook  # primitives sandbox on :6006
 ```
@@ -133,18 +133,49 @@ prevent that, and every one of them matters:
    through (half-open); success closes, failure re-opens longer. Trips on 5xx
    and network errors but **deliberately not on 4xx** — a bad API key means the
    upstream is healthy and answering. Now covers every upstream call including
-   `services/route.ts` — for a long time it didn't, which meant the breaker
+   `lib/services.ts` — for a long time it didn't, which meant the breaker
    didn't protect the *arr stack whose crashes motivated it.
-3. **Per-endpoint memoization** in `services/route.ts` — heavy library calls
+3. **Per-endpoint memoization** in `lib/services.ts` — heavy library calls
    (`radarr/movies`, `sonarr/series`) cached 5min, enrichment 3–5min. Only
    genuinely real-time data (queue items, active streams, qBit speeds) is
    fetched fresh each cycle. This is the real load-killer: ~150 calls/hour per
    upstream instead of 1800+.
-4. **Staged batching** — `services/route.ts` splits its 10 upstream fetches into
+4. **Staged batching** — `lib/services.ts` splits its 10 upstream fetches into
    2 batches of 5 with a 250ms gap, avoiding a thundering herd.
 
 Plus a per-service last-known-good cache (60s) that keeps cards populated across
 brief failures, flagged `stale: true`.
+
+### Background collector — alerts and history with no tab open
+
+`instrumentation.ts` starts `lib/collector.ts` once per server process. It
+exists because alerts used to be evaluated only when a browser tab POSTed its
+data to `/api/alerts`, and `history.jsonl` was only appended when something
+requested `/api/metrics`. With the tab closed or hidden (polling pauses then),
+webhooks never fired and `/forecast` filled with gaps.
+
+- **Idle** (no `/api/stream` clients): polls `getMetrics()` every 30s and
+  `getServicesFresh()` every 60s, then runs `evaluateAndDispatch()`.
+- **Active** (≥1 SSE client): makes **no** upstream calls. The SSE self-fetches
+  already poll, so the collector just evaluates alerts against
+  `peekMetrics()`/`peekServices()` every 10s.
+- Fires go out on `collectorEvents` → `/api/stream` relays them as `event:
+  alert` → `page.tsx` counts them and raises browser notifications. Webhooks
+  are the always-on channel; browser notifications only reach a connected tab.
+- On SIGTERM/SIGINT it emits `shutdown`, which closes open SSE streams so they
+  don't hold Next's drain open, and waits for pending `alerts.json` writes.
+- `COMEXE_COLLECTOR=0` disables it (the e2e suite does). Status is reported
+  under `collector` in `/api/diagnostics`.
+
+> **Shared state must go through `lib/singleton.ts`.** Next compiles
+> `instrumentation.ts` separately from the route handlers, so a module-level
+> `let cache` can exist twice in one process. Anything the collector and the
+> routes both touch — the metrics/services caches, the circuit breaker's origin
+> map, the collector's client counter and emitter — lives on `globalThis` via
+> `globalSingleton(key, factory)`. A new module-level cache that the collector
+> reads needs the same treatment, or it silently doubles upstream load. Unit
+> tests must call `resetGlobalSingletons()` (`tests/unit/helpers/`), since
+> `vi.resetModules()` doesn't clear `globalThis`.
 
 ### Shared lib modules — use these, don't re-roll them
 
@@ -196,37 +227,39 @@ All server-side proxies. All credentials resolved via `loadConfig()`.
 
 | Route | Purpose |
 |-------|---------|
-| `metrics/` | ~30 PromQL queries via one `Promise.all`. Also appends to `history.jsonl`. |
-| `services/` | 10 service health cards via `Promise.allSettled`. |
+| `metrics/` | Thin wrapper over `lib/metrics.ts`: ~30 PromQL queries, 9s cache, appends to `history.jsonl`. |
+| `services/` | Thin wrapper over `lib/services.ts`: 10 service health cards, SWR + memoization. |
 | `mikrotik/` | RouterOS stats (Basic auth). 10s cache. |
 | `activity/` | Sonarr + Radarr history + Tautulli watches, merged. 60s cache. |
 | `speedtest/` | SpeedTracker history. **Never triggers tests.** |
 | `weather/` | open-meteo, no auth, + 3-day forecast. |
 
-> **`metrics/route.ts` positional destructuring:** the ~30 queries are
-> destructured positionally out of one `Promise.all`. **Query-array order and
-> destructuring order must stay in sync.** Append new queries at the *end*.
-> Getting this wrong produces silently-wrong data, not a crash.
+> **Metrics queries are a named object** resolved with `resolveNamed()` from
+> `lib/prometheus.ts`. They used to be ~30 results destructured positionally out
+> of one `Promise.all`, where inserting a query mid-list silently shifted every
+> later value into the wrong field. Keep them named.
 
 **Config & setup:** `config/` (runtime client config; POST writes
 `data/config.json`), `test-connection/` (wizard's live auth check),
 `bookmarks/`, `backup/` (export/import all of `data/`), `version/`,
 `health/` (local-only liveness for the Docker HEALTHCHECK),
-`diagnostics/` (per-origin circuit state + Prometheus scrape-target health).
+`diagnostics/` (collector status, per-origin circuit state, Prometheus
+scrape-target health).
 
 **Auth:** `auth/login/` (rate-limited), `auth/logout/`, `auth/status/`.
 
 **Observability:** `history/` (ranged + downsampled), `insights/` (z-score
 anomalies, linear-regression forecasts, SLA/MTTR), `smart/` (SMART disk health
-from `smartmon_*`), `alerts/` (GET config+recent / POST evaluate+dispatch /
-PATCH config), `stream/` (SSE).
+from `smartmon_*`), `alerts/` (GET config+recent / PATCH config — deliberately
+no POST; evaluation is the collector's job), `stream/` (SSE, also relays
+collector alert fires).
 
 **Infrastructure:** `docker/containers|logs|restart/`, `mikrotik/devices|wol/`,
 `topology/`, `servers/` (multi-server fleet CRUD), `dependencies/` (service
 dependency graph CRUD), `custom-cards/` + `custom-cards/query/`,
 `grafana/render|test/`.
 
-**`services/route.ts` contract** — `ServiceResult` (see `lib/types.ts`):
+**`lib/services.ts` contract** — `ServiceResult` (see `lib/types.ts`):
 - `configured: false` — required env var(s) missing. Returns immediately without
   hitting the upstream. Use the `unconfigured(name, ["VAR"])` helper. The
   frontend hides these from the grid and lists them in Settings → Connections.
@@ -344,10 +377,10 @@ verification in the proxy.
 | `config.json` | POST `/api/config` (the setup wizard) — **contains plaintext credentials** |
 | `bookmarks.json` | POST `/api/bookmarks` |
 | `custom-cards.json` | POST `/api/custom-cards` |
-| `alerts.json` | `/api/alerts` |
+| `alerts.json` | `lib/alerts-dispatch.ts` (collector fires, `/api/alerts` PATCH) |
 | `servers.json` | `/api/servers` |
 | `dependencies.json` | `/api/dependencies` |
-| `history.jsonl` | `lib/history.ts`, appended from the metrics route |
+| `history.jsonl` | `lib/history.ts`, appended by `lib/metrics.ts` on every real fetch |
 
 `data/` is **gitignored and dockerignored** — never commit it, never bake it
 into an image. The directory is created on demand by the Dockerfile
@@ -410,7 +443,8 @@ iframe cookie problems entirely).
 
 **Auth / paths / misc:** `DASHBOARD_PASSWORD`, `AUTH_PROXY_HEADER`,
 `BOOKMARKS_PATH`, `CONFIG_PATH`, `DOCKER_SOCK`, `COMEXE_DOCKER_ENABLED`,
-`COMEXE_DOCKER_ALLOW`, `HISTORY_RETENTION_DAYS`, `HISTORY_MAX_SIZE_MB`,
+`COMEXE_DOCKER_ALLOW`, `COMEXE_COLLECTOR` (`0` disables the background
+collector), `HISTORY_RETENTION_DAYS`, `HISTORY_MAX_SIZE_MB`,
 `COMEXE_GIT_SHA` (set by CI as a build-arg).
 
 ---
@@ -475,7 +509,7 @@ iframe cookie problems entirely).
 
 ## Testing
 
-- **Unit** — vitest, `tests/unit/`. 229 tests over 16 files covering `app/lib/*`
+- **Unit** — vitest, `tests/unit/`. 257 tests over 19 files covering `app/lib/*`
   plus `tests/unit/routes/` for API route handlers.
 - **E2E** — Playwright, `tests/e2e/smoke.spec.ts`, run by its own CI job.
 - **Storybook** — `stories/Primitives.stories.tsx`.
@@ -490,13 +524,15 @@ needed. Two gotchas:
 
 `tests/unit/routes/grafana.test.ts` is the worked example.
 
-> **Remaining gap:** route coverage is the security-critical paths (the Grafana
-> SSRF guard, the Content-Type guard on all 14 write handlers), not the routes'
-> business logic. Still untested: `metrics`'s ~30-slot positional destructure,
-> `insights`'s z-score/regression maths, the Docker allowlists, and
-> `services/route.ts` — the last of which fires a `setTimeout` on module load
-> that starts a real upstream fetch, so it needs a guard before it can be
-> imported in a test at all.
+> **Remaining gap:** route coverage is mostly the security-critical paths (the
+> Grafana SSRF guard, the Content-Type guard on all 13 write handlers), plus
+> `lib/metrics.ts` (field mapping, ZFS pool maths), `lib/services.ts`
+> (unconfigured short-circuit, stale fallback) and the collector. Still
+> untested: `insights`'s z-score/regression maths and the Docker allowlists.
+>
+> Shared state lives on `globalThis` (see "Background collector"), which
+> `vi.resetModules()` does not clear — call `resetGlobalSingletons()` from
+> `tests/unit/helpers/singletons.ts` in `beforeEach`.
 
 ---
 

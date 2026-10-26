@@ -18,6 +18,18 @@ export async function promScalar(base: string, query: string, timeoutMs?: number
   return v != null ? parseFloat(v) : null;
 }
 
+// Promise.all over a named object instead of an array. The metrics route used
+// to destructure ~30 query results positionally out of one Promise.all, where
+// inserting a query anywhere but the end silently shifted every later value
+// into the wrong field. With names, order carries no meaning.
+export async function resolveNamed<T extends Record<string, Promise<unknown>>>(
+  promises: T,
+): Promise<{ [K in keyof T]: Awaited<T[K]> }> {
+  const keys = Object.keys(promises) as (keyof T)[];
+  const values = await Promise.all(keys.map((k) => promises[k]));
+  return Object.fromEntries(keys.map((k, i) => [k, values[i]])) as { [K in keyof T]: Awaited<T[K]> };
+}
+
 export interface PromSample {
   metric: Record<string, string>;
   value: number;

@@ -50,7 +50,7 @@ export function useEventStream({ enabled, intervals, onMessage }: UseEventStream
       const es = new EventSource(url);
       esRef.current = es;
 
-      const EVENTS = ["connected", "metrics", "services", "mikrotik", "activity", "speedtest", "weather", "heartbeat"];
+      const EVENTS = ["connected", "metrics", "services", "mikrotik", "activity", "speedtest", "weather", "alert", "heartbeat"];
 
       for (const evt of EVENTS) {
         es.addEventListener(evt, (e: MessageEvent) => {

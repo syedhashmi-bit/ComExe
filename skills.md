@@ -20,7 +20,8 @@ pattern that had been copy-pasted across many routes:
 | `http.ts` | All outbound HTTP — `fetchWithTimeout` / `fetchJson`. Applies the socket cap and circuit breaker. |
 | `cache.ts` | `createTTLCache` / `createKeyedTTLCache` instead of a local `{data, ts}`. |
 | `json-store.ts` | Anything under `data/` — atomic temp-file + rename. |
-| `prometheus.ts` | `promScalar` / `promVector` instead of re-parsing `data.result[0].value[1]`. |
+| `prometheus.ts` | `promScalar` / `promVector` instead of re-parsing `data.result[0].value[1]`; `resolveNamed` for many queries at once — never a positional `Promise.all` destructure. |
+| `singleton.ts` | `globalSingleton(key, factory)` for any module-level state the background collector also touches (caches, maps, emitters). Plain `let` state can exist twice in one process. |
 | `validate.ts` | `isNonEmptyString` / `isHttpUrl` on every write route. |
 | `formatters.ts` | `fmtBytes`, `fmtEtaShort`, `fmtSmoothAgo`, `WEATHER_CODES`, … all pure. |
 
@@ -32,8 +33,8 @@ Data fetching is **server-side** in Next.js API routes. The browser only talks t
 
 | Route | Purpose |
 |-------|---------|
-| `app/api/metrics/route.ts` | Prometheus PromQL (~30 queries via `Promise.all`) |
-| `app/api/services/route.ts` | Homelab service health (Radarr, Sonarr, Bazarr, …) |
+| `app/api/metrics/route.ts` | Prometheus PromQL — thin wrapper over `lib/metrics.ts` (~30 named queries via `resolveNamed`) |
+| `app/api/services/route.ts` | Homelab service health — thin wrapper over `lib/services.ts` |
 | `app/api/speedtest/route.ts` | SpeedTracker history (read-only, never trigger) |
 | `app/api/weather/route.ts` | Open-Meteo |
 | `app/api/mikrotik/route.ts` | MikroTik proxy (Basic auth) |

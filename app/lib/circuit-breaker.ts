@@ -17,6 +17,8 @@
 // The recorded stats double as the data source for /api/diagnostics — the
 // dashboard previously had no way to explain *why* a card was empty.
 
+import { globalSingleton } from "@/app/lib/singleton";
+
 export type CircuitState = "closed" | "open" | "half-open";
 
 export interface OriginHealth {
@@ -40,7 +42,10 @@ interface Entry extends OriginHealth {
   openCount: number; // consecutive opens, drives exponential backoff
 }
 
-const origins = new Map<string, Entry>();
+// Process-wide, not per module instance: the background collector (started
+// from instrumentation.ts) and the route handlers must see one breaker per
+// origin, or each would keep hammering an upstream the other had given up on.
+const origins = globalSingleton("circuit-breaker", () => new Map<string, Entry>());
 
 export class CircuitOpenError extends Error {
   constructor(origin: string, retryAtTs: number) {

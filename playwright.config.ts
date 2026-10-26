@@ -16,5 +16,8 @@ export default defineConfig({
     port: 3000,
     reuseExistingServer: true,
     timeout: 60_000,
+    // No background collector in e2e: it would poll the default homelab IP
+    // from CI runners, where every call is a slow timeout.
+    env: { COMEXE_COLLECTOR: "0" },
   },
 });

@@ -11,8 +11,14 @@ Past decisions and bug fixes. **`CLAUDE.md` is authoritative** — when this fil
 
 ### Core data routes (33 total)
 
-- `app/api/metrics/route.ts` — Prometheus, `Promise.all` of ~30 PromQL queries. **Positional destructure must stay in sync with the queries array** — new queries get appended at end.
-- `app/api/services/route.ts` — 10 services via `Promise.allSettled`. `checkReachable()` fallback so failed-auth services still show "up" with `"—"`.
+- `app/api/metrics/route.ts` → `app/lib/metrics.ts` — Prometheus, ~30 PromQL queries as a **named object** via `resolveNamed()`. (Was a positional `Promise.all` destructure where a mid-list insert silently shifted every later field — removed Sep 2026.)
+- `app/api/services/route.ts` → `app/lib/services.ts` — 10 services via `Promise.allSettled`. `checkReachable()` fallback so failed-auth services still show "up" with `"—"`.
+
+### Background collector (Sep 2026)
+
+**Problem:** alerts were only evaluated when `page.tsx` POSTed `{metrics, services}` to `/api/alerts`, and `history.jsonl` was only appended when something hit `/api/metrics`. The previous round had just made polling pause on hidden tabs, so in practice webhooks never fired unless someone was actively looking at the dashboard — the one time you don't need an alert. `/forecast`'s SLA only covered watched time.
+**Fix:** `instrumentation.ts` → `lib/collector.ts`. Polls 30s/60s when no SSE client is connected; with clients connected it makes no upstream calls and evaluates on the last SSE-polled data. `POST /api/alerts` removed (it also let any LAN client forge metrics to trigger the webhook).
+**Gotcha that shaped it:** Next compiles `instrumentation.ts` separately from route handlers, so module-level state can exist twice in one process. Shared caches, the breaker map and the collector's emitter live on `globalThis` via `lib/singleton.ts`. Verified at runtime: `/api/diagnostics` (a route) reports ticks from the instrumentation-started loop.
 - `app/api/speedtest/route.ts` — SpeedTracker history. **Read-only — never trigger tests.**
 - `app/api/weather/route.ts` — Open-Meteo (Launceston, TAS).
 - `app/api/mikrotik/route.ts` — server-side proxy with Basic auth. The `MikrotikTab` client component now fetches `/api/mikrotik`, NOT the router directly.

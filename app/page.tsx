@@ -87,7 +87,6 @@ export default function Dashboard() {
   const [showBookmarks,  setShowBookmarks]  = useState(true);
   const [alertsEnabled,  setAlertsEnabled]  = useState(false);
   const [alertCount,     setAlertCount]     = useState(0);   // session-level fire counter for the header pill
-  const [alertsBrowserNotif, setAlertsBrowserNotif] = useState(true);
   const [showShortcuts,      setShowShortcuts]      = useState(false);
   const [showNotifications,  setShowNotifications]  = useState(false);
   const [showCommandPalette, setShowCommandPalette] = useState(false);
@@ -308,6 +307,40 @@ export default function Dashboard() {
     } catch { /* weather is non-critical */ }
   }, []);
 
+  // ── Alerts ────────────────────────────────────────────────────────────────
+  // The server's background collector evaluates thresholds and sends webhooks
+  // whether or not this tab exists. The tab only counts fires and raises
+  // browser notifications for the ones it hears about — over SSE while
+  // connected, or by polling GET /api/alerts in fallback mode.
+  const alertsBrowserNotifRef = useRef(true);
+  // Fires from before this page loaded aren't news; set on mount.
+  const lastAlertTsRef = useRef(0);
+  useEffect(() => { lastAlertTsRef.current = Date.now(); }, []);
+  const handleAlertFires = useCallback((fires: { key: string; ts: number; level: "warning" | "critical"; msg: string }[]) => {
+    const fresh = fires.filter(f => f.ts > lastAlertTsRef.current);
+    if (fresh.length === 0) return;
+    lastAlertTsRef.current = Math.max(...fresh.map(f => f.ts));
+    setAlertCount(c => c + fresh.length);
+
+    // Only when the tab isn't in focus — a visible tab already shows the pill.
+    if (alertsBrowserNotifRef.current && typeof Notification !== "undefined" && Notification.permission === "granted" && document.visibilityState !== "visible") {
+      for (const f of fresh) {
+        try {
+          new Notification(`ComExe · ${f.level === "critical" ? "critical" : "warning"}`, { body: f.msg, tag: f.key, icon: "/icon.svg" });
+        } catch { /* some browsers reject if not in user gesture; ignore */ }
+      }
+    }
+  }, []);
+
+  const fetchAlerts = useCallback(async () => {
+    try {
+      const res = await fetch("/api/alerts");
+      if (!res.ok) return;
+      const d = await res.json();
+      if (Array.isArray(d.recent)) handleAlertFires(d.recent);
+    } catch { /* alerts shouldn't break the dashboard */ }
+  }, [handleAlertFires]);
+
   // ── SSE live updates ──────────────────────────────────────────────────────
   const handleSSE = useCallback((event: string, data: unknown) => {
     switch (event) {
@@ -354,8 +387,13 @@ export default function Dashboard() {
         if (d.ok !== false && !d.error) setWeather({ temp: d.temp ?? null, condition: d.condition ?? null, forecast: d.forecast ?? [] });
         break;
       }
+      case "alert": {
+        const d = data as { fires?: { key: string; ts: number; level: "warning" | "critical"; msg: string }[] };
+        if (Array.isArray(d.fires)) handleAlertFires(d.fires);
+        break;
+      }
     }
-  }, []);
+  }, [handleAlertFires]);
 
   // CRITICAL: this object must be memoized. A fresh literal every render
   // would make useEventStream's connect callback churn, tearing down and
@@ -396,13 +434,18 @@ export default function Dashboard() {
   usePollingInterval(fetchServices,  (settings.refreshOverrides?.services || 30)  * 1000,       { enabled: pollActive });
   usePollingInterval(fetchSpeedtest, 300_000,                                                  { enabled: pollActive });
   usePollingInterval(fetchActivity,  (settings.refreshOverrides?.activity || 60)  * 1000,       { enabled: pollActive });
+  usePollingInterval(fetchAlerts,    60_000, { enabled: pollActive && alertsEnabled, skipImmediate: true });
 
-  // Load alert config on mount so we know whether to dispatch (server is the
-  // source of truth — POST /api/alerts is a cheap no-op if disabled).
+  // Load alert config on mount — decides whether the header pill shows and
+  // whether fires raise browser notifications.
   useEffect(() => {
     fetch("/api/alerts")
       .then(r => r.json())
-      .then(d => { setAlertsEnabled(!!d.config?.enabled); setAlertsBrowserNotif(d.config?.browserNotifications !== false); })
+      .then(d => {
+        const notif = d.config?.browserNotifications !== false;
+        alertsBrowserNotifRef.current = notif;
+        setAlertsEnabled(!!d.config?.enabled);
+      })
       .catch(() => {});
   }, []);
 
@@ -426,39 +469,6 @@ export default function Dashboard() {
     const id = setInterval(check, 30 * 60 * 1000);
     return () => { cancelled = true; clearInterval(id); };
   }, []);
-
-  // After every metric+services update, send to /api/alerts. Server evaluates
-  // thresholds, throttles, dispatches webhook. Returns the new fires for us
-  // to push as browser notifications. Server-side throttle handles dedupe.
-  useEffect(() => {
-    if (demoMode || !alertsEnabled) return;
-    if (!metrics && !services) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch("/api/alerts", {
-          method:  "POST",
-          headers: { "Content-Type": "application/json" },
-          body:    JSON.stringify({ metrics, services }),
-        });
-        if (cancelled) return;
-        const data = await res.json();
-        const fires: { key: string; level: "warning" | "critical"; msg: string }[] = data.fires ?? [];
-        if (fires.length === 0) return;
-        setAlertCount(c => c + fires.length);
-
-        // Browser notifications — only if permission granted and not in tab focus
-        if (alertsBrowserNotif && typeof Notification !== "undefined" && Notification.permission === "granted" && document.visibilityState !== "visible") {
-          for (const f of fires) {
-            try {
-              new Notification(`ComExe · ${f.level === "critical" ? "critical" : "warning"}`, { body: f.msg, tag: f.key, icon: "/icon.svg" });
-            } catch { /* some browsers reject if not in user gesture; ignore */ }
-          }
-        }
-      } catch { /* ignore — alerts shouldn't break the dashboard */ }
-    })();
-    return () => { cancelled = true; };
-  }, [metrics, services, demoMode, alertsEnabled, alertsBrowserNotif]);
 
   // Client config — fetched once on mount
   useEffect(() => {

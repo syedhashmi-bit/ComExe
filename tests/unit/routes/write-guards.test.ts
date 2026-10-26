@@ -22,7 +22,6 @@ const WRITE_ROUTES: [name: string, importPath: string, method: "POST" | "PATCH"]
   ["POST /api/servers",          "@/app/api/servers/route",          "POST"],
   ["PATCH /api/servers",         "@/app/api/servers/route",          "PATCH"],
   ["POST /api/dependencies",     "@/app/api/dependencies/route",     "POST"],
-  ["POST /api/alerts",           "@/app/api/alerts/route",           "POST"],
   ["PATCH /api/alerts",          "@/app/api/alerts/route",           "PATCH"],
   ["POST /api/history",          "@/app/api/history/route",          "POST"],
   ["POST /api/docker/restart",   "@/app/api/docker/restart/route",   "POST"],

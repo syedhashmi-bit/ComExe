@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { snapshot } from "@/app/lib/circuit-breaker";
 import { promVector } from "@/app/lib/prometheus";
 import { loadConfig } from "@/app/lib/server-config";
+import { collectorStatus } from "@/app/lib/collector";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +39,9 @@ export async function GET() {
   const upstreams = snapshot();
 
   return NextResponse.json({
+    // The background collector that keeps alerts and history running with no
+    // tab open. firstTickAt stays null if it never started or is disabled.
+    collector: collectorStatus(),
     upstreams,
     prometheus: {
       url:       cfg.prometheusUrl,
