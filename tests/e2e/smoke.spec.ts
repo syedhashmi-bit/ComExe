@@ -81,11 +81,23 @@ test.describe("Theme switching", () => {
     // runs before any page script, so the value is already there for the
     // pre-hydration theme script in layout.tsx to read.
     await page.addInitScript(() => {
-      localStorage.setItem("comexe:settings", JSON.stringify({ theme: "forge" }));
+      localStorage.setItem("comexe:settings", JSON.stringify({ theme: "paper" }));
     });
     await page.goto("/?demo=1");
     // layout.tsx applies the class in a pre-hydration inline script, so it is
     // present before React mounts.
-    await expect(page.locator("html")).toHaveClass(/theme-forge/, { timeout: 10_000 });
+    await expect(page.locator("html")).toHaveClass(/theme-paper/, { timeout: 10_000 });
+  });
+
+  test("falls back to Midnight for a retired theme", async ({ page }) => {
+    // Forge, Forest and Plum were removed in the calm redesign. A browser that
+    // saved one must get the default theme, not an unstyled `theme-forge` class.
+    await page.addInitScript(() => {
+      localStorage.setItem("comexe:settings", JSON.stringify({ theme: "forge" }));
+    });
+    await page.goto("/?demo=1");
+    // Wait for the dashboard to hydrate, so page.tsx's theme effect has run too.
+    await expect(page.getByRole("region", { name: "Status" })).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator("html")).not.toHaveClass(/theme-/);
   });
 });
