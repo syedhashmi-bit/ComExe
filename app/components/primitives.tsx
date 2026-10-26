@@ -315,12 +315,12 @@ const CARD_TITLES: Record<string, string> = {
   network: "Network", speedtest: "Speedtest", system: "System", grafana: "Grafana",
 };
 
-// Calm card: flat surface, 1px border, no per-card colour. Colour appears only
-// for status — a warning/critical card gets a tinted border and a labelled dot.
-// `accent` and `animDelay` are still accepted so callers needn't change, but no
-// longer paint anything.
+// Calm card: flat surface, 1px border. The card's soft data accent tints only
+// its icon (its charts use it too); a warning/critical card gets a tinted
+// border and a labelled dot. `animDelay` is still accepted so callers needn't
+// change, but no longer does anything.
 export function Card({
-  label, subtitle, children, alertLevel = null,
+  label, subtitle, children, accent, alertLevel = null,
   icon, expanded = false, onToggle, externalLink, info,
 }: {
   label: string; subtitle?: string; children: React.ReactNode; accent?: string;
@@ -366,7 +366,7 @@ export function Card({
       }}
     >
       <div className="flex items-center gap-2 overflow-hidden px-4 pt-4 pb-0">
-        {icon && <span aria-hidden="true" style={{ color: "var(--text-label)", display: "inline-flex" }}>{icon}</span>}
+        {icon && <span aria-hidden="true" style={{ color: accent ?? "var(--text-label)", display: "inline-flex" }}>{icon}</span>}
         <span className="shrink-0" style={{ fontSize: 13, color: "var(--text-muted)" }}>{title}</span>
         {subtitle && <span title={subtitle} className="truncate" style={{ fontSize: 12, color: "var(--text-faint)" }}>{subtitle}</span>}
         {infoText && (

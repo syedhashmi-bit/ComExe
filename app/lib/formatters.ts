@@ -103,19 +103,20 @@ export function withAlpha(color: string, pct: number): string {
   return `color-mix(in srgb, ${color} ${pct}%, transparent)`;
 }
 
-// Below a threshold these return the neutral data colour, not green: colour
-// is reserved for "something needs attention", so a normal value stays quiet.
+// Below a threshold these return `base` — the metric's soft data accent, or
+// neutral grey by default — never green: status colours are reserved for
+// "something needs attention", so a normal value stays quiet.
 
-export function barColor(p: number): string {
+export function barColor(p: number, base = "var(--data)"): string {
   if (p >= 90) return "var(--critical)";
   if (p >= 75) return "var(--warn)";
-  return "var(--data)";
+  return base;
 }
 
-export function gpuUtilColor(p: number): string {
+export function gpuUtilColor(p: number, base = "var(--data)"): string {
   if (p >= 90) return "var(--critical)";
   if (p >= 70) return "var(--warn)";
-  return "var(--data)";
+  return base;
 }
 
 // Used for temperature text as well as lines, so the normal case is the

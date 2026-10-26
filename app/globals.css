@@ -7,10 +7,13 @@
    Forge, Forest and Plum were retired in the calm redesign; a saved value
    naming one falls back to Midnight (normalizeTheme in lib/constants.ts).
 
-   Colour carries status only: --ok / --warn / --critical. Surfaces are opaque
-   neutrals and the one brand accent is for the logo, links and focus. The
-   --accent-* card variables still exist so old references resolve, but they
-   are neutral on purpose: a card's colour is no longer its identity.
+   Two kinds of colour, kept apart:
+   - status: --ok / --warn / --critical, only when something crossed a
+     threshold or is broken;
+   - data: one soft accent per metric (--accent-*) for its icon and charts.
+     Muted, similar lightness, and deliberately not green/amber/red, so a
+     chart's colour can never be mistaken for a status.
+   Surfaces are opaque neutrals; --brand is for the logo, links and focus.
    Every text shade down to --text-ghost passes 4.5:1 on --card. */
 
 :root {
@@ -59,15 +62,16 @@
   --data:           #6b7380;
   --data-strong:    #a3a9b3;
 
-  /* per-card accents: neutral on purpose (see top) */
-  --accent-cpu:      #8a919c;
-  --accent-memory:   #8a919c;
-  --accent-fs:       #8a919c;
-  --accent-network:  #8a919c;
-  --accent-gpu:      #8a919c;
-  --accent-speedtest:#8a919c;
-  --accent-system:   #8a919c;
-  --accent-grafana:  #8a919c;
+  /* per-metric data accents: soft, easy on the eye (see top) */
+  --accent-cpu:        #6cbfcc;
+  --accent-memory:     #86a8e0;
+  --accent-fs:         #a99ae0;
+  --accent-network:    #86a8e0;
+  --accent-network-tx: #c79bd6;
+  --accent-gpu:        #c79bd6;
+  --accent-speedtest:  #a99ae0;
+  --accent-system:     #93aab8;
+  --accent-grafana:    #93aab8;
 
   /* mikrotik bar */
   --mt-bg:          #14161a;
@@ -132,14 +136,15 @@
   --critical:       #cf222e;
   --data:           #9aa1ab;
   --data-strong:    #5f6672;
-  --accent-cpu:      #6b7280;
-  --accent-memory:   #6b7280;
-  --accent-fs:       #6b7280;
-  --accent-network:  #6b7280;
-  --accent-gpu:      #6b7280;
-  --accent-speedtest:#6b7280;
-  --accent-system:   #6b7280;
-  --accent-grafana:  #6b7280;
+  --accent-cpu:        #2f8a98;
+  --accent-memory:     #4f72b8;
+  --accent-fs:         #6e5fb8;
+  --accent-network:    #4f72b8;
+  --accent-network-tx: #9a5fae;
+  --accent-gpu:        #9a5fae;
+  --accent-speedtest:  #6e5fb8;
+  --accent-system:     #5b7486;
+  --accent-grafana:    #5b7486;
   --mt-bg:          #ffffff;
   --mt-bg-hover:    #fbfbfc;
   --settings-bg:         #ffffff;

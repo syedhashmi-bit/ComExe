@@ -352,12 +352,17 @@ in `lib/constants.ts` and implemented in `globals.css` (`:root` and
 redesign; `normalizeTheme()` maps any saved or configured value naming one of
 them to Midnight.
 
-**Colour means status, nothing else.** `--ok`/`--warn`/`--critical` appear only
-when something crossed a threshold or is broken. Bars, sparklines and charts
-use the neutral `--data` / `--data-strong`; `barColor`, `gpuUtilColor` and
-`tempColor` return those below their thresholds. `--brand` is for the logo,
-links and focus only. The `--accent-*` card variables still exist but are
-neutral on purpose. Every text shade down to `--text-ghost` passes 4.5:1 on
+**Two kinds of colour, kept apart.** *Status* — `--ok`/`--warn`/`--critical` —
+appears only when something crossed a threshold or is broken. *Data* — each
+metric has one soft, easy-on-the-eye accent for its icon and charts:
+`--accent-cpu` (teal), `--accent-memory` and `--accent-network` (sky),
+`--accent-network-tx` and `--accent-gpu` (orchid), `--accent-fs` and
+`--accent-speedtest` (lavender), `--accent-system` (slate). Accents are muted,
+of similar lightness, and never green/amber/red, so they can't read as status.
+`barColor(p, base)` / `gpuUtilColor(p, base)` return the accent as `base` and
+switch to warn/critical at threshold. `--data`/`--data-strong` are the neutral
+fallback (queue bars, cache segments). `--brand` is for the logo, links and
+focus only. No stripes, tints or glows. Every text shade down to `--text-ghost` passes 4.5:1 on
 `--card`. **Don't reintroduce literal hex colors** where a variable exists, and
 use `withAlpha()` (`lib/formatters.ts`, color-mix) for translucency — a hex
 suffix on a `var()` is invalid CSS and silently drops the whole declaration.
@@ -515,6 +520,8 @@ collector), `HISTORY_RETENTION_DAYS`, `HISTORY_MAX_SIZE_MB`,
 - Type: nothing under 12px. Roughly 12 (meta) / 13–14 (body) / 16–18
   (headings) / 32+ (headline numbers).
 - Icons: line SVGs, never emoji. Service icons stay full colour (`SVC_ICONS`).
+- Side panels (Settings): `min(420px, 100vw)` wide, 24px padding, sentence-case
+  13px section headings, controls at least ~34px tall, `role="dialog"`.
 - Fonts: Inter (UI), JetBrains Mono (numbers — `font-mono` or `var(--font-mono)`).
 - Inline `style` for colors/sizes; Tailwind for layout/spacing/flex. No CSS
   modules, no styled-components.

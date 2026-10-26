@@ -537,7 +537,7 @@ export default function Dashboard() {
   const gpuUtil     = metrics?.gpu?.utilization ?? null;
   const gpuMemPct   = pct(metrics?.gpu?.memUsed ?? null, metrics?.gpu?.memTotal ?? null);
   const gpuPwrPct   = pct(metrics?.gpu?.powerDraw ?? null, metrics?.gpu?.powerLimit ?? null);
-  const gpuColor    = gpuUtil != null ? gpuUtilColor(gpuUtil) : "var(--data)";
+  const gpuColor    = gpuUtil != null ? gpuUtilColor(gpuUtil, "var(--accent-gpu)") : "var(--accent-gpu)";
 
   const cpuAlert     = cpuAlertLevel(metrics?.cpu ?? null);
   const memAlert     = memAlertLevel(metrics?.memory.total ?? null, metrics?.memory.available ?? null, metrics?.memory.sReclaimable ?? null);
@@ -865,8 +865,8 @@ export default function Dashboard() {
                     </div>
                   )}
                 </div>
-                <Sparkline data={cpuHistory} color={barColor(cpuPct)} height={48} />
-                <GaugeBar percent={cpuPct} color={barColor(cpuPct)} />
+                <Sparkline data={cpuHistory} color={barColor(cpuPct, "var(--accent-cpu)")} height={48} />
+                <GaugeBar percent={cpuPct} color={barColor(cpuPct, "var(--accent-cpu)")} />
                 {!loading && (metrics?.sysInfo?.load1 != null) && (
                   <span className="text-xs tabular-nums font-mono" style={{ color: "var(--text-faint)" }}>
                     Load: {metrics.sysInfo.load1?.toFixed(2)} · {metrics.sysInfo.load5?.toFixed(2)} · {metrics.sysInfo.load15?.toFixed(2)}
@@ -899,7 +899,7 @@ export default function Dashboard() {
                       freeBytes={metrics?.memory.available ?? 0}
                       totalBytes={memTotal ?? 0}
                       du={du}
-                      usedColor={memAlert === "critical" ? "var(--critical)" : memAlert === "warning" ? "var(--warn)" : undefined}
+                      usedColor={memAlert === "critical" ? "var(--critical)" : memAlert === "warning" ? "var(--warn)" : "var(--accent-memory)"}
                     />
                     {realMemPct > 0 && (
                       <div className="flex items-center justify-center gap-2">
@@ -937,13 +937,13 @@ export default function Dashboard() {
                   const PREFIX = "/mnt/Pool/Media/";
                   const folderName = (mp: string) => mp.startsWith(PREFIX) ? mp.slice(PREFIX.length) : (mp.split("/").pop() ?? mp);
                   // Documented disk thresholds: warn >85%, critical >95%. Neutral below.
-                  const fsBarColor = (p: number) => p > 95 ? "var(--critical)" : p > 85 ? "var(--warn)" : "var(--data)";
+                  const fsBarColor = (p: number) => p > 95 ? "var(--critical)" : p > 85 ? "var(--warn)" : "var(--accent-fs)";
                   const sorted = [...metrics.disks].sort((a, b) => b.usedPct - a.usedPct);
                   const poolUsed  = metrics.pool?.used  ?? null;
                   const poolTotal = metrics.pool?.total ?? null;
                   const poolPct   = poolTotal != null && poolUsed != null && poolTotal > 0
                     ? (poolUsed / poolTotal) * 100 : null;
-                  const poolColor = poolPct == null ? "var(--data)" : fsBarColor(poolPct);
+                  const poolColor = poolPct == null ? "var(--accent-fs)" : fsBarColor(poolPct);
                   return (
                     <div className="flex flex-col gap-3">
                       {poolTotal != null && poolUsed != null && (
@@ -1030,7 +1030,7 @@ export default function Dashboard() {
                       {loading ? "—" : `${fmtBytes(metrics?.network.rxBytesPerSec ?? null, 1, du)}/s`}
                     </span>
                   </div>
-                  <Sparkline data={rxHistory} color="var(--data-strong)" autoMax height={50} />
+                  <Sparkline data={rxHistory} color="var(--accent-network)" autoMax height={50} />
                   <span className="text-xs tabular-nums font-medium" style={{ color: "var(--text-faint)" }}>
                     ↓ {fmtBytes(metrics?.network.rxBytesTotal ?? null, 1, du)} total
                   </span>
@@ -1038,13 +1038,13 @@ export default function Dashboard() {
                 <div style={{ height: 1, background: "var(--surface-bright)" }} />
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold" style={{ color: "var(--warn)" }}>↑</span>
+                    <span className="text-xs font-bold" style={{ color: "var(--accent-network-tx)" }}>↑</span>
                     <span className="text-xs uppercase tracking-widest" style={{ color: "var(--text-faint)" }}>tx</span>
                     <span className="text-xs font-medium tabular-nums ml-auto font-mono" style={{ color: "var(--text-secondary)" }}>
                       {loading ? "—" : `${fmtBytes(metrics?.network.txBytesPerSec ?? null, 1, du)}/s`}
                     </span>
                   </div>
-                  <Sparkline data={txHistory} color="var(--data)" autoMax height={50} />
+                  <Sparkline data={txHistory} color="var(--accent-network-tx)" autoMax height={50} />
                   <span className="text-xs tabular-nums font-medium" style={{ color: "var(--text-faint)" }}>
                     ↑ {fmtBytes(metrics?.network.txBytesTotal ?? null, 1, du)} total
                   </span>
@@ -1105,10 +1105,10 @@ export default function Dashboard() {
                       </div>
                     </div>
                     <LabeledBar label="vram" right={`${fmtBytes(metrics?.gpu?.memUsed ?? null, 1, du)} / ${fmtBytes(metrics?.gpu?.memTotal ?? null, 1, du)}`}
-                      percent={gpuMemPct} color="var(--data)" />
+                      percent={gpuMemPct} color="var(--accent-gpu)" />
                     {metrics?.gpu?.powerDraw != null && metrics?.gpu?.powerLimit != null && (
                       <LabeledBar label="power" right={`${metrics.gpu.powerDraw.toFixed(1)} / ${metrics.gpu.powerLimit.toFixed(0)} W`}
-                        percent={gpuPwrPct} color="var(--data)" />
+                        percent={gpuPwrPct} color="var(--accent-gpu)" />
                     )}
                     {(() => {
                       const tertiaryItems: { label: string; value: string }[] = [];
@@ -1141,7 +1141,7 @@ export default function Dashboard() {
                         <div className="flex justify-between items-center">
                           <span className="text-xs uppercase tracking-widest" style={{ color: "var(--text-ghost)" }}>temp history</span>
                         </div>
-                        <Sparkline data={gpuTempHistory} color={metrics?.gpu?.temperature != null ? tempColor(metrics.gpu.temperature) : "var(--data)"} autoMax height={28} />
+                        <Sparkline data={gpuTempHistory} color={metrics?.gpu?.temperature != null && metrics.gpu.temperature >= 70 ? tempColor(metrics.gpu.temperature) : "var(--accent-gpu)"} autoMax height={28} />
                       </div>
                     )}
                     {expandedCard === "gpu" && (() => {
@@ -1229,7 +1229,7 @@ export default function Dashboard() {
                           <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "var(--text-ghost)" }} />
                           {latest.ping != null && (
                             <>
-                              <span className="text-xs tabular-nums font-medium font-mono" style={{ color: "var(--ok)" }}>
+                              <span className="text-xs tabular-nums font-medium font-mono" style={{ color: "var(--text-secondary)" }}>
                                 {latest.ping < 10 ? latest.ping.toFixed(1) : latest.ping.toFixed(0)} ms
                               </span>
                               <span className="text-xs uppercase tracking-widest" style={{ color: "var(--text-ghost)" }}>ping</span>
@@ -1249,7 +1249,7 @@ export default function Dashboard() {
                       {speedtestHistory.length >= 2 && (
                         <div className="flex flex-col gap-1">
                           <span className="text-xs uppercase tracking-widest" style={{ color: "var(--text-ghost)" }}>download history</span>
-                          <Sparkline data={speedtestHistory} color="var(--data)" height={40} />
+                          <Sparkline data={speedtestHistory} color="var(--accent-speedtest)" height={40} />
                         </div>
                       )}
                       <div className="flex items-center justify-between flex-wrap gap-1">

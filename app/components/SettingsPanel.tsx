@@ -20,23 +20,30 @@ export function SettingsPanel({ settings, onUpdate, onClose, services }: {
     <>
       <div className="fixed inset-0 z-40" style={{ background: "rgba(0,0,0,0.5)" }} onClick={onClose} />
       <div
-        className="fixed top-0 right-0 h-full z-50 flex flex-col gap-5 p-4 sm:p-6 overflow-y-auto w-full sm:w-[272px]"
-        style={{ maxWidth: 320, background: "var(--settings-bg)", borderLeft: "1px solid var(--settings-border)", boxShadow: "-12px 0 40px rgba(0,0,0,0.7)" }}
+        role="dialog" aria-modal="true" aria-labelledby="settings-h"
+        className="fixed top-0 right-0 h-full z-50 flex flex-col overflow-y-auto"
+        style={{
+          width: "min(420px, 100vw)", padding: 24, gap: 26,
+          background: "var(--settings-bg)", borderLeft: "1px solid var(--settings-border)", boxShadow: "-12px 0 40px rgba(0,0,0,0.45)",
+        }}
       >
-        <div className="flex items-center justify-between mb-1">
-          <span className="text-xs tracking-widest uppercase" style={{ color: "var(--settings-text)" }}>Settings</span>
-          <button onClick={onClose} style={{ color: "var(--settings-text-dim)", background: "none", border: "none", cursor: "pointer", fontSize: 12 }}>✕</button>
+        <div className="flex items-center justify-between">
+          <h2 id="settings-h" style={{ margin: 0, fontSize: 16, fontWeight: 600, color: "var(--text)" }}>Settings</h2>
+          <button onClick={onClose} aria-label="Close settings" className="flex items-center justify-center"
+            style={{ width: 32, height: 32, borderRadius: 8, color: "var(--text-muted)", background: "none", border: "1px solid var(--settings-input-border)", cursor: "pointer" }}>
+            <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+          </button>
         </div>
 
         {[
           { title: "Refresh", options: [10, 15, 30, 60], key: "refreshInterval" as const, fmt: (v: number) => `${v}s` },
         ].map(({ title, options, key, fmt }) => (
           <div key={key} className="flex flex-col gap-2">
-            <span className="text-xs uppercase tracking-widest" style={{ color: "var(--settings-label)" }}>{title}</span>
-            <div className="flex gap-1.5">
+            <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)" }}>{title}</span>
+            <div className="flex gap-2">
               {options.map(o => (
                 <button key={o} onClick={() => onUpdate({ ...settings, [key]: o })}
-                  className="flex-1 py-1.5 rounded text-xs font-medium transition-all duration-150"
+                  className="flex-1 py-2 rounded-md text-sm font-medium transition-all duration-150"
                   style={{
                     background: settings[key] === o ? "var(--settings-active-bg)" : "var(--settings-input)",
                     border: `1px solid ${settings[key] === o ? "var(--settings-active-border)" : "var(--settings-input-border)"}`,
@@ -53,7 +60,7 @@ export function SettingsPanel({ settings, onUpdate, onClose, services }: {
         <button
           onClick={() => { resetCardOrder(); window.location.reload(); }}
           style={{
-            fontSize: 12, padding: "4px 8px", borderRadius: 4,
+            fontSize: 13, padding: "7px 12px", borderRadius: 6,
             background: "var(--settings-input)", color: "var(--settings-text)",
             border: "1px solid var(--settings-input-border)", cursor: "pointer",
             alignSelf: "flex-start",
@@ -64,11 +71,11 @@ export function SettingsPanel({ settings, onUpdate, onClose, services }: {
         <CustomCardSection />
 
         <div className="flex flex-col gap-2">
-          <span className="text-xs uppercase tracking-widest" style={{ color: "var(--settings-label)" }}>Temperature</span>
-          <div className="flex gap-1.5">
+          <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)" }}>Temperature</span>
+          <div className="flex gap-2">
             {(["C", "F"] as TempUnit[]).map(u => (
               <button key={u} onClick={() => onUpdate({ ...settings, tempUnit: u })}
-                className="flex-1 py-1.5 rounded text-xs font-medium transition-all duration-150"
+                className="flex-1 py-2 rounded-md text-sm font-medium transition-all duration-150"
                 style={{
                   background: settings.tempUnit === u ? "var(--settings-active-bg)" : "var(--settings-input)",
                   border: `1px solid ${settings.tempUnit === u ? "var(--settings-active-border)" : "var(--settings-input-border)"}`,
@@ -80,11 +87,11 @@ export function SettingsPanel({ settings, onUpdate, onClose, services }: {
         </div>
 
         <div className="flex flex-col gap-2">
-          <span className="text-xs uppercase tracking-widest" style={{ color: "var(--settings-label)" }}>Data Units</span>
-          <div className="flex gap-1.5">
+          <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)" }}>Data units</span>
+          <div className="flex gap-2">
             {(["decimal", "binary"] as DataUnit[]).map(u => (
               <button key={u} onClick={() => onUpdate({ ...settings, dataUnit: u })}
-                className="flex-1 py-1.5 rounded text-xs font-medium transition-all duration-150"
+                className="flex-1 py-2 rounded-md text-sm font-medium transition-all duration-150"
                 style={{
                   background: settings.dataUnit === u ? "var(--settings-active-bg)" : "var(--settings-input)",
                   border: `1px solid ${settings.dataUnit === u ? "var(--settings-active-border)" : "var(--settings-input-border)"}`,
@@ -96,33 +103,33 @@ export function SettingsPanel({ settings, onUpdate, onClose, services }: {
         </div>
 
         <div className="flex flex-col gap-2">
-          <span className="text-xs uppercase tracking-widest" style={{ color: "var(--settings-label)" }}>Search Engine</span>
-          <div className="flex gap-1.5 flex-wrap">
+          <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)" }}>Search engine</span>
+          <div className="grid grid-cols-2 gap-2">
             {(["google", "bing", "duckduckgo", "kagi"] as SearchEngine[]).map(e => (
               <button key={e} onClick={() => onUpdate({ ...settings, searchEngine: e })}
-                className="flex-1 py-1.5 rounded text-xs font-medium transition-all duration-150 flex items-center justify-center gap-1"
+                className="rounded-md font-medium transition-all duration-150 flex items-center justify-center gap-2"
                 style={{
                   background: settings.searchEngine === e ? "var(--settings-active-bg)" : "var(--settings-input)",
                   border: `1px solid ${settings.searchEngine === e ? "var(--settings-active-border)" : "var(--settings-input-border)"}`,
                   color: settings.searchEngine === e ? "var(--settings-active)" : "var(--settings-text)", cursor: "pointer",
-                  minWidth: 0, padding: "6px 4px",
+                  minWidth: 0, padding: "8px 10px",
                 }}
               >
-                <SearchEngineIcon engine={e} size={10} />
-                <span style={{ fontSize: 12 }}>{e === "duckduckgo" ? "DDG" : e.charAt(0).toUpperCase() + e.slice(1)}</span>
+                <SearchEngineIcon engine={e} size={13} />
+                <span style={{ fontSize: 13 }}>{e === "duckduckgo" ? "DuckDuckGo" : e.charAt(0).toUpperCase() + e.slice(1)}</span>
               </button>
             ))}
           </div>
         </div>
 
         <div className="flex flex-col gap-2">
-          <span className="text-xs uppercase tracking-widest" style={{ color: "var(--settings-label)" }}>Timezone</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)" }}>Timezone</span>
           <select
             value={settings.timezone}
             onChange={e => onUpdate({ ...settings, timezone: e.target.value })}
             style={{
               background: "var(--settings-input)", border: "1px solid var(--settings-input-border)", borderRadius: 6,
-              padding: "6px 8px", fontSize: 12, color: settings.timezone ? "var(--settings-active)" : "#444",
+              padding: "8px 10px", fontSize: 13, color: settings.timezone ? "var(--text)" : "var(--text-muted)",
               cursor: "pointer", outline: "none", width: "100%",
             }}
           >
@@ -134,13 +141,13 @@ export function SettingsPanel({ settings, onUpdate, onClose, services }: {
         </div>
 
         <div className="flex flex-col gap-2">
-          <span className="text-xs uppercase tracking-widest" style={{ color: "var(--settings-label)" }}>Theme</span>
-          <div className="flex gap-1.5">
+          <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)" }}>Theme</span>
+          <div className="flex gap-2">
             {THEMES.map(t => {
               const active = settings.theme === t.key;
               return (
                 <button key={t.key} onClick={() => onUpdate({ ...settings, theme: t.key })}
-                  className="flex-1 flex flex-col items-center gap-1 py-2 rounded transition-all duration-150"
+                  className="flex-1 flex flex-col items-center gap-2 py-3 rounded-md transition-all duration-150"
                   style={{
                     background: active ? "var(--settings-active-bg)" : "var(--settings-input)",
                     border: `1px solid ${active ? "var(--settings-active-border)" : "var(--settings-input-border)"}`,
@@ -150,7 +157,7 @@ export function SettingsPanel({ settings, onUpdate, onClose, services }: {
                   <div className="flex items-center justify-center" style={{ width: 18, height: 18, borderRadius: 9, background: t.bg, border: `2px solid ${t.brand}` }}>
                     <div style={{ width: 8, height: 8, borderRadius: 4, background: t.brand }} />
                   </div>
-                  <span style={{ fontSize: 12, color: active ? "var(--settings-active)" : "#444" }}>{t.label}</span>
+                  <span style={{ fontSize: 13, color: active ? "var(--settings-active)" : "var(--text-muted)" }}>{t.label}</span>
                 </button>
               );
             })}
@@ -158,37 +165,41 @@ export function SettingsPanel({ settings, onUpdate, onClose, services }: {
         </div>
 
         <div className="flex flex-col gap-2">
-          <span className="text-xs uppercase tracking-widest" style={{ color: "var(--settings-label)" }}>Visible Cards</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)" }}>Visible cards</span>
+          <div className="grid grid-cols-2" style={{ columnGap: 16, rowGap: 4 }}>
           {CARD_KEYS.map(c => {
             const on = settings.visibleCards[c] !== false;
+            const name = c === "cpu" || c === "gpu" ? c.toUpperCase() : c.charAt(0).toUpperCase() + c.slice(1);
             return (
-              <label key={c} className="flex items-center gap-3 cursor-pointer" onClick={() => onUpdate({ ...settings, visibleCards: { ...settings.visibleCards, [c]: !on } })}>
-                <div className="relative w-7 h-4 rounded-full transition-all duration-200"
-                  style={{ background: on ? "var(--settings-active-bg-dim)" : "var(--settings-input)", border: `1px solid ${on ? "var(--settings-active-border)" : "var(--settings-input-border)"}` }}>
-                  <div className="absolute top-0.5 w-3 h-3 rounded-full transition-all duration-200"
-                    style={{ left: on ? "calc(100% - 14px)" : "2px", background: on ? "var(--settings-active)" : "var(--settings-label)" }} />
-                </div>
-                <span className="text-xs uppercase tracking-widest" style={{ color: on ? "#555" : "#2e2e2e" }}>{c}</span>
-              </label>
+              <button key={c} type="button" role="switch" aria-checked={on}
+                className="flex items-center gap-3"
+                style={{ background: "none", border: "none", padding: "6px 0", cursor: "pointer", textAlign: "left" }}
+                onClick={() => onUpdate({ ...settings, visibleCards: { ...settings.visibleCards, [c]: !on } })}>
+                <span aria-hidden="true" className="relative shrink-0 rounded-full transition-all duration-200"
+                  style={{ width: 32, height: 18, background: on ? "var(--settings-active-bg-dim)" : "var(--settings-input)", border: `1px solid ${on ? "var(--settings-active-border)" : "var(--settings-input-border)"}` }}>
+                  <span className="absolute rounded-full transition-all duration-200"
+                    style={{ top: 2, width: 12, height: 12, left: on ? 16 : 2, background: on ? "var(--settings-active)" : "var(--text-ghost)" }} />
+                </span>
+                <span style={{ fontSize: 13, color: on ? "var(--text-secondary)" : "var(--text-ghost)" }}>{name}</span>
+              </button>
             );
           })}
+          </div>
         </div>
 
         {services && services.length > 0 && (
           <div className="flex flex-col gap-2">
-            <span className="text-xs uppercase tracking-widest" style={{ color: "var(--settings-label)" }}>Connections</span>
-            <div className="flex flex-col gap-1">
+            <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)" }}>Connections</span>
+            <div className="flex flex-col gap-2">
               {services.map(s => {
                 const configured = s.configured !== false;
                 const ok         = configured && s.up;
-                const dotColor   = !configured ? "#444" : ok ? "#10b981" : "#ef4444";
-                const dotShadow  = !configured ? "none" : ok ? "0 0 4px #10b98166" : "0 0 4px #ef444466";
                 const statusText = !configured ? "not configured" : ok ? "connected" : "unreachable";
-                const statusColor = !configured ? "#555"     : ok ? "#10b981"      : "#ef4444";
+                const statusColor = !configured ? "var(--text-ghost)" : ok ? "var(--ok)" : "var(--critical)";
                 return (
                   <div key={s.name} className="flex items-center gap-2">
-                    <span className="rounded-full shrink-0" style={{ width: 6, height: 6, background: dotColor, boxShadow: dotShadow }} />
-                    <span className="text-xs flex-1" style={{ color: configured ? "#888" : "#444" }}>
+                    <span className="rounded-full shrink-0" style={{ width: 6, height: 6, background: statusColor }} />
+                    <span className="flex-1" style={{ fontSize: 13, color: configured ? "var(--text-secondary)" : "var(--text-ghost)" }}>
                       {SVC_LABELS[s.name] ?? s.name}
                     </span>
                     <span className="text-xs tabular-nums font-mono" style={{ color: statusColor }}>
@@ -204,7 +215,7 @@ export function SettingsPanel({ settings, onUpdate, onClose, services }: {
               const envVars = Array.from(new Set(missing.flatMap(s => s.envVar ?? [])));
               return (
                 <div style={{ marginTop: 6, padding: "8px 10px", background: "var(--settings-bg)", borderRadius: 6, border: "1px solid var(--settings-border)" }}>
-                  <div className="text-xs uppercase tracking-widest" style={{ color: "var(--settings-label)", marginBottom: 4 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 4 }}>
                     Missing env vars
                   </div>
                   <div className="flex flex-col gap-0.5">
@@ -226,8 +237,6 @@ export function SettingsPanel({ settings, onUpdate, onClose, services }: {
         <AlertsSection />
         <BackupSection />
 
-        <div style={{ height: 1, background: "var(--settings-input)", marginTop: "auto" }} />
-        <span className="text-xs text-center" style={{ color: "var(--settings-input-border)" }}>resets on page reload</span>
       </div>
     </>
   );
@@ -241,7 +250,7 @@ function CustomCardSection() {
       <button
         onClick={() => setOpen(!open)}
         style={{
-          fontSize: 12, padding: "4px 8px", borderRadius: 4,
+          fontSize: 13, padding: "7px 12px", borderRadius: 6,
           background: "var(--settings-input)", color: "var(--settings-text)",
           border: "1px solid var(--settings-input-border)", cursor: "pointer",
           alignSelf: "flex-start",
@@ -272,7 +281,7 @@ function RefreshOverrides({ settings, onUpdate }: { settings: Settings; onUpdate
 
   return (
     <details style={{ background: "var(--settings-input)", border: "1px solid var(--settings-input-border)", borderRadius: 6, padding: "6px 10px" }}>
-      <summary style={{ fontSize: 12, cursor: "pointer", color: "var(--settings-text)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Per-endpoint overrides</summary>
+      <summary style={{ fontSize: 13, cursor: "pointer", color: "var(--text-secondary)" }}>Per-endpoint overrides</summary>
       <div className="flex flex-col gap-2" style={{ marginTop: 8 }}>
         {rows.map(({ key, label }) => {
           const v = settings.refreshOverrides?.[key];
@@ -368,7 +377,7 @@ function AlertsSection() {
 
   return (
     <div className="flex flex-col gap-2">
-      <span className="text-xs uppercase tracking-widest" style={{ color: "var(--settings-label)" }}>Alerts</span>
+      <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)" }}>Alerts</span>
 
       {/* Master toggle */}
       <label className="flex items-center gap-2 cursor-pointer" style={{ fontSize: 12, color: "var(--settings-text)" }}>
@@ -386,7 +395,7 @@ function AlertsSection() {
           </label>
           {cfg.browserNotifications && notifPerm !== "granted" && notifPerm !== "unsupported" && (
             <button onClick={requestNotificationPermission}
-              style={{ fontSize: 12, padding: "4px 8px", borderRadius: 4, background: "var(--brand)", color: "#0a0c12", border: "none", cursor: "pointer", alignSelf: "flex-start", fontWeight: 600 }}>
+              style={{ fontSize: 13, padding: "7px 12px", borderRadius: 6, background: "var(--brand)", color: "#0a0c12", border: "none", cursor: "pointer", alignSelf: "flex-start", fontWeight: 600 }}>
               {notifPerm === "denied" ? "Permission denied — check browser site settings" : "Grant browser permission"}
             </button>
           )}
@@ -510,7 +519,7 @@ function LayoutPresetsSection({ settings, onUpdate }: { settings: Settings; onUp
 
   return (
     <div className="flex flex-col gap-2">
-      <span className="text-xs uppercase tracking-widest" style={{ color: "var(--settings-label)" }}>Layout Presets</span>
+      <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)" }}>Layout presets</span>
 
       {presets.length > 0 && (
         <div className="flex flex-col gap-1">
@@ -536,7 +545,7 @@ function LayoutPresetsSection({ settings, onUpdate }: { settings: Settings; onUp
         </div>
       )}
 
-      <div className="flex gap-1.5">
+      <div className="flex gap-2">
         <input
           value={newName}
           onChange={e => setNewName(e.target.value)}
@@ -607,7 +616,7 @@ function BackupSection() {
 
   return (
     <div className="flex flex-col gap-2">
-      <span className="text-xs uppercase tracking-widest" style={{ color: "var(--settings-label)" }}>Backup</span>
+      <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)" }}>Backup</span>
       <div className="flex gap-2">
         <button onClick={exportBackup} style={btnStyle}>Export config</button>
         <label style={{ ...btnStyle, display: "inline-flex", alignItems: "center", gap: 4, cursor: importing ? "wait" : "pointer", opacity: importing ? 0.6 : 1 }}>
