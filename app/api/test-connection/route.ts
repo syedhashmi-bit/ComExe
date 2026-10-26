@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { fetchWithTimeout } from "@/app/lib/http";
 import { isJsonContentType } from "@/app/lib/validate";
+import { loadConfig, type ServiceName } from "@/app/lib/server-config";
 
 // ── /api/test-connection ──────────────────────────────────────────────────────
 // Setup-wizard helper. POST a service spec, returns whether the credentials
@@ -285,20 +286,31 @@ export async function POST(req: Request) {
 
   const cleanUrl = url.replace(/\/+$/, "");
 
+  // The wizard never receives saved secrets, so a blank field means "test the
+  // saved one". Only for the saved URL, though — otherwise a stored key could
+  // be sent to whatever host the request names.
+  const cfg = await loadConfig();
+  const saved: { url: string; apiKey?: string; username?: string; password?: string } | undefined =
+    service === "mikrotik" ? cfg.mikrotik : cfg.services[service as ServiceName];
+  const useSaved = !!saved && saved.url.replace(/\/+$/, "") === cleanUrl;
+  const key  = apiKey   || (useSaved ? saved.apiKey   : undefined);
+  const user = username || (useSaved ? saved.username : undefined);
+  const pass = password || (useSaved ? saved.password : undefined);
+
   let result: TestResult;
   switch (service) {
-    case "radarr":      result = await testRadarr(cleanUrl, apiKey ?? "");                    break;
-    case "sonarr":      result = await testSonarr(cleanUrl, apiKey ?? "");                    break;
-    case "bazarr":      result = await testBazarr(cleanUrl, apiKey ?? "");                    break;
-    case "tautulli":    result = await testTautulli(cleanUrl, apiKey ?? "");                  break;
-    case "prowlarr":    result = await testProwlarr(cleanUrl, apiKey ?? "");                  break;
-    case "overseerr":   result = await testOverseerr(cleanUrl, apiKey ?? "");                 break;
-    case "qbittorrent": result = await testQbittorrent(cleanUrl, apiKey ?? "", username ?? "", password ?? ""); break;
-    case "pihole":      result = await testPihole(cleanUrl, password ?? "");                  break;
-    case "nginx":       result = await testNginx(cleanUrl, username ?? "", password ?? "");   break;
-    case "uptimekuma":  result = await testUptimeKuma(cleanUrl, apiKey ?? "");                break;
-    case "mikrotik":    result = await testMikrotik(cleanUrl, username ?? "", password ?? ""); break;
-    case "speedtest":   result = await testSpeedtest(cleanUrl, apiKey ?? "");                 break;
+    case "radarr":      result = await testRadarr(cleanUrl, key ?? "");                    break;
+    case "sonarr":      result = await testSonarr(cleanUrl, key ?? "");                    break;
+    case "bazarr":      result = await testBazarr(cleanUrl, key ?? "");                    break;
+    case "tautulli":    result = await testTautulli(cleanUrl, key ?? "");                  break;
+    case "prowlarr":    result = await testProwlarr(cleanUrl, key ?? "");                  break;
+    case "overseerr":   result = await testOverseerr(cleanUrl, key ?? "");                 break;
+    case "qbittorrent": result = await testQbittorrent(cleanUrl, key ?? "", user ?? "", pass ?? ""); break;
+    case "pihole":      result = await testPihole(cleanUrl, pass ?? "");                  break;
+    case "nginx":       result = await testNginx(cleanUrl, user ?? "", pass ?? "");   break;
+    case "uptimekuma":  result = await testUptimeKuma(cleanUrl, key ?? "");                break;
+    case "mikrotik":    result = await testMikrotik(cleanUrl, user ?? "", pass ?? ""); break;
+    case "speedtest":   result = await testSpeedtest(cleanUrl, key ?? "");                 break;
     default:            result = fail(`Unknown service: ${service}`);
   }
   return NextResponse.json(result);
