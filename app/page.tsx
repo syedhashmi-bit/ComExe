@@ -831,580 +831,587 @@ export default function Dashboard() {
             );
           })()}
 
-          {/* ── metric grid ── */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-stretch">
+          {/* Two columns from 1280px (metrics | Plex + services), one column
+              below — see .dash-columns in globals.css. */}
+          <div className="dash-columns">
+            <div className="dash-main">
+              {/* ── metric grid ── */}
+              <div className="metric-grid">
 
-            {/* CPU */}
-            {isVisible("cpu") && (
-              <div style={{ order: orderIndex("cpu") }}><DraggableCard cardKey="cpu" onReorder={reorderCards}>
-              <Card label="cpu" accent="var(--accent-cpu)"
-                subtitle={!loading ? (metrics?.sysInfo?.cpuModel ?? undefined) : undefined}
-                alertLevel={cpuAlert} icon={<IconCPU />}
-                animDelay={0} expanded={expandedCard === "cpu"} onToggle={() => toggleCard("cpu")}>
-                <div className="flex items-end justify-between gap-2">
-                  <div className="flex items-baseline gap-2">
-                    <BigValue value={fmtPct(metrics?.cpu ?? null)} loading={loading} />
-                    {!loading && metrics?.cpu != null && (
-                      <TrendDelta history={cpuHistory} current={metrics.cpu} goodDirection="down" suffix="%" />
-                    )}
-                  </div>
-                  {!loading && (
-                    <div className="flex flex-wrap gap-1 mb-1 justify-end">
-                      {metrics?.sysInfo?.cpuCores != null && (
-                        <span className="tabular-nums" style={{
-                          background: "var(--surface)", border: "1px solid var(--border)",
-                          borderRadius: 5, padding: "2px 7px", fontSize: 12, color: "var(--text-muted)",
-                        }}>{metrics.sysInfo.cpuCores} cores</span>
-                      )}
-                      {metrics?.sysInfo?.cpuFreqGhz != null && (
-                        <span className="tabular-nums font-mono" style={{
-                          background: "var(--surface)", border: "1px solid var(--border)",
-                          borderRadius: 5, padding: "2px 7px", fontSize: 12, color: "var(--text-muted)",
-                        }}>@ {metrics.sysInfo.cpuFreqGhz.toFixed(2)} GHz</span>
-                      )}
-                    </div>
-                  )}
-                </div>
-                <Sparkline data={cpuHistory} color={barColor(cpuPct, "var(--accent-cpu)")} height={48} />
-                <GaugeBar percent={cpuPct} color={barColor(cpuPct, "var(--accent-cpu)")} />
-                {!loading && (metrics?.sysInfo?.load1 != null) && (
-                  <span className="text-xs tabular-nums font-mono" style={{ color: "var(--text-faint)" }}>
-                    Load: {metrics.sysInfo.load1?.toFixed(2)} · {metrics.sysInfo.load5?.toFixed(2)} · {metrics.sysInfo.load15?.toFixed(2)}
-                  </span>
-                )}
-                {expandedCard === "cpu" && (() => {
-                  const s = histStats(cpuHistory);
-                  return (
-                    <div className="flex flex-col gap-0.5 pt-2" style={{ borderTop: "1px solid var(--divider)" }}>
-                      <StatRow label="min" value={s.min != null ? fmtPct(s.min) : "—"} />
-                      <StatRow label="max" value={s.max != null ? fmtPct(s.max) : "—"} />
-                      <StatRow label="avg" value={s.avg != null ? fmtPct(s.avg) : "—"} />
-                    </div>
-                  );
-                })()}
-              </Card>
-              </DraggableCard></div>
-            )}
-
-            {/* Memory */}
-            {isVisible("memory") && (
-              <div style={{ order: orderIndex("memory") }}><DraggableCard cardKey="memory" onReorder={reorderCards}>
-              <Card label="memory" accent="var(--accent-memory)" alertLevel={memAlert} icon={<IconMemory />}
-                animDelay={50} expanded={expandedCard === "memory"} onToggle={() => toggleCard("memory")}>
-                {loading ? <Skeleton /> : (
-                  <>
-                    <ThreeSegmentDonut
-                      usedBytes={realMemUsed ?? 0}
-                      cacheBytes={metrics?.memory.sReclaimable ?? 0}
-                      freeBytes={metrics?.memory.available ?? 0}
-                      totalBytes={memTotal ?? 0}
-                      du={du}
-                      usedColor={memAlert === "critical" ? "var(--critical)" : memAlert === "warning" ? "var(--warn)" : "var(--accent-memory)"}
-                    />
-                    {realMemPct > 0 && (
-                      <div className="flex items-center justify-center gap-2">
-                        <span className="text-xs tabular-nums" style={{ color: "var(--text-faint)" }}>
-                          actual pressure: {realMemPct.toFixed(1)}%
-                        </span>
-                        <TrendDelta history={memHistory} current={realMemPct} goodDirection="down" suffix="%" />
+                {/* CPU */}
+                {isVisible("cpu") && (
+                  <div style={{ order: orderIndex("cpu") }}><DraggableCard cardKey="cpu" onReorder={reorderCards}>
+                  <Card label="cpu" accent="var(--accent-cpu)"
+                    subtitle={!loading ? (metrics?.sysInfo?.cpuModel ?? undefined) : undefined}
+                    alertLevel={cpuAlert} icon={<IconCPU />}
+                    animDelay={0} expanded={expandedCard === "cpu"} onToggle={() => toggleCard("cpu")}>
+                    <div className="flex items-end justify-between gap-2">
+                      <div className="flex items-baseline gap-2">
+                        <BigValue value={fmtPct(metrics?.cpu ?? null)} loading={loading} />
+                        {!loading && metrics?.cpu != null && (
+                          <TrendDelta history={cpuHistory} current={metrics.cpu} goodDirection="down" suffix="%" />
+                        )}
                       </div>
+                      {!loading && (
+                        <div className="flex flex-wrap gap-1 mb-1 justify-end">
+                          {metrics?.sysInfo?.cpuCores != null && (
+                            <span className="tabular-nums" style={{
+                              background: "var(--surface)", border: "1px solid var(--border)",
+                              borderRadius: 5, padding: "2px 7px", fontSize: 12, color: "var(--text-muted)",
+                            }}>{metrics.sysInfo.cpuCores} cores</span>
+                          )}
+                          {metrics?.sysInfo?.cpuFreqGhz != null && (
+                            <span className="tabular-nums font-mono" style={{
+                              background: "var(--surface)", border: "1px solid var(--border)",
+                              borderRadius: 5, padding: "2px 7px", fontSize: 12, color: "var(--text-muted)",
+                            }}>@ {metrics.sysInfo.cpuFreqGhz.toFixed(2)} GHz</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <Sparkline data={cpuHistory} color={barColor(cpuPct, "var(--accent-cpu)")} height={48} />
+                    <GaugeBar percent={cpuPct} color={barColor(cpuPct, "var(--accent-cpu)")} />
+                    {!loading && (metrics?.sysInfo?.load1 != null) && (
+                      <span className="text-xs tabular-nums font-mono" style={{ color: "var(--text-faint)" }}>
+                        Load: {metrics.sysInfo.load1?.toFixed(2)} · {metrics.sysInfo.load5?.toFixed(2)} · {metrics.sysInfo.load15?.toFixed(2)}
+                      </span>
                     )}
-                    {expandedCard === "memory" && (() => {
-                      const s = histStats(memHistory);
+                    {expandedCard === "cpu" && (() => {
+                      const s = histStats(cpuHistory);
                       return (
                         <div className="flex flex-col gap-0.5 pt-2" style={{ borderTop: "1px solid var(--divider)" }}>
-                          <StatRow label="total"    value={fmtBytes(memTotal, 1, du)} />
-                          <StatRow label="min used" value={s.min != null ? fmtPct(s.min) : "—"} />
-                          <StatRow label="max used" value={s.max != null ? fmtPct(s.max) : "—"} />
-                          <StatRow label="avg used" value={s.avg != null ? fmtPct(s.avg) : "—"} />
+                          <StatRow label="min" value={s.min != null ? fmtPct(s.min) : "—"} />
+                          <StatRow label="max" value={s.max != null ? fmtPct(s.max) : "—"} />
+                          <StatRow label="avg" value={s.avg != null ? fmtPct(s.avg) : "—"} />
                         </div>
                       );
                     })()}
-                  </>
+                  </Card>
+                  </DraggableCard></div>
                 )}
-              </Card>
-              </DraggableCard></div>
-            )}
 
-            {/* Filesystems */}
-            {isVisible("filesystems") && (
-              <div style={{ order: orderIndex("filesystems") }}><DraggableCard cardKey="filesystems" onReorder={reorderCards}>
-              <Card label="filesystems" accent="var(--accent-fs)" alertLevel={maxDiskAlert} icon={<IconDisk />}
-                animDelay={100} expanded={expandedCard === "filesystems"} onToggle={() => toggleCard("filesystems")}>
-                {loading ? <Skeleton /> : !metrics?.disks.length ? (
-                  <span className="text-xs" style={{ color: "var(--settings-text)" }}>no filesystems found</span>
-                ) : (() => {
-                  const PREFIX = "/mnt/Pool/Media/";
-                  const folderName = (mp: string) => mp.startsWith(PREFIX) ? mp.slice(PREFIX.length) : (mp.split("/").pop() ?? mp);
-                  // Documented disk thresholds: warn >85%, critical >95%. Neutral below.
-                  const fsBarColor = (p: number) => p > 95 ? "var(--critical)" : p > 85 ? "var(--warn)" : "var(--accent-fs)";
-                  const sorted = [...metrics.disks].sort((a, b) => b.usedPct - a.usedPct);
-                  const poolUsed  = metrics.pool?.used  ?? null;
-                  const poolTotal = metrics.pool?.total ?? null;
-                  const poolPct   = poolTotal != null && poolUsed != null && poolTotal > 0
-                    ? (poolUsed / poolTotal) * 100 : null;
-                  const poolColor = poolPct == null ? "var(--accent-fs)" : fsBarColor(poolPct);
-                  return (
-                    <div className="flex flex-col gap-3">
-                      {poolTotal != null && poolUsed != null && (
-                        <div className="flex flex-col gap-2">
-                          <div className="flex items-baseline justify-between gap-2">
-                            <div className="flex items-baseline gap-2">
-                              <span className="font-mono tabular-nums" style={{ fontSize: 26, fontWeight: 600, color: "var(--text)", lineHeight: 1.1, letterSpacing: "-0.01em" }}>
-                                {fmtBytes(poolUsed, 1, du)}
-                              </span>
-                              <span className="text-xs" style={{ color: "var(--text-label)" }}>
-                                of {fmtBytes(poolTotal, 1, du)}
-                              </span>
-                            </div>
-                            {poolPct != null && (
-                              <span className="font-mono tabular-nums" style={{ fontSize: 13, fontWeight: 700, color: poolColor }}>
-                                {poolPct.toFixed(0)}%
-                              </span>
-                            )}
+                {/* Memory */}
+                {isVisible("memory") && (
+                  <div style={{ order: orderIndex("memory") }}><DraggableCard cardKey="memory" onReorder={reorderCards}>
+                  <Card label="memory" accent="var(--accent-memory)" alertLevel={memAlert} icon={<IconMemory />}
+                    animDelay={50} expanded={expandedCard === "memory"} onToggle={() => toggleCard("memory")}>
+                    {loading ? <Skeleton /> : (
+                      <>
+                        <ThreeSegmentDonut
+                          usedBytes={realMemUsed ?? 0}
+                          cacheBytes={metrics?.memory.sReclaimable ?? 0}
+                          freeBytes={metrics?.memory.available ?? 0}
+                          totalBytes={memTotal ?? 0}
+                          du={du}
+                          usedColor={memAlert === "critical" ? "var(--critical)" : memAlert === "warning" ? "var(--warn)" : "var(--accent-memory)"}
+                        />
+                        {realMemPct > 0 && (
+                          <div className="flex items-center justify-center gap-2">
+                            <span className="text-xs tabular-nums" style={{ color: "var(--text-faint)" }}>
+                              actual pressure: {realMemPct.toFixed(1)}%
+                            </span>
+                            <TrendDelta history={memHistory} current={realMemPct} goodDirection="down" suffix="%" />
                           </div>
-                          <div className="rounded-full overflow-hidden" style={{ background: "var(--card-hover)", height: 6 }}>
-                            <div className="h-full rounded-full transition-all duration-700" style={{
-                              width: `${poolPct ?? 0}%`,
-                              background: `linear-gradient(90deg, ${withAlpha(poolColor, 60)}, ${poolColor})`,
-                              boxShadow: `0 0 8px ${withAlpha(poolColor, 33)}`,
-                            }} />
-                          </div>
-                        </div>
-                      )}
-                      <div className="flex flex-col" style={{
-                        overflowY: sorted.length > 4 ? "auto" : "visible",
-                        maxHeight: sorted.length > 4 ? 220 : undefined,
-                      }}>
-                        {sorted.map((disk, idx) => {
-                          const name = folderName(disk.mountpoint);
-                          const barC = fsBarColor(disk.usedPct);
+                        )}
+                        {expandedCard === "memory" && (() => {
+                          const s = histStats(memHistory);
                           return (
-                            <div key={disk.mountpoint} className="flex flex-col gap-1"
-                              style={{ padding: "5px 0", borderTop: idx > 0 ? "1px solid var(--border-dim)" : "none" }}>
-                              <div className="flex items-center justify-between gap-2">
-                                <div className="flex items-center gap-1.5 min-w-0">
-                                  <span style={{ color: "var(--warn)", opacity: 0.55, flexShrink: 0 }}><IconFolder /></span>
-                                  <span className="text-xs font-medium truncate" style={{ color: "var(--text-mid)" }}>{name}</span>
-                                </div>
-                                <div className="flex items-center gap-2 shrink-0">
-                                  <span className="text-xs tabular-nums font-mono" style={{ color: "var(--text-faint)" }}>
-                                    {fmtBytes(disk.used, 1, du)}
-                                  </span>
-                                  <span className="tabular-nums font-mono font-semibold" style={{ fontSize: 12, color: barC, minWidth: "2.5ch", textAlign: "right" }}>
-                                    {disk.usedPct.toFixed(0)}%
-                                  </span>
-                                </div>
-                              </div>
-                              <div className="rounded-full overflow-hidden" style={{ background: "var(--card-hover)", height: 4 }}>
-                                <div className="h-full rounded-full transition-all duration-700"
-                                  style={{ width: `${disk.usedPct}%`, background: barC, boxShadow: `0 0 4px ${withAlpha(barC, 33)}` }} />
-                              </div>
+                            <div className="flex flex-col gap-0.5 pt-2" style={{ borderTop: "1px solid var(--divider)" }}>
+                              <StatRow label="total"    value={fmtBytes(memTotal, 1, du)} />
+                              <StatRow label="min used" value={s.min != null ? fmtPct(s.min) : "—"} />
+                              <StatRow label="max used" value={s.max != null ? fmtPct(s.max) : "—"} />
+                              <StatRow label="avg used" value={s.avg != null ? fmtPct(s.avg) : "—"} />
                             </div>
                           );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })()}
-              </Card>
-              </DraggableCard></div>
-            )}
-
-            {/* Network */}
-            {isVisible("network") && (
-              <div style={{ order: orderIndex("network") }}><DraggableCard cardKey="network" onReorder={reorderCards}>
-              <Card label="network" accent="var(--accent-network)" icon={<IconNetwork />}
-                animDelay={150} expanded={expandedCard === "network"} onToggle={() => toggleCard("network")}>
-                {!loading && metrics?.network?.interfaceName && (
-                  <span className="self-start font-mono" style={{
-                    background: "var(--surface)", border: "1px solid var(--border)",
-                    borderRadius: 4, padding: "2px 7px", fontSize: 12, color: "var(--accent-network)",
-                  }}>{metrics.network.interfaceName}</span>
-                )}
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold" style={{ color: "var(--accent-network)" }}>↓</span>
-                    <span className="text-xs uppercase tracking-widest" style={{ color: "var(--text-faint)" }}>rx</span>
-                    <span className="text-xs font-medium tabular-nums ml-auto font-mono" style={{ color: "var(--text-secondary)" }}>
-                      {loading ? "—" : `${fmtBytes(metrics?.network.rxBytesPerSec ?? null, 1, du)}/s`}
-                    </span>
-                  </div>
-                  <Sparkline data={rxHistory} color="var(--accent-network)" autoMax height={50} />
-                  <span className="text-xs tabular-nums font-medium" style={{ color: "var(--text-faint)" }}>
-                    ↓ {fmtBytes(metrics?.network.rxBytesTotal ?? null, 1, du)} total
-                  </span>
-                </div>
-                <div style={{ height: 1, background: "var(--surface-bright)" }} />
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold" style={{ color: "var(--accent-network-tx)" }}>↑</span>
-                    <span className="text-xs uppercase tracking-widest" style={{ color: "var(--text-faint)" }}>tx</span>
-                    <span className="text-xs font-medium tabular-nums ml-auto font-mono" style={{ color: "var(--text-secondary)" }}>
-                      {loading ? "—" : `${fmtBytes(metrics?.network.txBytesPerSec ?? null, 1, du)}/s`}
-                    </span>
-                  </div>
-                  <Sparkline data={txHistory} color="var(--accent-network-tx)" autoMax height={50} />
-                  <span className="text-xs tabular-nums font-medium" style={{ color: "var(--text-faint)" }}>
-                    ↑ {fmtBytes(metrics?.network.txBytesTotal ?? null, 1, du)} total
-                  </span>
-                </div>
-                {!loading && metrics?.sysInfo?.tcpEstab != null && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs uppercase tracking-widest" style={{ color: "var(--text-faint)" }}>tcp</span>
-                    <span className="text-xs tabular-nums font-mono font-medium" style={{ color: "var(--text-muted)" }}>
-                      {metrics.sysInfo.tcpEstab} established
-                    </span>
-                  </div>
-                )}
-                {expandedCard === "network" && rxHistory.length > 0 && (
-                  <div className="flex flex-col gap-0.5 pt-2" style={{ borderTop: "1px solid var(--divider)" }}>
-                    <StatRow label="peak rx" value={`${fmtBytes(Math.max(...rxHistory), 1, du)}/s`} />
-                    <StatRow label="peak tx" value={`${fmtBytes(Math.max(...txHistory), 1, du)}/s`} />
-                  </div>
-                )}
-              </Card>
-              </DraggableCard></div>
-            )}
-
-            {/* GPU */}
-            {isVisible("gpu") && (
-              <div style={{ order: orderIndex("gpu") }}><DraggableCard cardKey="gpu" onReorder={reorderCards}>
-              <Card label="gpu" accent={gpuColor} alertLevel={gpuTempAlert} icon={<IconGPU />}
-                animDelay={200} expanded={expandedCard === "gpu"} onToggle={() => toggleCard("gpu")}>
-                {loading ? <Skeleton /> : (
-                  <>
-                    <div className="flex items-center gap-4">
-                      <div className="relative flex items-center justify-center shrink-0" style={{ width: 88, height: 88 }}>
-                        <RadialGauge percent={gpuUtil ?? 0} color={gpuColor} size={88} />
-                        <div className="absolute inset-0 flex flex-col items-center justify-center">
-                          <span className="font-medium tabular-nums font-mono" style={{ fontSize: 22, lineHeight: 1, color: "var(--text)" }}>
-                            {gpuUtil != null ? gpuUtil.toFixed(0) : "—"}
-                          </span>
-                          <span className="text-xs uppercase tracking-widest" style={{ color: "var(--text-faint)" }}>%</span>
-                        </div>
-                      </div>
-                      <div className="flex flex-col gap-1 min-w-0">
-                        {metrics?.gpu?.name && (
-                          <span className="text-xs font-medium truncate" style={{ color: "var(--text-secondary)" }}>{metrics.gpu.name}</span>
-                        )}
-                        {metrics?.gpu?.temperature != null && (
-                          <div className="flex items-baseline gap-2">
-                            <span className="font-medium tabular-nums font-mono"
-                              style={{ fontSize: 22, lineHeight: 1, color: tempColor(metrics.gpu.temperature), transition: "color 0.3s ease" }}>
-                              {fmtTemp(metrics.gpu.temperature, tu)}
-                            </span>
-                            <TrendDelta history={gpuTempHistory} current={metrics.gpu.temperature} goodDirection="down" suffix="°" precision={0} threshold={1} />
-                          </div>
-                        )}
-                        {metrics?.gpu?.powerDraw != null && (
-                          <span className="text-xs tabular-nums" style={{ color: "var(--text-label)" }}>
-                            {metrics.gpu.powerDraw.toFixed(1)} W
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <LabeledBar label="vram" right={`${fmtBytes(metrics?.gpu?.memUsed ?? null, 1, du)} / ${fmtBytes(metrics?.gpu?.memTotal ?? null, 1, du)}`}
-                      percent={gpuMemPct} color="var(--accent-gpu)" />
-                    {metrics?.gpu?.powerDraw != null && metrics?.gpu?.powerLimit != null && (
-                      <LabeledBar label="power" right={`${metrics.gpu.powerDraw.toFixed(1)} / ${metrics.gpu.powerLimit.toFixed(0)} W`}
-                        percent={gpuPwrPct} color="var(--accent-gpu)" />
+                        })()}
+                      </>
                     )}
-                    {(() => {
-                      const tertiaryItems: { label: string; value: string }[] = [];
-                      if (metrics?.gpu?.coreClock != null) tertiaryItems.push({ label: "core", value: `${metrics.gpu.coreClock} MHz` });
-                      if (metrics?.gpu?.memClock  != null) tertiaryItems.push({ label: "mem",  value: `${metrics.gpu.memClock} MHz`  });
-                      if (metrics?.gpu?.fanSpeed  != null) tertiaryItems.push({ label: "fan",  value: `${metrics.gpu.fanSpeed}%`    });
-                      const enc = metrics?.gpu?.encUtil ?? 0;
-                      const dec = metrics?.gpu?.decUtil ?? 0;
-                      if (enc > 0 || dec > 0) {
-                        if (metrics?.gpu?.encUtil != null) tertiaryItems.push({ label: "enc", value: `${enc}%` });
-                        if (metrics?.gpu?.decUtil != null) tertiaryItems.push({ label: "dec", value: `${dec}%` });
-                      }
-                      if (tertiaryItems.length === 0) return null;
-                      return (
-                        <div className="flex flex-wrap gap-1.5 pt-1" style={{ borderTop: "1px solid var(--border-dim)" }}>
-                          {tertiaryItems.map(item => (
-                            <span key={item.label} className="tabular-nums font-mono" style={{
-                              background: "var(--card)", border: "1px solid var(--border)",
-                              borderRadius: 4, padding: "2px 7px", fontSize: 12, color: "var(--text-dim)", letterSpacing: "0.01em",
-                            }}>
-                              <span style={{ color: "var(--text-faint)", marginRight: 4 }}>{item.label}</span>
-                              {item.value}
-                            </span>
-                          ))}
-                        </div>
-                      );
-                    })()}
-                    {gpuTempHistory.length >= 2 && (
-                      <div className="flex flex-col gap-1.5">
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs uppercase tracking-widest" style={{ color: "var(--text-ghost)" }}>temp history</span>
-                        </div>
-                        <Sparkline data={gpuTempHistory} color={metrics?.gpu?.temperature != null && metrics.gpu.temperature >= 70 ? tempColor(metrics.gpu.temperature) : "var(--accent-gpu)"} autoMax height={28} />
-                      </div>
-                    )}
-                    {expandedCard === "gpu" && (() => {
-                      const s  = histStats(gpuHistory);
-                      const ts = histStats(gpuTempHistory);
-                      return (
-                        <div className="flex flex-col gap-0.5 pt-2" style={{ borderTop: "1px solid var(--divider)" }}>
-                          <StatRow label="util min" value={s.min != null ? fmtPct(s.min) : "—"} />
-                          <StatRow label="util max" value={s.max != null ? fmtPct(s.max) : "—"} />
-                          <StatRow label="util avg" value={s.avg != null ? fmtPct(s.avg) : "—"} />
-                          <StatRow label="temp min" value={fmtTemp(ts.min ?? null, tu)} />
-                          <StatRow label="temp max" value={fmtTemp(ts.max ?? null, tu)} />
-                        </div>
-                      );
-                    })()}
-                  </>
+                  </Card>
+                  </DraggableCard></div>
                 )}
-              </Card>
-              </DraggableCard></div>
-            )}
 
-            {/* Speedtest */}
-            {isVisible("speedtest") && (
-              <div style={{ order: orderIndex("speedtest") }}><DraggableCard cardKey="speedtest" onReorder={reorderCards}>
-              <Card label="speedtest" accent="var(--accent-speedtest)" icon={<IconSpeedtest />}
-                animDelay={250} externalLink={`http://${clientConfig?.truenasIp ?? "192.168.88.196"}:${SVC_PORTS.speedtest}`}>
-                {speedtestLoading ? <Skeleton /> : !speedtestResults.length ? (
-                  <div className="flex flex-col items-center justify-center text-center gap-1.5" style={{ flex: 1, minHeight: 96, padding: "8px 0" }}>
-                    <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>No results from SpeedTracker yet</span>
-                    <span style={{ fontSize: 12, color: "var(--text-ghost)", maxWidth: 220, lineHeight: 1.5 }}>
-                      Tests run on SpeedTracker&apos;s own schedule. If this stays empty, check its URL and API token in Setup.
-                    </span>
-                  </div>
-                ) : (() => {
-                  const latest = speedtestResults[0];
-                  const ts   = latest.timestamp ?? latest.created_at;
-                  const tsMs = ts ? new Date(ts).getTime() : null;
-                  const diff = tsMs != null ? (Date.now() - tsMs) / 1000 : null;
-                  const rel  = diff == null ? null
-                    : diff < 60    ? "just now"
-                    : diff < 3600  ? `${Math.round(diff / 60)}m ago`
-                    : diff < 86400 ? `${Math.round(diff / 3600)}h ago`
-                    : `${Math.round(diff / 86400)}d ago`;
-                  // Color the timestamp by age — a result from 278 days ago
-                  // should be visibly stale rather than blending into the bg.
-                  const relColor = ageColor(tsMs, { warnSec: 7 * 86400, critSec: 30 * 86400 });
-                  const isStale = diff != null && diff > 7 * 86400;
-                  const dl = latest.download;
-                  const quality = dl == null ? null
-                    : dl >= 500 ? { label: "Excellent", color: "var(--text-muted)", bg: "var(--surface)", border: "var(--border)" }
-                    : dl >= 200 ? { label: "Good",      color: "var(--text-muted)", bg: "var(--surface)", border: "var(--border)" }
-                    : dl >= 50  ? { label: "Fair",      color: "var(--warn)", bg: "color-mix(in srgb, var(--warn) 12%, transparent)", border: "color-mix(in srgb, var(--warn) 30%, transparent)" }
-                    :             { label: "Poor",      color: "var(--critical)", bg: "color-mix(in srgb, var(--critical) 12%, transparent)", border: "color-mix(in srgb, var(--critical) 30%, transparent)" };
-                  return (
-                    <div className="flex flex-col gap-2.5">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex flex-col gap-0.5">
-                          {latest.isp && <span className="text-[12px] font-semibold" style={{ color: "var(--text-mid)" }}>{latest.isp}</span>}
-                          {latest.serverLocation && <span className="text-xs" style={{ color: "var(--text-label)" }}>{latest.serverLocation}</span>}
-                          {latest.serverHost && <span title={latest.serverHost} className="text-xs font-mono truncate" style={{ color: "var(--text-ghost)", maxWidth: 160 }}>{latest.serverHost}</span>}
-                        </div>
-                        {quality && (
-                          <span className="text-xs font-semibold uppercase tracking-wider shrink-0 mt-0.5"
-                            style={{ color: quality.color, background: quality.bg, border: `1px solid ${quality.border}`, borderRadius: 5, padding: "2px 7px" }}>
-                            {quality.label}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-end gap-4">
-                        <div className="flex flex-col">
-                          <span className="font-medium tabular-nums font-mono" style={{ fontSize: 44, lineHeight: 1, color: "var(--text)" }}>
-                            {dl != null ? dl.toFixed(0) : "—"}
-                          </span>
-                          <span className="text-xs uppercase tracking-widest mt-0.5" style={{ color: "var(--text-faint)" }}>Mbps ↓</span>
-                        </div>
-                        <div className="flex flex-col mb-[4px]">
-                          <span className="font-medium tabular-nums font-mono" style={{ fontSize: 28, lineHeight: 1, color: "var(--text-secondary)" }}>
-                            {latest.upload != null ? latest.upload.toFixed(0) : "—"}
-                          </span>
-                          <span className="text-xs uppercase tracking-widest mt-0.5" style={{ color: "var(--text-faint)" }}>Mbps ↑</span>
-                        </div>
-                      </div>
-                      {(latest.ping != null || latest.jitter != null) && (
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "var(--text-ghost)" }} />
-                          {latest.ping != null && (
-                            <>
-                              <span className="text-xs tabular-nums font-medium font-mono" style={{ color: "var(--text-secondary)" }}>
-                                {latest.ping < 10 ? latest.ping.toFixed(1) : latest.ping.toFixed(0)} ms
-                              </span>
-                              <span className="text-xs uppercase tracking-widest" style={{ color: "var(--text-ghost)" }}>ping</span>
-                            </>
-                          )}
-                          {latest.jitter != null && (
-                            <>
-                              <span style={{ color: "var(--text-ghost)", fontSize: 12 }}>·</span>
-                              <span className="text-xs tabular-nums font-medium font-mono" style={{ color: "var(--text-label)" }}>
-                                {latest.jitter < 10 ? latest.jitter.toFixed(1) : latest.jitter.toFixed(0)} ms
-                              </span>
-                              <span className="text-xs uppercase tracking-widest" style={{ color: "var(--text-ghost)" }}>jitter</span>
-                            </>
-                          )}
-                        </div>
-                      )}
-                      {speedtestHistory.length >= 2 && (
-                        <div className="flex flex-col gap-1">
-                          <span className="text-xs uppercase tracking-widest" style={{ color: "var(--text-ghost)" }}>download history</span>
-                          <Sparkline data={speedtestHistory} color="var(--accent-speedtest)" height={40} />
-                        </div>
-                      )}
-                      <div className="flex items-center justify-between flex-wrap gap-1">
-                        {rel && (
-                          <span
-                            title={tsMs ? new Date(tsMs).toLocaleString() : undefined}
-                            className="text-xs tabular-nums"
-                            style={{ color: relColor, fontWeight: isStale ? 600 : 400 }}>
-                            {isStale ? "⚠ " : ""}auto-tested · {rel}
-                          </span>
-                        )}
-                        {speedtestTotalTests != null && (
-                          <span className="text-xs tabular-nums" style={{ color: "var(--text-ghost)" }}>
-                            {speedtestTotalTests.toLocaleString()} tests recorded
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })()}
-              </Card>
-              </DraggableCard></div>
-            )}
-
-            {/* System + Grafana — pinned to the end regardless of card reorder */}
-            {(isVisible("system") || isVisible("grafana")) && (
-              <div className="lg:col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch" style={{ order: 9999 }}>
-                {isVisible("system") && (
-                  <Card label="system" accent="var(--accent-system)" icon={<IconTerminal />}
-                    expanded={expandedCard === "system"} onToggle={() => toggleCard("system")}>
-                    {loading ? <Skeleton /> : (
-                      <div className="flex flex-col gap-0">
-                        {([
-                          { emoji: "🐧", label: "os",       value: metrics?.sysInfo?.os       ?? "—", mono: false },
-                          { emoji: "⚙️", label: "kernel",   value: metrics?.sysInfo?.kernel   ?? "—", mono: true  },
-                          { emoji: "🖥️", label: "arch",     value: metrics?.sysInfo?.arch     ?? "—", mono: false },
-                          { emoji: "🌐", label: "host",     value: metrics?.sysInfo?.hostname ?? "—", mono: false },
-                          { emoji: "⚡", label: "cores",    value: metrics?.sysInfo?.cpuCores != null ? `${metrics.sysInfo.cpuCores} cores` : "—", mono: false },
-                          { emoji: "🕐", label: "up since", value: fmtSince(metrics?.uptime ?? null), mono: true  },
-                        ] as { emoji: string; label: string; value: string; mono: boolean }[]).map(({ emoji, label, value, mono }, i, arr) => (
-                          <div key={label}>
-                            <div className="flex items-center gap-2 py-2">
-                              <span style={{ fontSize: 13, width: 18, textAlign: "center", flexShrink: 0 }}>{emoji}</span>
-                              <span className="text-xs uppercase tracking-widest shrink-0" style={{ color: "var(--text-faint)", minWidth: 46 }}>{label}</span>
-                              <span className={`text-xs font-medium ml-auto truncate${mono ? " font-mono" : ""}`}
-                                style={{ color: "var(--text-mid)" }}>{value}</span>
+                {/* Filesystems */}
+                {isVisible("filesystems") && (
+                  <div style={{ order: orderIndex("filesystems") }}><DraggableCard cardKey="filesystems" onReorder={reorderCards}>
+                  <Card label="filesystems" accent="var(--accent-fs)" alertLevel={maxDiskAlert} icon={<IconDisk />}
+                    animDelay={100} expanded={expandedCard === "filesystems"} onToggle={() => toggleCard("filesystems")}>
+                    {loading ? <Skeleton /> : !metrics?.disks.length ? (
+                      <span className="text-xs" style={{ color: "var(--settings-text)" }}>no filesystems found</span>
+                    ) : (() => {
+                      const PREFIX = "/mnt/Pool/Media/";
+                      const folderName = (mp: string) => mp.startsWith(PREFIX) ? mp.slice(PREFIX.length) : (mp.split("/").pop() ?? mp);
+                      // Documented disk thresholds: warn >85%, critical >95%. Neutral below.
+                      const fsBarColor = (p: number) => p > 95 ? "var(--critical)" : p > 85 ? "var(--warn)" : "var(--accent-fs)";
+                      const sorted = [...metrics.disks].sort((a, b) => b.usedPct - a.usedPct);
+                      const poolUsed  = metrics.pool?.used  ?? null;
+                      const poolTotal = metrics.pool?.total ?? null;
+                      const poolPct   = poolTotal != null && poolUsed != null && poolTotal > 0
+                        ? (poolUsed / poolTotal) * 100 : null;
+                      const poolColor = poolPct == null ? "var(--accent-fs)" : fsBarColor(poolPct);
+                      return (
+                        <div className="flex flex-col gap-3">
+                          {poolTotal != null && poolUsed != null && (
+                            <div className="flex flex-col gap-2">
+                              <div className="flex items-baseline justify-between gap-2">
+                                <div className="flex items-baseline gap-2">
+                                  <span className="font-mono tabular-nums" style={{ fontSize: 26, fontWeight: 600, color: "var(--text)", lineHeight: 1.1, letterSpacing: "-0.01em" }}>
+                                    {fmtBytes(poolUsed, 1, du)}
+                                  </span>
+                                  <span className="text-xs" style={{ color: "var(--text-label)" }}>
+                                    of {fmtBytes(poolTotal, 1, du)}
+                                  </span>
+                                </div>
+                                {poolPct != null && (
+                                  <span className="font-mono tabular-nums" style={{ fontSize: 13, fontWeight: 700, color: poolColor }}>
+                                    {poolPct.toFixed(0)}%
+                                  </span>
+                                )}
+                              </div>
+                              <div className="rounded-full overflow-hidden" style={{ background: "var(--card-hover)", height: 6 }}>
+                                <div className="h-full rounded-full transition-all duration-700" style={{
+                                  width: `${poolPct ?? 0}%`,
+                                  background: `linear-gradient(90deg, ${withAlpha(poolColor, 60)}, ${poolColor})`,
+                                  boxShadow: `0 0 8px ${withAlpha(poolColor, 33)}`,
+                                }} />
+                              </div>
                             </div>
-                            {i < arr.length - 1 && <div style={{ height: 1, background: "var(--surface-bright)" }} />}
+                          )}
+                          <div className="flex flex-col" style={{
+                            overflowY: sorted.length > 4 ? "auto" : "visible",
+                            maxHeight: sorted.length > 4 ? 220 : undefined,
+                          }}>
+                            {sorted.map((disk, idx) => {
+                              const name = folderName(disk.mountpoint);
+                              const barC = fsBarColor(disk.usedPct);
+                              return (
+                                <div key={disk.mountpoint} className="flex flex-col gap-1"
+                                  style={{ padding: "5px 0", borderTop: idx > 0 ? "1px solid var(--border-dim)" : "none" }}>
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-1.5 min-w-0">
+                                      <span style={{ color: "var(--warn)", opacity: 0.55, flexShrink: 0 }}><IconFolder /></span>
+                                      <span className="text-xs font-medium truncate" style={{ color: "var(--text-mid)" }}>{name}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                      <span className="text-xs tabular-nums font-mono" style={{ color: "var(--text-faint)" }}>
+                                        {fmtBytes(disk.used, 1, du)}
+                                      </span>
+                                      <span className="tabular-nums font-mono font-semibold" style={{ fontSize: 12, color: barC, minWidth: "2.5ch", textAlign: "right" }}>
+                                        {disk.usedPct.toFixed(0)}%
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <div className="rounded-full overflow-hidden" style={{ background: "var(--card-hover)", height: 4 }}>
+                                    <div className="h-full rounded-full transition-all duration-700"
+                                      style={{ width: `${disk.usedPct}%`, background: barC, boxShadow: `0 0 4px ${withAlpha(barC, 33)}` }} />
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
-                        ))}
-                        {uptimeHistory.length > 1 && (
-                          <div style={{ marginTop: 8 }}>
-                            <UptimeTimeline history={uptimeHistory} height={20} />
-                          </div>
-                        )}
+                        </div>
+                      );
+                    })()}
+                  </Card>
+                  </DraggableCard></div>
+                )}
+
+                {/* Network */}
+                {isVisible("network") && (
+                  <div style={{ order: orderIndex("network") }}><DraggableCard cardKey="network" onReorder={reorderCards}>
+                  <Card label="network" accent="var(--accent-network)" icon={<IconNetwork />}
+                    animDelay={150} expanded={expandedCard === "network"} onToggle={() => toggleCard("network")}>
+                    {!loading && metrics?.network?.interfaceName && (
+                      <span className="self-start font-mono" style={{
+                        background: "var(--surface)", border: "1px solid var(--border)",
+                        borderRadius: 4, padding: "2px 7px", fontSize: 12, color: "var(--accent-network)",
+                      }}>{metrics.network.interfaceName}</span>
+                    )}
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold" style={{ color: "var(--accent-network)" }}>↓</span>
+                        <span className="text-xs uppercase tracking-widest" style={{ color: "var(--text-faint)" }}>rx</span>
+                        <span className="text-xs font-medium tabular-nums ml-auto font-mono" style={{ color: "var(--text-secondary)" }}>
+                          {loading ? "—" : `${fmtBytes(metrics?.network.rxBytesPerSec ?? null, 1, du)}/s`}
+                        </span>
+                      </div>
+                      <Sparkline data={rxHistory} color="var(--accent-network)" autoMax height={50} />
+                      <span className="text-xs tabular-nums font-medium" style={{ color: "var(--text-faint)" }}>
+                        ↓ {fmtBytes(metrics?.network.rxBytesTotal ?? null, 1, du)} total
+                      </span>
+                    </div>
+                    <div style={{ height: 1, background: "var(--surface-bright)" }} />
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold" style={{ color: "var(--accent-network-tx)" }}>↑</span>
+                        <span className="text-xs uppercase tracking-widest" style={{ color: "var(--text-faint)" }}>tx</span>
+                        <span className="text-xs font-medium tabular-nums ml-auto font-mono" style={{ color: "var(--text-secondary)" }}>
+                          {loading ? "—" : `${fmtBytes(metrics?.network.txBytesPerSec ?? null, 1, du)}/s`}
+                        </span>
+                      </div>
+                      <Sparkline data={txHistory} color="var(--accent-network-tx)" autoMax height={50} />
+                      <span className="text-xs tabular-nums font-medium" style={{ color: "var(--text-faint)" }}>
+                        ↑ {fmtBytes(metrics?.network.txBytesTotal ?? null, 1, du)} total
+                      </span>
+                    </div>
+                    {!loading && metrics?.sysInfo?.tcpEstab != null && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs uppercase tracking-widest" style={{ color: "var(--text-faint)" }}>tcp</span>
+                        <span className="text-xs tabular-nums font-mono font-medium" style={{ color: "var(--text-muted)" }}>
+                          {metrics.sysInfo.tcpEstab} established
+                        </span>
+                      </div>
+                    )}
+                    {expandedCard === "network" && rxHistory.length > 0 && (
+                      <div className="flex flex-col gap-0.5 pt-2" style={{ borderTop: "1px solid var(--divider)" }}>
+                        <StatRow label="peak rx" value={`${fmtBytes(Math.max(...rxHistory), 1, du)}/s`} />
+                        <StatRow label="peak tx" value={`${fmtBytes(Math.max(...txHistory), 1, du)}/s`} />
                       </div>
                     )}
                   </Card>
+                  </DraggableCard></div>
                 )}
-                {isVisible("grafana") && (
-                  <ErrorBoundary name="Grafana panel">
-                    <GrafanaCard
-                      baseUrl={clientConfig?.grafana.baseUrl ?? `http://${clientConfig?.truenasIp ?? "localhost"}:30037`}
-                      panelUrl={clientConfig?.grafana.panelUrl ?? null}
-                      panels={clientConfig?.grafana.panels}
-                      tokenSet={clientConfig?.grafanaTokenSet}
-                    />
-                  </ErrorBoundary>
+
+                {/* GPU */}
+                {isVisible("gpu") && (
+                  <div style={{ order: orderIndex("gpu") }}><DraggableCard cardKey="gpu" onReorder={reorderCards}>
+                  <Card label="gpu" accent={gpuColor} alertLevel={gpuTempAlert} icon={<IconGPU />}
+                    animDelay={200} expanded={expandedCard === "gpu"} onToggle={() => toggleCard("gpu")}>
+                    {loading ? <Skeleton /> : (
+                      <>
+                        <div className="flex items-center gap-4">
+                          <div className="relative flex items-center justify-center shrink-0" style={{ width: 88, height: 88 }}>
+                            <RadialGauge percent={gpuUtil ?? 0} color={gpuColor} size={88} />
+                            <div className="absolute inset-0 flex flex-col items-center justify-center">
+                              <span className="font-medium tabular-nums font-mono" style={{ fontSize: 22, lineHeight: 1, color: "var(--text)" }}>
+                                {gpuUtil != null ? gpuUtil.toFixed(0) : "—"}
+                              </span>
+                              <span className="text-xs uppercase tracking-widest" style={{ color: "var(--text-faint)" }}>%</span>
+                            </div>
+                          </div>
+                          <div className="flex flex-col gap-1 min-w-0">
+                            {metrics?.gpu?.name && (
+                              <span className="text-xs font-medium truncate" style={{ color: "var(--text-secondary)" }}>{metrics.gpu.name}</span>
+                            )}
+                            {metrics?.gpu?.temperature != null && (
+                              <div className="flex items-baseline gap-2">
+                                <span className="font-medium tabular-nums font-mono"
+                                  style={{ fontSize: 22, lineHeight: 1, color: tempColor(metrics.gpu.temperature), transition: "color 0.3s ease" }}>
+                                  {fmtTemp(metrics.gpu.temperature, tu)}
+                                </span>
+                                <TrendDelta history={gpuTempHistory} current={metrics.gpu.temperature} goodDirection="down" suffix="°" precision={0} threshold={1} />
+                              </div>
+                            )}
+                            {metrics?.gpu?.powerDraw != null && (
+                              <span className="text-xs tabular-nums" style={{ color: "var(--text-label)" }}>
+                                {metrics.gpu.powerDraw.toFixed(1)} W
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <LabeledBar label="vram" right={`${fmtBytes(metrics?.gpu?.memUsed ?? null, 1, du)} / ${fmtBytes(metrics?.gpu?.memTotal ?? null, 1, du)}`}
+                          percent={gpuMemPct} color="var(--accent-gpu)" />
+                        {metrics?.gpu?.powerDraw != null && metrics?.gpu?.powerLimit != null && (
+                          <LabeledBar label="power" right={`${metrics.gpu.powerDraw.toFixed(1)} / ${metrics.gpu.powerLimit.toFixed(0)} W`}
+                            percent={gpuPwrPct} color="var(--accent-gpu)" />
+                        )}
+                        {(() => {
+                          const tertiaryItems: { label: string; value: string }[] = [];
+                          if (metrics?.gpu?.coreClock != null) tertiaryItems.push({ label: "core", value: `${metrics.gpu.coreClock} MHz` });
+                          if (metrics?.gpu?.memClock  != null) tertiaryItems.push({ label: "mem",  value: `${metrics.gpu.memClock} MHz`  });
+                          if (metrics?.gpu?.fanSpeed  != null) tertiaryItems.push({ label: "fan",  value: `${metrics.gpu.fanSpeed}%`    });
+                          const enc = metrics?.gpu?.encUtil ?? 0;
+                          const dec = metrics?.gpu?.decUtil ?? 0;
+                          if (enc > 0 || dec > 0) {
+                            if (metrics?.gpu?.encUtil != null) tertiaryItems.push({ label: "enc", value: `${enc}%` });
+                            if (metrics?.gpu?.decUtil != null) tertiaryItems.push({ label: "dec", value: `${dec}%` });
+                          }
+                          if (tertiaryItems.length === 0) return null;
+                          return (
+                            <div className="flex flex-wrap gap-1.5 pt-1" style={{ borderTop: "1px solid var(--border-dim)" }}>
+                              {tertiaryItems.map(item => (
+                                <span key={item.label} className="tabular-nums font-mono" style={{
+                                  background: "var(--card)", border: "1px solid var(--border)",
+                                  borderRadius: 4, padding: "2px 7px", fontSize: 12, color: "var(--text-dim)", letterSpacing: "0.01em",
+                                }}>
+                                  <span style={{ color: "var(--text-faint)", marginRight: 4 }}>{item.label}</span>
+                                  {item.value}
+                                </span>
+                              ))}
+                            </div>
+                          );
+                        })()}
+                        {gpuTempHistory.length >= 2 && (
+                          <div className="flex flex-col gap-1.5">
+                            <div className="flex justify-between items-center">
+                              <span className="text-xs uppercase tracking-widest" style={{ color: "var(--text-ghost)" }}>temp history</span>
+                            </div>
+                            <Sparkline data={gpuTempHistory} color={metrics?.gpu?.temperature != null && metrics.gpu.temperature >= 70 ? tempColor(metrics.gpu.temperature) : "var(--accent-gpu)"} autoMax height={28} />
+                          </div>
+                        )}
+                        {expandedCard === "gpu" && (() => {
+                          const s  = histStats(gpuHistory);
+                          const ts = histStats(gpuTempHistory);
+                          return (
+                            <div className="flex flex-col gap-0.5 pt-2" style={{ borderTop: "1px solid var(--divider)" }}>
+                              <StatRow label="util min" value={s.min != null ? fmtPct(s.min) : "—"} />
+                              <StatRow label="util max" value={s.max != null ? fmtPct(s.max) : "—"} />
+                              <StatRow label="util avg" value={s.avg != null ? fmtPct(s.avg) : "—"} />
+                              <StatRow label="temp min" value={fmtTemp(ts.min ?? null, tu)} />
+                              <StatRow label="temp max" value={fmtTemp(ts.max ?? null, tu)} />
+                            </div>
+                          );
+                        })()}
+                      </>
+                    )}
+                  </Card>
+                  </DraggableCard></div>
+                )}
+
+                {/* Speedtest */}
+                {isVisible("speedtest") && (
+                  <div style={{ order: orderIndex("speedtest") }}><DraggableCard cardKey="speedtest" onReorder={reorderCards}>
+                  <Card label="speedtest" accent="var(--accent-speedtest)" icon={<IconSpeedtest />}
+                    animDelay={250} externalLink={`http://${clientConfig?.truenasIp ?? "192.168.88.196"}:${SVC_PORTS.speedtest}`}>
+                    {speedtestLoading ? <Skeleton /> : !speedtestResults.length ? (
+                      <div className="flex flex-col items-center justify-center text-center gap-1.5" style={{ flex: 1, minHeight: 96, padding: "8px 0" }}>
+                        <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>No results from SpeedTracker yet</span>
+                        <span style={{ fontSize: 12, color: "var(--text-ghost)", maxWidth: 220, lineHeight: 1.5 }}>
+                          Tests run on SpeedTracker&apos;s own schedule. If this stays empty, check its URL and API token in Setup.
+                        </span>
+                      </div>
+                    ) : (() => {
+                      const latest = speedtestResults[0];
+                      const ts   = latest.timestamp ?? latest.created_at;
+                      const tsMs = ts ? new Date(ts).getTime() : null;
+                      const diff = tsMs != null ? (Date.now() - tsMs) / 1000 : null;
+                      const rel  = diff == null ? null
+                        : diff < 60    ? "just now"
+                        : diff < 3600  ? `${Math.round(diff / 60)}m ago`
+                        : diff < 86400 ? `${Math.round(diff / 3600)}h ago`
+                        : `${Math.round(diff / 86400)}d ago`;
+                      // Color the timestamp by age — a result from 278 days ago
+                      // should be visibly stale rather than blending into the bg.
+                      const relColor = ageColor(tsMs, { warnSec: 7 * 86400, critSec: 30 * 86400 });
+                      const isStale = diff != null && diff > 7 * 86400;
+                      const dl = latest.download;
+                      const quality = dl == null ? null
+                        : dl >= 500 ? { label: "Excellent", color: "var(--text-muted)", bg: "var(--surface)", border: "var(--border)" }
+                        : dl >= 200 ? { label: "Good",      color: "var(--text-muted)", bg: "var(--surface)", border: "var(--border)" }
+                        : dl >= 50  ? { label: "Fair",      color: "var(--warn)", bg: "color-mix(in srgb, var(--warn) 12%, transparent)", border: "color-mix(in srgb, var(--warn) 30%, transparent)" }
+                        :             { label: "Poor",      color: "var(--critical)", bg: "color-mix(in srgb, var(--critical) 12%, transparent)", border: "color-mix(in srgb, var(--critical) 30%, transparent)" };
+                      return (
+                        <div className="flex flex-col gap-2.5">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex flex-col gap-0.5">
+                              {latest.isp && <span className="text-[12px] font-semibold" style={{ color: "var(--text-mid)" }}>{latest.isp}</span>}
+                              {latest.serverLocation && <span className="text-xs" style={{ color: "var(--text-label)" }}>{latest.serverLocation}</span>}
+                              {latest.serverHost && <span title={latest.serverHost} className="text-xs font-mono truncate" style={{ color: "var(--text-ghost)", maxWidth: 160 }}>{latest.serverHost}</span>}
+                            </div>
+                            {quality && (
+                              <span className="text-xs font-semibold uppercase tracking-wider shrink-0 mt-0.5"
+                                style={{ color: quality.color, background: quality.bg, border: `1px solid ${quality.border}`, borderRadius: 5, padding: "2px 7px" }}>
+                                {quality.label}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-end gap-4">
+                            <div className="flex flex-col">
+                              <span className="font-medium tabular-nums font-mono" style={{ fontSize: 44, lineHeight: 1, color: "var(--text)" }}>
+                                {dl != null ? dl.toFixed(0) : "—"}
+                              </span>
+                              <span className="text-xs uppercase tracking-widest mt-0.5" style={{ color: "var(--text-faint)" }}>Mbps ↓</span>
+                            </div>
+                            <div className="flex flex-col mb-[4px]">
+                              <span className="font-medium tabular-nums font-mono" style={{ fontSize: 28, lineHeight: 1, color: "var(--text-secondary)" }}>
+                                {latest.upload != null ? latest.upload.toFixed(0) : "—"}
+                              </span>
+                              <span className="text-xs uppercase tracking-widest mt-0.5" style={{ color: "var(--text-faint)" }}>Mbps ↑</span>
+                            </div>
+                          </div>
+                          {(latest.ping != null || latest.jitter != null) && (
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "var(--text-ghost)" }} />
+                              {latest.ping != null && (
+                                <>
+                                  <span className="text-xs tabular-nums font-medium font-mono" style={{ color: "var(--text-secondary)" }}>
+                                    {latest.ping < 10 ? latest.ping.toFixed(1) : latest.ping.toFixed(0)} ms
+                                  </span>
+                                  <span className="text-xs uppercase tracking-widest" style={{ color: "var(--text-ghost)" }}>ping</span>
+                                </>
+                              )}
+                              {latest.jitter != null && (
+                                <>
+                                  <span style={{ color: "var(--text-ghost)", fontSize: 12 }}>·</span>
+                                  <span className="text-xs tabular-nums font-medium font-mono" style={{ color: "var(--text-label)" }}>
+                                    {latest.jitter < 10 ? latest.jitter.toFixed(1) : latest.jitter.toFixed(0)} ms
+                                  </span>
+                                  <span className="text-xs uppercase tracking-widest" style={{ color: "var(--text-ghost)" }}>jitter</span>
+                                </>
+                              )}
+                            </div>
+                          )}
+                          {speedtestHistory.length >= 2 && (
+                            <div className="flex flex-col gap-1">
+                              <span className="text-xs uppercase tracking-widest" style={{ color: "var(--text-ghost)" }}>download history</span>
+                              <Sparkline data={speedtestHistory} color="var(--accent-speedtest)" height={40} />
+                            </div>
+                          )}
+                          <div className="flex items-center justify-between flex-wrap gap-1">
+                            {rel && (
+                              <span
+                                title={tsMs ? new Date(tsMs).toLocaleString() : undefined}
+                                className="text-xs tabular-nums"
+                                style={{ color: relColor, fontWeight: isStale ? 600 : 400 }}>
+                                {isStale ? "⚠ " : ""}auto-tested · {rel}
+                              </span>
+                            )}
+                            {speedtestTotalTests != null && (
+                              <span className="text-xs tabular-nums" style={{ color: "var(--text-ghost)" }}>
+                                {speedtestTotalTests.toLocaleString()} tests recorded
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </Card>
+                  </DraggableCard></div>
+                )}
+
+                {/* System + Grafana — pinned to the end regardless of card reorder */}
+                {(isVisible("system") || isVisible("grafana")) && (
+                  <div className="span-all grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch" style={{ order: 9999 }}>
+                    {isVisible("system") && (
+                      <Card label="system" accent="var(--accent-system)" icon={<IconTerminal />}
+                        expanded={expandedCard === "system"} onToggle={() => toggleCard("system")}>
+                        {loading ? <Skeleton /> : (
+                          <div className="flex flex-col gap-0">
+                            {([
+                              { emoji: "🐧", label: "os",       value: metrics?.sysInfo?.os       ?? "—", mono: false },
+                              { emoji: "⚙️", label: "kernel",   value: metrics?.sysInfo?.kernel   ?? "—", mono: true  },
+                              { emoji: "🖥️", label: "arch",     value: metrics?.sysInfo?.arch     ?? "—", mono: false },
+                              { emoji: "🌐", label: "host",     value: metrics?.sysInfo?.hostname ?? "—", mono: false },
+                              { emoji: "⚡", label: "cores",    value: metrics?.sysInfo?.cpuCores != null ? `${metrics.sysInfo.cpuCores} cores` : "—", mono: false },
+                              { emoji: "🕐", label: "up since", value: fmtSince(metrics?.uptime ?? null), mono: true  },
+                            ] as { emoji: string; label: string; value: string; mono: boolean }[]).map(({ emoji, label, value, mono }, i, arr) => (
+                              <div key={label}>
+                                <div className="flex items-center gap-2 py-2">
+                                  <span style={{ fontSize: 13, width: 18, textAlign: "center", flexShrink: 0 }}>{emoji}</span>
+                                  <span className="text-xs uppercase tracking-widest shrink-0" style={{ color: "var(--text-faint)", minWidth: 46 }}>{label}</span>
+                                  <span className={`text-xs font-medium ml-auto truncate${mono ? " font-mono" : ""}`}
+                                    style={{ color: "var(--text-mid)" }}>{value}</span>
+                                </div>
+                                {i < arr.length - 1 && <div style={{ height: 1, background: "var(--surface-bright)" }} />}
+                              </div>
+                            ))}
+                            {uptimeHistory.length > 1 && (
+                              <div style={{ marginTop: 8 }}>
+                                <UptimeTimeline history={uptimeHistory} height={20} />
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </Card>
+                    )}
+                    {isVisible("grafana") && (
+                      <ErrorBoundary name="Grafana panel">
+                        <GrafanaCard
+                          baseUrl={clientConfig?.grafana.baseUrl ?? `http://${clientConfig?.truenasIp ?? "localhost"}:30037`}
+                          panelUrl={clientConfig?.grafana.panelUrl ?? null}
+                          panels={clientConfig?.grafana.panels}
+                          tokenSet={clientConfig?.grafanaTokenSet}
+                        />
+                      </ErrorBoundary>
+                    )}
+                  </div>
                 )}
               </div>
-            )}
-          </div>
 
-          {/* ── Disk health (SMART) ── */}
-          {/* Draws its own card; collapses to a slim hint (or nothing) with no exporter. */}
-          {isVisible("system") && (
-            <ErrorBoundary name="Disk health">
-              <DiskHealthPanel />
-            </ErrorBoundary>
-          )}
+              {/* ── Disk health (SMART) ── */}
+              {/* Draws its own card; collapses to a slim hint (or nothing) with no exporter. */}
+              {isVisible("system") && (
+                <ErrorBoundary name="Disk health">
+                  <DiskHealthPanel />
+                </ErrorBoundary>
+              )}
 
-          {/* ── Custom cards (user-defined PromQL) ── */}
-          <ErrorBoundary name="Custom cards">
-            <CustomCardsGrid refreshInterval={settings.refreshInterval} />
-          </ErrorBoundary>
+              {/* ── Custom cards (user-defined PromQL) ── */}
+              <ErrorBoundary name="Custom cards">
+                <CustomCardsGrid refreshInterval={settings.refreshInterval} />
+              </ErrorBoundary>
 
-          {/* ── NOW PLAYING banner ── */}
-          {(() => {
-            const tautulliSvc = services?.find(s => s.name === "tautulli");
-            const streams = tautulliSvc?.streams ?? [];
-            if (!streams.length) return null;
-            return (
-              <div style={{
-                background: "var(--card)", border: "1px solid var(--border)",
-                borderRadius: 14, padding: "14px 20px",
-              }}>
-                <div className="flex items-center gap-3 mb-3">
-                  <span style={{
-                    width: 8, height: 8, borderRadius: "50%", background: "var(--critical)", flexShrink: 0,
-                  }} />
-                  <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--accent-speedtest)" }}>
-                    Now Playing · {streams.length} stream{streams.length !== 1 ? "s" : ""}
-                  </span>
-                </div>
-                <div className="flex flex-col gap-3">
-                  {streams.map((st, i) => (
-                    <div key={i} className="flex flex-col gap-1.5">
-                      <div className="flex items-baseline justify-between gap-2">
-                        <span className="text-[12px] font-medium truncate" style={{ color: "var(--text-secondary)" }}>{st.title}</span>
-                        {st.posStr && <span className="text-xs tabular-nums font-mono shrink-0" style={{ color: "var(--text-faint)" }}>{st.posStr}</span>}
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--text-faint)", flexShrink: 0 }}>
-                          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
-                        </svg>
-                        <span style={{ fontSize: 12, color: "var(--text-label)" }}>{st.user}</span>
-                      </div>
-                      <div style={{ height: 3, background: "var(--border-subtle)", borderRadius: 2 }}>
-                        <div style={{
-                          height: "100%", borderRadius: 2,
-                          width: `${Math.min(100, st.progress)}%`,
-                          background: "var(--data-strong)",
-                        }} />
-                      </div>
+              {/* ── activity feed ── */}
+              {isVisible("activity") && (
+                <ErrorBoundary name="Activity feed">
+                  <ActivityFeed events={activityEvents} loading={activityLoading} />
+                </ErrorBoundary>
+              )}
+            </div>
+            <div className="dash-side">
+              {/* ── NOW PLAYING banner ── */}
+              {(() => {
+                const tautulliSvc = services?.find(s => s.name === "tautulli");
+                const streams = tautulliSvc?.streams ?? [];
+                if (!streams.length) return null;
+                return (
+                  <div style={{
+                    background: "var(--card)", border: "1px solid var(--border)",
+                    borderRadius: 14, padding: "14px 20px",
+                  }}>
+                    <div className="flex items-center gap-3 mb-3">
+                      <span style={{
+                        width: 8, height: 8, borderRadius: "50%", background: "var(--critical)", flexShrink: 0,
+                      }} />
+                      <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--accent-speedtest)" }}>
+                        Now Playing · {streams.length} stream{streams.length !== 1 ? "s" : ""}
+                      </span>
                     </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })()}
+                    <div className="flex flex-col gap-3">
+                      {streams.map((st, i) => (
+                        <div key={i} className="flex flex-col gap-1.5">
+                          <div className="flex items-baseline justify-between gap-2">
+                            <span className="text-[12px] font-medium truncate" style={{ color: "var(--text-secondary)" }}>{st.title}</span>
+                            {st.posStr && <span className="text-xs tabular-nums font-mono shrink-0" style={{ color: "var(--text-faint)" }}>{st.posStr}</span>}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--text-faint)", flexShrink: 0 }}>
+                              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+                            </svg>
+                            <span style={{ fontSize: 12, color: "var(--text-label)" }}>{st.user}</span>
+                          </div>
+                          <div style={{ height: 3, background: "var(--border-subtle)", borderRadius: 2 }}>
+                            <div style={{
+                              height: "100%", borderRadius: 2,
+                              width: `${Math.min(100, st.progress)}%`,
+                              background: "var(--data-strong)",
+                            }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
 
-          {/* ── activity feed ── */}
-          {isVisible("activity") && (
-            <ErrorBoundary name="Activity feed">
-              <ActivityFeed events={activityEvents} loading={activityLoading} />
-            </ErrorBoundary>
-          )}
-
-          {/* ── services ── */}
-          {isVisible("services") && (
-            <ErrorBoundary name="Services">
-              <ServicesPanel
-                services={services}
-                servicesLoading={servicesLoading}
-                servicesUpdatedAt={servicesUpdatedAt}
-                serviceFilter={serviceFilter}
-                setServiceFilter={setServiceFilter}
-                serviceFilterRef={serviceFilterRef}
-                clientConfig={clientConfig}
-                setLogsContainer={setLogsContainer}
-                restartingSvc={restartingSvc}
-                restartService={restartService}
-              />
-            </ErrorBoundary>
-          )}
+              {/* ── services ── */}
+              {isVisible("services") && (
+                <ErrorBoundary name="Services">
+                  <ServicesPanel
+                    services={services}
+                    servicesLoading={servicesLoading}
+                    servicesUpdatedAt={servicesUpdatedAt}
+                    serviceFilter={serviceFilter}
+                    setServiceFilter={setServiceFilter}
+                    serviceFilterRef={serviceFilterRef}
+                    clientConfig={clientConfig}
+                    setLogsContainer={setLogsContainer}
+                    restartingSvc={restartingSvc}
+                    restartService={restartService}
+                  />
+                </ErrorBoundary>
+              )}
+            </div>
+          </div>
 
           {/* ── bookmarks ── */}
           {showBookmarks && (

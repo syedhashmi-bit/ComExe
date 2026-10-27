@@ -79,7 +79,7 @@ and SLA reports.
 
 | Layer | Choice |
 |---|---|
-| Framework | Next.js 16 (App Router — 7 route-segment pages, 28 components) |
+| Framework | Next.js 16 (App Router — 7 route-segment pages, 29 components) |
 | Language | TypeScript 6 |
 | Styling | Tailwind CSS 3 + inline `style` for dynamic colours |
 | Charts | Canvas API + inline SVG, **zero chart libraries** |

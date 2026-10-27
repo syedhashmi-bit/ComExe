@@ -298,6 +298,40 @@ body {
   }
 }
 
+/* ── Dashboard columns ───────────────────────────────────────────────────────
+   Below 1280px the dashboard is one column in its original order. From 1280px
+   the page grows past the old 1024px cap and splits in two: metric cards on
+   the left, Plex + services on the right, so services sit beside the numbers
+   instead of a long scroll below them. The metric grid fills whatever width
+   it gets: 3 columns from ~1024px and in the left column from ~1440px, 2 in
+   the narrower left column at 1280px. */
+.dash-columns, .dash-main, .dash-side {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+@media (min-width: 640px) {
+  .dash-columns, .dash-main, .dash-side { gap: 24px; }
+}
+
+.metric-grid {
+  display: grid;
+  gap: 16px;
+  align-items: stretch;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+}
+.metric-grid > .span-all { grid-column: 1 / -1; }
+
+@media (min-width: 1280px) {
+  .main-content, .header-inner { max-width: 1560px; }
+  .dash-columns {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(460px, 0.62fr);
+    align-items: start;
+  }
+}
+
 /* ── Focus visibility ────────────────────────────────────────────────────────
    There was no :focus or :focus-visible rule anywhere in the app, and 21 inline
    `outline: "none"` declarations across the components removed the browser

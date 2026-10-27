@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import { PageHeader, PageTitle } from "@/app/components/PageHeader";
 
 interface ContainerInfo {
   id: string;
@@ -148,13 +148,7 @@ export default function LogsPage() {
 
   return (
     <div style={{ background: "var(--bg)", minHeight: "100vh", color: "var(--text)" }}>
-      {/* Header */}
-      <div className="sticky top-0 z-30" style={{ background: "var(--header-bg)", backdropFilter: "blur(12px)", borderBottom: "1px solid var(--border-dim)" }}>
-        <div className="flex items-center gap-2 sm:gap-4 flex-wrap px-3 sm:px-6 py-3" style={{ maxWidth: 1400, margin: "0 auto" }}>
-          <Link href="/" style={{ color: "var(--brand)", textDecoration: "none", fontSize: 12, fontWeight: 600 }}>
-            &larr; Dashboard
-          </Link>
-          <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.02em" }}>Log Viewer</span>
+      <PageHeader current="logs">
 
           {/* Container selector */}
           <select
@@ -204,12 +198,13 @@ export default function LogsPage() {
             {/* Tail toggle */}
             <button
               onClick={() => setTailMode(t => !t)}
+              aria-pressed={tailMode}
               style={{
-                fontSize: 12, padding: "4px 10px", borderRadius: 5, cursor: "pointer",
-                background: tailMode ? "var(--brand)" : "var(--card)",
-                color: tailMode ? "var(--bg)" : "var(--text-dim)",
-                border: `1px solid ${tailMode ? "var(--brand)" : "var(--border)"}`,
-                fontWeight: tailMode ? 700 : 400,
+                fontSize: 12, padding: "5px 10px", borderRadius: 6, cursor: "pointer",
+                background: tailMode ? "var(--surface)" : "transparent",
+                color: tailMode ? "var(--text)" : "var(--text-muted)",
+                border: `1px solid ${tailMode ? "var(--border-hover)" : "var(--border)"}`,
+                fontWeight: tailMode ? 600 : 400,
               }}
             >
               {tailMode ? "Tailing..." : "Tail"}
@@ -217,21 +212,23 @@ export default function LogsPage() {
             {/* Auto-scroll toggle */}
             <button
               onClick={() => setAutoScroll(a => !a)}
+              aria-pressed={autoScroll}
               style={{
-                fontSize: 12, padding: "4px 10px", borderRadius: 5, cursor: "pointer",
-                background: autoScroll ? "rgba(16,185,129,0.15)" : "var(--card)",
-                color: autoScroll ? "var(--ok)" : "var(--text-dim)",
-                border: `1px solid ${autoScroll ? "rgba(16,185,129,0.3)" : "var(--border)"}`,
+                fontSize: 12, padding: "5px 10px", borderRadius: 6, cursor: "pointer",
+                background: autoScroll ? "var(--surface)" : "transparent",
+                color: autoScroll ? "var(--text)" : "var(--text-muted)",
+                border: `1px solid ${autoScroll ? "var(--border-hover)" : "var(--border)"}`,
+                fontWeight: autoScroll ? 600 : 400,
               }}
             >
               Auto-scroll
             </button>
           </div>
-        </div>
-      </div>
+      </PageHeader>
 
       {/* Toolbar */}
-      <div className="px-6 py-3" style={{ maxWidth: 1400, margin: "0 auto" }}>
+      <div className="px-3 sm:px-6 pt-6 pb-3 flex flex-col gap-4" style={{ maxWidth: 1560, margin: "0 auto" }}>
+        <PageTitle title="Logs" description="Container logs with search, level filters and live tail." />
         <div className="flex items-center gap-3 flex-wrap">
           {/* Search */}
           <div style={{ position: "relative", flex: 1, minWidth: 200 }}>
@@ -262,10 +259,10 @@ export default function LogsPage() {
                   key={opt.key}
                   onClick={() => setLevelFilter(opt.key)}
                   style={{
-                    fontSize: 12, padding: "4px 8px", borderRadius: 4, cursor: "pointer",
-                    background: active ? (opt.key === "error" ? "rgba(239,68,68,0.15)" : opt.key === "warn" ? "rgba(245,158,11,0.15)" : "var(--surface-bright)") : "var(--card)",
-                    color: active ? (LEVEL_COLORS[opt.key === "all" ? "unknown" : opt.key] ?? "var(--text)") : "var(--text-ghost)",
-                    border: `1px solid ${active ? (opt.key === "error" ? "rgba(239,68,68,0.3)" : opt.key === "warn" ? "rgba(245,158,11,0.3)" : "var(--border-mid)") : "var(--border-dim)"}`,
+                    fontSize: 12, padding: "5px 9px", borderRadius: 6, cursor: "pointer",
+                    background: active ? (opt.key === "error" ? "color-mix(in srgb, var(--critical) 15%, transparent)" : opt.key === "warn" ? "color-mix(in srgb, var(--warn) 15%, transparent)" : "var(--surface)") : "transparent",
+                    color: active ? (LEVEL_COLORS[opt.key === "all" ? "unknown" : opt.key] ?? "var(--text)") : "var(--text-muted)",
+                    border: `1px solid ${active ? (opt.key === "error" ? "color-mix(in srgb, var(--critical) 30%, transparent)" : opt.key === "warn" ? "color-mix(in srgb, var(--warn) 30%, transparent)" : "var(--border-hover)") : "var(--border)"}`,
                     fontWeight: active ? 600 : 400,
                     fontVariantNumeric: "tabular-nums",
                   }}
@@ -283,7 +280,7 @@ export default function LogsPage() {
       </div>
 
       {/* Log output */}
-      <div className="px-6 pb-8" style={{ maxWidth: 1400, margin: "0 auto" }}>
+      <div className="px-3 sm:px-6 pb-8" style={{ maxWidth: 1560, margin: "0 auto" }}>
         {!selected ? (
           <div className="flex flex-col items-center justify-center gap-3" style={{ height: 400, color: "var(--text-ghost)" }}>
             <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -328,10 +325,10 @@ export default function LogsPage() {
                           key={i}
                           style={{
                             borderBottom: "1px solid var(--border-dim)",
-                            background: isHighlighted ? "rgba(6,182,212,0.06)" : "transparent",
+                            background: isHighlighted ? "color-mix(in srgb, var(--brand) 6%, transparent)" : "transparent",
                           }}
                           onMouseEnter={e => (e.currentTarget.style.background = "var(--surface)")}
-                          onMouseLeave={e => (e.currentTarget.style.background = isHighlighted ? "rgba(6,182,212,0.06)" : "transparent")}
+                          onMouseLeave={e => (e.currentTarget.style.background = isHighlighted ? "color-mix(in srgb, var(--brand) 6%, transparent)" : "transparent")}
                         >
                           <td style={{
                             padding: "2px 8px", width: 36,
@@ -398,7 +395,7 @@ function highlightSearch(text: string, query: string): React.ReactNode {
     if (idx > lastIndex) parts.push(text.slice(lastIndex, idx));
     parts.push(
       <mark key={keyCounter++} style={{
-        background: "rgba(6,182,212,0.25)", color: "var(--brand)",
+        background: "color-mix(in srgb, var(--brand) 25%, transparent)", color: "var(--text)",
         borderRadius: 2, padding: "0 1px",
       }}>
         {text.slice(idx, idx + query.length)}

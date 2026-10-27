@@ -46,7 +46,6 @@ export default function WelcomePage() {
 
   if (!mounted) return null;
 
-  const isPaper = selectedTheme === "paper";
 
   return (
     <div style={{
@@ -67,7 +66,7 @@ export default function WelcomePage() {
             width: i === step ? 24 : 8,
             height: 8,
             borderRadius: 4,
-            background: i === step ? "var(--brand)" : (isPaper ? "rgba(0,0,0,0.12)" : "rgba(255,255,255,0.12)"),
+            background: i === step ? "var(--brand)" : "var(--border-mid)",
             transition: "all 0.3s ease",
           }} />
         ))}
@@ -87,9 +86,8 @@ export default function WelcomePage() {
             background: "var(--brand)",
             display: "flex", alignItems: "center", justifyContent: "center",
             margin: "0 auto 24px",
-            boxShadow: `0 0 40px ${isPaper ? "rgba(2,132,199,0.2)" : "rgba(6,182,212,0.3)"}`,
           }}>
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke={isPaper ? "#fff" : "#0a0c12"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--bg)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="2" y="3" width="20" height="14" rx="2" />
               <path d="M8 21h8" />
               <path d="M12 17v4" />
@@ -107,7 +105,7 @@ export default function WelcomePage() {
           <div style={{
             display: "flex", flexDirection: "column", gap: 10,
             background: "var(--card)",
-            border: `1px solid ${isPaper ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.06)"}`,
+            border: `1px solid var(--border)`,
             borderRadius: 12,
             padding: "16px 20px",
             textAlign: "left",
@@ -121,7 +119,7 @@ export default function WelcomePage() {
               <div key={item.icon} style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <span style={{
                   width: 24, height: 24, borderRadius: 12,
-                  background: `${isPaper ? "rgba(2,132,199,0.1)" : "rgba(6,182,212,0.12)"}`,
+                  background: "color-mix(in srgb, var(--brand) 12%, transparent)",
                   color: "var(--brand)",
                   fontSize: 12, fontWeight: 700,
                   display: "flex", alignItems: "center", justifyContent: "center",
@@ -134,7 +132,7 @@ export default function WelcomePage() {
 
           <button onClick={() => setStep(1)} style={{
             background: "var(--brand)",
-            color: isPaper ? "#fff" : "#0a0c12",
+            color: "var(--bg)",
             border: "none",
             borderRadius: 10,
             padding: "12px 32px",
@@ -142,7 +140,6 @@ export default function WelcomePage() {
             fontWeight: 600,
             cursor: "pointer",
             transition: "transform 0.15s, box-shadow 0.15s",
-            boxShadow: `0 4px 20px ${isPaper ? "rgba(2,132,199,0.25)" : "rgba(6,182,212,0.3)"}`,
           }}
             onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-1px)"; }}
             onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; }}
@@ -188,8 +185,8 @@ export default function WelcomePage() {
                     padding: "16px 8px",
                     borderRadius: 12,
                     cursor: "pointer",
-                    background: active ? (isPaper ? "rgba(2,132,199,0.06)" : "rgba(255,255,255,0.06)") : "transparent",
-                    border: `2px solid ${active ? t.brand : (isPaper ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.06)")}`,
+                    background: active ? "var(--surface)" : "transparent",
+                    border: `2px solid ${active ? t.brand : "var(--border)"}`,
                     transition: "all 0.2s ease",
                     outline: "none",
                   }}
@@ -198,7 +195,7 @@ export default function WelcomePage() {
                   <div style={{
                     width: 56, height: 40, borderRadius: 8,
                     background: t.bg,
-                    border: `1.5px solid ${isPaper && t.key !== "paper" ? "rgba(0,0,0,0.12)" : "rgba(255,255,255,0.1)"}`,
+                    border: `1.5px solid var(--border-mid)`,
                     position: "relative",
                     overflow: "hidden",
                   }}>
@@ -238,7 +235,7 @@ export default function WelcomePage() {
             <button onClick={() => setStep(0)} style={{
               background: "transparent",
               color: "var(--text-secondary)",
-              border: `1px solid ${isPaper ? "rgba(0,0,0,0.12)" : "rgba(255,255,255,0.1)"}`,
+              border: `1px solid var(--border-mid)`,
               borderRadius: 10, padding: "10px 24px",
               fontSize: 13, fontWeight: 500, cursor: "pointer",
             }}>
@@ -246,11 +243,10 @@ export default function WelcomePage() {
             </button>
             <button onClick={() => { applyTheme(); setStep(2); }} style={{
               background: "var(--brand)",
-              color: isPaper ? "#fff" : "#0a0c12",
+              color: "var(--bg)",
               border: "none",
               borderRadius: 10, padding: "10px 32px",
               fontSize: 13, fontWeight: 600, cursor: "pointer",
-              boxShadow: `0 4px 20px ${isPaper ? "rgba(2,132,199,0.25)" : "rgba(6,182,212,0.3)"}`,
             }}>
               Continue
             </button>
@@ -268,7 +264,7 @@ export default function WelcomePage() {
           <div style={{
             width: 56, height: 56,
             borderRadius: 14,
-            background: isPaper ? "rgba(2,132,199,0.08)" : "rgba(6,182,212,0.1)",
+            background: "color-mix(in srgb, var(--brand) 10%, transparent)",
             display: "flex", alignItems: "center", justifyContent: "center",
             margin: "0 auto 20px",
           }}>
@@ -293,7 +289,7 @@ export default function WelcomePage() {
             <button onClick={() => setStep(1)} style={{
               background: "transparent",
               color: "var(--text-secondary)",
-              border: `1px solid ${isPaper ? "rgba(0,0,0,0.12)" : "rgba(255,255,255,0.1)"}`,
+              border: `1px solid var(--border-mid)`,
               borderRadius: 10, padding: "10px 24px",
               fontSize: 13, fontWeight: 500, cursor: "pointer",
             }}>
@@ -302,12 +298,11 @@ export default function WelcomePage() {
             <Link href="/setup" onClick={() => { markDone(); }} style={{
               display: "inline-flex", alignItems: "center", gap: 6,
               background: "var(--brand)",
-              color: isPaper ? "#fff" : "#0a0c12",
+              color: "var(--bg)",
               border: "none",
               borderRadius: 10, padding: "10px 28px",
               fontSize: 13, fontWeight: 600, cursor: "pointer",
               textDecoration: "none",
-              boxShadow: `0 4px 20px ${isPaper ? "rgba(2,132,199,0.25)" : "rgba(6,182,212,0.3)"}`,
             }}>
               Open setup wizard
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -339,11 +334,11 @@ export default function WelcomePage() {
           <div style={{
             width: 56, height: 56,
             borderRadius: 28,
-            background: isPaper ? "rgba(16,185,129,0.1)" : "rgba(16,185,129,0.12)",
+            background: "color-mix(in srgb, var(--ok) 12%, transparent)",
             display: "flex", alignItems: "center", justifyContent: "center",
             margin: "0 auto 20px",
           }}>
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--ok)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M20 6L9 17l-5-5" />
             </svg>
           </div>
@@ -356,7 +351,7 @@ export default function WelcomePage() {
             <code style={{
               fontSize: 12,
               color: "var(--brand)",
-              background: isPaper ? "rgba(2,132,199,0.06)" : "rgba(6,182,212,0.08)",
+              background: "color-mix(in srgb, var(--brand) 8%, transparent)",
               padding: "2px 6px",
               borderRadius: 4,
             }}>
@@ -368,12 +363,11 @@ export default function WelcomePage() {
           <Link href="/" onClick={markDone} style={{
             display: "inline-flex", alignItems: "center", gap: 8,
             background: "var(--brand)",
-            color: isPaper ? "#fff" : "#0a0c12",
+            color: "var(--bg)",
             border: "none",
             borderRadius: 10, padding: "12px 32px",
             fontSize: 14, fontWeight: 600, cursor: "pointer",
             textDecoration: "none",
-            boxShadow: `0 4px 20px ${isPaper ? "rgba(2,132,199,0.25)" : "rgba(6,182,212,0.3)"}`,
           }}>
             Go to dashboard
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">

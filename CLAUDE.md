@@ -24,7 +24,7 @@ A single-user, LAN-only homelab dashboard for a TrueNAS Scale host. Next.js 16
 chart library. Every upstream service is reached through a server-side route so
 credentials never enter the browser bundle.
 
-**Scale:** ~15k lines of TS/TSX under `app/` — 33 API routes, 28 components,
+**Scale:** ~15k lines of TS/TSX under `app/` — 33 API routes, 29 components,
 26 lib modules, 7 pages.
 
 **Deployment posture:** one LAN, one user, never exposed to the internet. That
@@ -308,12 +308,26 @@ services are configured), `/login`, `/analytics` (interactive area charts over
   lift. A warning/critical `alertLevel` tints the border and adds a labelled
   dot. Keyboard-activatable (role="button"). Optional ⓘ popover from `CARD_INFO`.
 
-**Feature components:** `StatusSummary`, `ServicesPanel`, `ServiceDetailSheet`, `BookmarksPanel`,
+**Feature components:** `StatusSummary`, `PageHeader`, `ServicesPanel`, `ServiceDetailSheet`, `BookmarksPanel`,
 `SettingsPanel`, `SearchBar`, `MikrotikTab`, `GrafanaCard`, `ActivityFeed`,
 `AreaChart`, `CommandPalette`, `KeyboardShortcuts`, `NotificationCenter`,
 `HeaderSparklines`, `UptimeTimeline`, `DiskHealthPanel`, `NetworkTopology`,
 `ServerFleetPanel`, `DependencyMap`, `CustomCards` + `CustomCardEditor`,
 `ContainerLogsSheet`, `DraggableCard`, `ErrorBoundary`, `Modal`, `Clock`, `icons`.
+
+**Layout.** Below 1280px the dashboard is one column. From 1280px it widens
+(max 1560px) and splits in two — `.dash-columns` / `.dash-main` / `.dash-side`
+in `globals.css`: metric grid, disk health, custom cards and activity on the
+left; Plex now-playing and services on the right. The metric grid
+(`.metric-grid`) is `auto-fill, minmax(260px, 1fr)`, so it fills whatever width
+it gets; a full-width item inside it uses `.span-all`. Breakpoint rules live in
+CSS rather than new Tailwind classes.
+
+**Sub-pages** (Analytics, Forecast, Logs) share `components/PageHeader.tsx`:
+`PageHeader` (ComExe mark, the same page nav as the dashboard with the current
+page marked, a slot for the page's controls), `PageTitle`, and `Segmented` (a
+quiet radio-group for time ranges). Setup and Welcome use theme tokens only —
+no hardcoded hex/rgba, no glows.
 
 **`StatusSummary`** is the first thing on the dashboard: "All systems normal", or
 a list of what needs attention — crossed thresholds (`healthIssues()` in

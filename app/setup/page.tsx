@@ -165,7 +165,7 @@ function Field({ label, value, onChange, type = "text", placeholder, mono = fals
 }) {
   return (
     <label className="flex flex-col gap-1">
-      <span className="text-xs uppercase tracking-widest" style={{ color: "var(--text-label)" }}>{label}</span>
+      <span style={{ fontSize: 12, fontWeight: 500, color: "var(--text-muted)" }}>{label}</span>
       <input
         type={type}
         value={value}
@@ -194,7 +194,7 @@ function Btn({ children, onClick, variant = "secondary", disabled }: {
   variant?: "primary" | "secondary" | "danger"; disabled?: boolean;
 }) {
   const palette = variant === "primary" ? { bg: "var(--brand)", fg: "var(--bg)" }
-                : variant === "danger"  ? { bg: "rgba(239,68,68,0.15)", fg: "var(--critical)" }
+                : variant === "danger"  ? { bg: "color-mix(in srgb, var(--critical) 15%, transparent)", fg: "var(--critical)" }
                                         : { bg: "var(--surface)", fg: "var(--text-mid)" };
   return (
     <button
@@ -203,7 +203,7 @@ function Btn({ children, onClick, variant = "secondary", disabled }: {
       style={{
         background: palette.bg,
         color: palette.fg,
-        border: variant === "primary" ? "none" : `1px solid ${variant === "danger" ? "rgba(239,68,68,0.35)" : "var(--border-mid)"}`,
+        border: variant === "primary" ? "none" : `1px solid ${variant === "danger" ? "color-mix(in srgb, var(--critical) 35%, transparent)" : "var(--border-mid)"}`,
         borderRadius: 6,
         padding: "6px 12px",
         fontSize: 12,
@@ -544,8 +544,8 @@ export default function SetupWizard() {
       {/* ── 4. Grafana embed ── */}
       <Section title="4 · Grafana embed (optional)" subtitle="If you want a Grafana panel embedded in the dashboard, paste the dashboard's UID and your Prometheus datasource UID. Both are visible in Grafana's URLs.">
         <div style={{
-          background: state.grafana.enabled ? "rgba(249,115,22,0.05)" : "var(--surface-dim)",
-          border: `1px solid ${state.grafana.enabled ? "rgba(249,115,22,0.2)" : "var(--border-dim)"}`,
+          background: "var(--surface-dim)",
+          border: `1px solid ${state.grafana.enabled ? "var(--border-mid)" : "var(--border-dim)"}`,
           borderRadius: 8, padding: 14,
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -553,7 +553,7 @@ export default function SetupWizard() {
               type="checkbox"
               checked={state.grafana.enabled}
               onChange={e => setState(s => ({ ...s, grafana: { ...s.grafana, enabled: e.target.checked, baseUrl: s.grafana.baseUrl || `http://${s.truenasIp}:30037` } }))}
-              style={{ width: 14, height: 14, accentColor: "#f97316", cursor: "pointer" }}
+              style={{ width: 14, height: 14, accentColor: "var(--brand)", cursor: "pointer" }}
             />
             <span style={{ fontSize: 13, fontWeight: 600, color: state.grafana.enabled ? "var(--text)" : "var(--text-dim)" }}>Grafana panel</span>
           </div>
@@ -569,13 +569,13 @@ export default function SetupWizard() {
               {/* Multi-panel support */}
               <div style={{ borderTop: "1px solid var(--border-dim)", paddingTop: 12 }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                  <span style={{ fontSize: 12, color: "var(--text-label)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Additional panels</span>
+                  <span style={{ fontSize: 12, color: "var(--text-label)" }}>Additional panels</span>
                   <button onClick={() => {
                     const s = { ...state, grafana: { ...state.grafana, panels: [...state.grafana.panels, { panelId: "", label: "", size: "md" as const }] } };
                     setState(s); saveState(s);
                   }} style={{
-                    fontSize: 12, color: "#f97316", background: "rgba(249,115,22,0.08)",
-                    border: "1px solid rgba(249,115,22,0.2)", borderRadius: 5,
+                    fontSize: 12, color: "var(--text-secondary)", background: "var(--surface)",
+                    border: "1px solid var(--border-mid)", borderRadius: 6,
                     padding: "3px 10px", cursor: "pointer",
                   }}>+ Add panel</button>
                 </div>
@@ -590,15 +590,15 @@ export default function SetupWizard() {
                         <button key={sz} onClick={() => { const s = { ...state, grafana: { ...state.grafana, panels: state.grafana.panels.map((p, i) => i === pi ? { ...p, size: sz } : p) } }; setState(s); saveState(s); }}
                           style={{
                             fontSize: 12, padding: "4px 8px", borderRadius: 4, cursor: "pointer",
-                            background: panel.size === sz ? "rgba(249,115,22,0.2)" : "var(--surface-dim)",
-                            border: `1px solid ${panel.size === sz ? "rgba(249,115,22,0.4)" : "var(--border)"}`,
-                            color: panel.size === sz ? "#f97316" : "var(--text-faint)",
+                            background: panel.size === sz ? "var(--surface)" : "var(--surface-dim)",
+                            border: `1px solid ${panel.size === sz ? "var(--border-hover)" : "var(--border)"}`,
+                            color: panel.size === sz ? "var(--text)" : "var(--text-faint)",
                             fontWeight: panel.size === sz ? 600 : 400,
                           }}>{sz.toUpperCase()}</button>
                       ))}
                     </div>
                     <button onClick={() => { const s = { ...state, grafana: { ...state.grafana, panels: state.grafana.panels.filter((_, i) => i !== pi) } }; setState(s); saveState(s); }}
-                      style={{ fontSize: 12, color: "#ef4444", background: "none", border: "none", cursor: "pointer", padding: "4px 6px" }} title="Remove">×</button>
+                      style={{ fontSize: 12, color: "var(--critical)", background: "none", border: "none", cursor: "pointer", padding: "4px 6px" }} title="Remove">×</button>
                   </div>
                 ))}
                 {state.grafana.panels.length === 0 && (
@@ -633,7 +633,7 @@ export default function SetupWizard() {
           borderRadius: 10, padding: 16,
         }}>
           <div>
-            <label style={{ display: "block", fontSize: 12, color: "var(--text-faint)", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>Search Engine</label>
+            <label style={{ display: "block", fontSize: 12, color: "var(--text-faint)", marginBottom: 4 }}>Search Engine</label>
             <select
               value={state.preferences.searchEngine}
               onChange={e => { const s = { ...state, preferences: { ...state.preferences, searchEngine: e.target.value } }; setState(s); saveState(s); }}
@@ -646,7 +646,7 @@ export default function SetupWizard() {
             </select>
           </div>
           <div>
-            <label style={{ display: "block", fontSize: 12, color: "var(--text-faint)", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>Timezone</label>
+            <label style={{ display: "block", fontSize: 12, color: "var(--text-faint)", marginBottom: 4 }}>Timezone</label>
             <select
               value={state.preferences.timezone}
               onChange={e => { const s = { ...state, preferences: { ...state.preferences, timezone: e.target.value } }; setState(s); saveState(s); }}
@@ -659,7 +659,7 @@ export default function SetupWizard() {
             </select>
           </div>
           <div style={{ gridColumn: "1 / -1" }}>
-            <label style={{ display: "block", fontSize: 12, color: "var(--text-faint)", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>Theme</label>
+            <label style={{ display: "block", fontSize: 12, color: "var(--text-faint)", marginBottom: 8 }}>Theme</label>
             <div style={{ display: "flex", gap: 8 }}>
               {THEMES.map(t => {
                 const active = state.preferences.theme === t.key;
@@ -700,17 +700,17 @@ export default function SetupWizard() {
         }}>
           {writable === false && (
             <div style={{
-              background: "rgba(245,158,11,0.08)",
-              border: "1px solid rgba(245,158,11,0.3)",
-              borderRadius: 6, padding: "10px 12px",
-              fontSize: 12, color: "#f59e0b", lineHeight: 1.6,
+              background: "color-mix(in srgb, var(--warn) 8%, transparent)",
+              border: "1px solid color-mix(in srgb, var(--warn) 30%, transparent)",
+              borderRadius: 8, padding: "12px 14px",
+              fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.6,
             }}>
-              <strong>Writable data volume not mounted.</strong> Save & apply needs a writable directory at <code style={{ color: "#fde68a" }}>/app/data</code>. Add this to your <code style={{ color: "#fde68a" }}>docker-compose.yml</code>:
-              <pre style={{ marginTop: 8, padding: 8, background: "#1a1300", borderRadius: 4, fontSize: 12, color: "#fcd34d", whiteSpace: "pre-wrap" }}>{`services:
+              <strong style={{ color: "var(--warn)" }}>Writable data volume not mounted.</strong> Save & apply needs a writable directory at <code style={{ color: "var(--text)" }}>/app/data</code>. Add this to your <code style={{ color: "var(--text)" }}>docker-compose.yml</code>:
+              <pre style={{ marginTop: 8, padding: 8, background: "var(--surface-dim)", borderRadius: 6, fontSize: 12, color: "var(--text)", whiteSpace: "pre-wrap" }}>{`services:
   comexe:
     volumes:
       - ./dashboard-data:/app/data`}</pre>
-              Or for plain <code style={{ color: "#fde68a" }}>docker run</code>: <code style={{ color: "#fde68a" }}>-v /root/dashboard-data:/app/data</code>. Restart the container, then come back here. Until then, use the manual config below.
+              Or for plain <code style={{ color: "var(--text)" }}>docker run</code>: <code style={{ color: "var(--text)" }}>-v /root/dashboard-data:/app/data</code>. Restart the container, then come back here. Until then, use the manual config below.
             </div>
           )}
 

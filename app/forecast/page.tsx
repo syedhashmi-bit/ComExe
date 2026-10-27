@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
+import { PageHeader, PageTitle, Segmented } from "@/app/components/PageHeader";
 
 interface Anomaly {
   metric: string;
@@ -52,7 +52,7 @@ const METRIC_LABELS: Record<string, { label: string; color: string; unit: string
   gpu:      { label: "GPU",        color: "var(--accent-gpu)",     unit: "%" },
   disk_pct: { label: "Disk",       color: "var(--accent-fs)",      unit: "%" },
   net_rx:   { label: "Net RX",     color: "var(--accent-network)", unit: " B/s" },
-  net_tx:   { label: "Net TX",     color: "#8b5cf6",               unit: " B/s" },
+  net_tx:   { label: "Net TX",     color: "var(--accent-network-tx)", unit: " B/s" },
 };
 
 function fmtDuration(ms: number | null): string {
@@ -100,31 +100,12 @@ export default function ForecastPage() {
 
   return (
     <div style={{ background: "var(--bg)", minHeight: "100vh", color: "var(--text)" }}>
-      {/* Header */}
-      <div className="sticky top-0 z-30" style={{ background: "var(--header-bg)", backdropFilter: "blur(12px)", borderBottom: "1px solid var(--border-dim)" }}>
-        <div className="flex items-center gap-4 px-6 py-3" style={{ maxWidth: 1200, margin: "0 auto" }}>
-          <Link href="/" style={{ color: "var(--brand)", textDecoration: "none", fontSize: 12, fontWeight: 600 }}>
-            &larr; Dashboard
-          </Link>
-          <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.02em" }}>Insights &amp; Forecasting</span>
-          <div className="flex gap-1 ml-auto">
-            {RANGES.map(r => (
-              <button key={r.key} onClick={() => setRange(r.key)}
-                style={{
-                  fontSize: 12, padding: "4px 10px", borderRadius: 5, cursor: "pointer",
-                  background: range === r.key ? "var(--brand)" : "var(--card)",
-                  color: range === r.key ? "var(--bg)" : "var(--text-dim)",
-                  border: `1px solid ${range === r.key ? "var(--brand)" : "var(--border)"}`,
-                  fontWeight: range === r.key ? 700 : 400,
-                }}>
-                {r.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
+      <PageHeader current="forecast">
+        <Segmented label="Time range" options={RANGES} value={range} onChange={setRange} />
+      </PageHeader>
 
-      <div className="px-3 sm:px-6 py-6" style={{ maxWidth: 1200, margin: "0 auto" }}>
+      <div className="px-3 sm:px-6 py-6 flex flex-col gap-6" style={{ maxWidth: 1560, margin: "0 auto" }}>
+        <PageTitle title="Forecast" description={<>Uptime, anomalies and where resources are heading, from the last {RANGES.find(r => r.key === range)?.label} of history.</>} />
         {loading ? (
           <div className="flex items-center justify-center" style={{ height: 400, color: "var(--text-ghost)" }}>
             <span style={{ fontSize: 12 }}>Analyzing {range} of history...</span>
@@ -137,9 +118,9 @@ export default function ForecastPage() {
           <div className="flex flex-col gap-6">
 
             {/* ── SLA Overview ── */}
-            <div style={{ background: "var(--card)", border: "1px solid var(--border-subtle)", borderRadius: 12, padding: "20px 24px" }}>
+            <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 10, padding: "18px 20px" }}>
               <div className="flex items-center gap-2 mb-4">
-                <span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-dim)" }}>
+                <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text)" }}>
                   SLA Report
                 </span>
                 <span style={{ fontSize: 12, color: "var(--text-ghost)" }}>last {range}</span>
@@ -147,7 +128,7 @@ export default function ForecastPage() {
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
                 <div className="flex flex-col gap-1">
-                  <span style={{ fontSize: 12, color: "var(--text-ghost)", textTransform: "uppercase" }}>Uptime</span>
+                  <span style={{ fontSize: 12, color: "var(--text-label)" }}>Uptime</span>
                   <span style={{
                     fontSize: 28, fontWeight: 700, fontFamily: "monospace", fontVariantNumeric: "tabular-nums",
                     color: data.sla.uptimePct >= 99.9 ? "var(--ok)" : data.sla.uptimePct >= 99 ? "var(--warn)" : "var(--critical)",
@@ -156,19 +137,19 @@ export default function ForecastPage() {
                   </span>
                 </div>
                 <div className="flex flex-col gap-1">
-                  <span style={{ fontSize: 12, color: "var(--text-ghost)", textTransform: "uppercase" }}>Incidents</span>
+                  <span style={{ fontSize: 12, color: "var(--text-label)" }}>Incidents</span>
                   <span style={{ fontSize: 28, fontWeight: 700, fontFamily: "monospace", color: data.sla.incidents.length > 0 ? "var(--warn)" : "var(--text-mid)" }}>
                     {data.sla.incidents.length}
                   </span>
                 </div>
                 <div className="flex flex-col gap-1">
-                  <span style={{ fontSize: 12, color: "var(--text-ghost)", textTransform: "uppercase" }}>MTTR</span>
+                  <span style={{ fontSize: 12, color: "var(--text-label)" }}>MTTR</span>
                   <span style={{ fontSize: 20, fontWeight: 600, fontFamily: "monospace", color: "var(--text-mid)" }}>
                     {fmtDuration(data.sla.mttrMs)}
                   </span>
                 </div>
                 <div className="flex flex-col gap-1">
-                  <span style={{ fontSize: 12, color: "var(--text-ghost)", textTransform: "uppercase" }}>Longest outage</span>
+                  <span style={{ fontSize: 12, color: "var(--text-label)" }}>Longest outage</span>
                   <span style={{ fontSize: 20, fontWeight: 600, fontFamily: "monospace", color: "var(--text-mid)" }}>
                     {fmtDuration(data.sla.longestOutageMs)}
                   </span>
@@ -177,7 +158,7 @@ export default function ForecastPage() {
 
               {data.sla.incidents.length > 0 && (
                 <div className="flex flex-col gap-1" style={{ borderTop: "1px solid var(--border-dim)", paddingTop: 12 }}>
-                  <span style={{ fontSize: 12, color: "var(--text-ghost)", textTransform: "uppercase", marginBottom: 4 }}>Incident timeline</span>
+                  <span style={{ fontSize: 12, color: "var(--text-label)", marginBottom: 4 }}>Incident timeline</span>
                   {data.sla.incidents.slice(0, 10).map((inc, i) => (
                     <div key={i} className="flex items-center gap-3" style={{ fontSize: 12 }}>
                       <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--critical)", flexShrink: 0 }} />
@@ -198,9 +179,9 @@ export default function ForecastPage() {
             </div>
 
             {/* ── Predictions ── */}
-            <div style={{ background: "var(--card)", border: "1px solid var(--border-subtle)", borderRadius: 12, padding: "20px 24px" }}>
+            <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 10, padding: "18px 20px" }}>
               <div className="flex items-center gap-2 mb-4">
-                <span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-dim)" }}>
+                <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text)" }}>
                   Resource Forecasting
                 </span>
               </div>
@@ -220,7 +201,7 @@ export default function ForecastPage() {
                       }}>
                         <div className="flex items-center gap-2 mb-2">
                           <span style={{ width: 8, height: 8, borderRadius: "50%", background: info.color }} />
-                          <span style={{ fontSize: 12, fontWeight: 600, color: info.color, textTransform: "uppercase" }}>
+                          <span style={{ fontSize: 13, fontWeight: 600, color: info.color }}>
                             {info.label}
                           </span>
                           <TrendArrow trend={pred.trend} />
@@ -245,7 +226,7 @@ export default function ForecastPage() {
                         {pred.warning && (
                           <div style={{
                             marginTop: 8, fontSize: 12, padding: "4px 8px", borderRadius: 4,
-                            background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.2)",
+                            background: "color-mix(in srgb, var(--warn) 10%, transparent)", border: "1px solid color-mix(in srgb, var(--warn) 25%, transparent)",
                             color: "var(--warn)",
                           }}>
                             {pred.warning}
@@ -259,14 +240,14 @@ export default function ForecastPage() {
             </div>
 
             {/* ── Anomalies ── */}
-            <div style={{ background: "var(--card)", border: "1px solid var(--border-subtle)", borderRadius: 12, padding: "20px 24px" }}>
+            <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 10, padding: "18px 20px" }}>
               <div className="flex items-center gap-2 mb-4">
-                <span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-dim)" }}>
+                <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text)" }}>
                   Anomaly Detection
                 </span>
                 <span style={{
                   fontSize: 12, padding: "2px 6px", borderRadius: 3,
-                  background: data.anomalies.length > 0 ? "rgba(239,68,68,0.1)" : "rgba(16,185,129,0.1)",
+                  background: data.anomalies.length > 0 ? "color-mix(in srgb, var(--critical) 10%, transparent)" : "color-mix(in srgb, var(--ok) 10%, transparent)",
                   color: data.anomalies.length > 0 ? "var(--critical)" : "var(--ok)",
                   fontWeight: 600,
                 }}>
