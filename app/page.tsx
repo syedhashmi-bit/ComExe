@@ -199,7 +199,7 @@ export default function Dashboard() {
     setActivityEvents([
       { type: "grabbed", title: "The Bear S04E08", source: "sonarr", timestamp: Date.now() - 300000, subtitle: "WEBDL-1080p" },
       { type: "imported", title: "Dune: Part Two", source: "radarr", timestamp: Date.now() - 1200000, subtitle: "Bluray-2160p" },
-      { type: "watched", title: "Shogun S02E04", source: "tautulli", timestamp: Date.now() - 60000, subtitle: "nauman" },
+      { type: "watched", title: "Shogun S02E04", source: "tautulli", timestamp: Date.now() - 60000, subtitle: "alex" },
     ]);
     setActivityLoading(false);
   }, [demoMode]);
@@ -214,18 +214,27 @@ export default function Dashboard() {
       }
     } catch { /* corrupt or empty — use defaults */ }
   }, []);
+  // `settings === DEFAULT_SETTINGS` means nothing has been loaded or chosen yet.
+  // Writing then saved the defaults over what the browser had stored before
+  // the load above landed (React dev runs effects twice, so the second load
+  // read the defaults back), and blocked the server-side preferences from
+  // applying because localStorage was never empty again.
   useEffect(() => {
+    if (settings === DEFAULT_SETTINGS) return;
     try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch { /* quota exceeded — ignore */ }
   }, [settings]);
 
-  // Apply theme class to <html>
+  // Apply theme class to <html>. Same guard: on the untouched defaults this
+  // would strip the class layout.tsx's pre-hydration script set (a saved
+  // theme, or Paper from prefers-color-scheme) and flash Midnight.
   useEffect(() => {
+    if (settings === DEFAULT_SETTINGS) return;
     const root = document.documentElement;
     THEMES.forEach(t => root.classList.remove(`theme-${t.key}`));
     if (settings.theme && settings.theme !== "midnight") {
       root.classList.add(`theme-${settings.theme}`);
     }
-  }, [settings.theme]);
+  }, [settings]);
 
   const fetchMetrics = useCallback(async () => {
     setRefreshing(true);
@@ -764,7 +773,7 @@ export default function Dashboard() {
               title="Settings"
               aria-label="Toggle settings panel"
               onClick={() => setShowSettings(v => !v)}
-              style={{ color: showSettings ? "rgba(255,255,255,0.6)" : "rgba(255,255,255,0.2)", background: "none", border: "none", cursor: "pointer", padding: 2, transition: "color 0.2s" }}
+              style={{ color: showSettings ? "var(--text)" : "var(--text-ghost)", background: "none", border: "none", cursor: "pointer", padding: 2, transition: "color 0.2s" }}
             ><IconGear /></button>
           </div>
         </div>
@@ -1432,8 +1441,8 @@ export default function Dashboard() {
             </span>
             <a href={`http://${clientConfig?.truenasIp ?? "192.168.88.196"}:${SVC_PORTS.prometheus}`} target="_blank" rel="noopener noreferrer"
               style={{ fontSize: 12, color: "var(--text-ghost)", textDecoration: "none", transition: "color 0.15s" }}
-              onMouseEnter={e => (e.currentTarget.style.color = "rgba(255,255,255,0.55)")}
-              onMouseLeave={e => (e.currentTarget.style.color = "rgba(255,255,255,0.25)")}>
+              onMouseEnter={e => (e.currentTarget.style.color = "var(--text-muted)")}
+              onMouseLeave={e => (e.currentTarget.style.color = "var(--text-ghost)")}>
               prometheus ↗
             </a>
           </div>

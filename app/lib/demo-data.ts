@@ -34,7 +34,7 @@ export function buildDemoServices(): ServiceResult[] {
     { name: "radarr",      up: true, configured: true, lines: ["1,247 movies (8.2 TB)", "12 missing cutoff", "2 in queue"], pct: 94, queueItems: [{ title: "Dune: Part Three", pct: 67, etaSec: 1200 }] },
     { name: "sonarr",      up: true, configured: true, lines: ["186 series (4.1 TB)", "3 missing episodes"], pct: 98, queueItems: [{ title: "The Bear S04E08", pct: 23, etaSec: 3600 }] },
     { name: "bazarr",      up: true, configured: true, lines: ["1,198 synced", "8 wanted"] },
-    { name: "tautulli",    up: true, configured: true, lines: ["1 stream active", "47 plays this week"], streams: [{ title: "Shogun S02E04", progress: 0.45, user: "nauman", posStr: "21:30 / 47:15" }], weekly: { plays: 47, topShow: "Shogun", topUser: "nauman" } },
+    { name: "tautulli",    up: true, configured: true, lines: ["1 stream active", "47 plays this week"], streams: [{ title: "Shogun S02E04", progress: 0.45, user: "alex", posStr: "21:30 / 47:15" }], weekly: { plays: 47, topShow: "Shogun", topUser: "alex" } },
     { name: "qbittorrent", up: true, configured: true, lines: ["2.4 ratio overall", "↓ 12.3 MB/s · ↑ 4.1 MB/s"], pct: 78, queueItems: [{ title: "ubuntu-24.04.iso", pct: 78, etaSec: 900 }, { title: "archlinux-2024.iso", pct: 34, etaSec: 2400 }] },
     { name: "overseerr",   up: true, configured: true, lines: ["12 pending requests", "3 processing"] },
     { name: "prowlarr",    up: true, configured: true, lines: ["8 indexers active", "23,411 grabs total"] },
