@@ -5,17 +5,60 @@
 <h1 align="center">ComExe</h1>
 
 <p align="center">
-  Real-time single-page dashboard for a TrueNAS Scale homelab.
+  A calm, self-hosted dashboard for a TrueNAS Scale homelab.
 </p>
 
-Aggregates Prometheus metrics, service-health checks, speedtest history, weather, and an embedded Grafana panel into a dark, minimal UI. No database, no external state library, no required auth (optional password / auth-proxy support for exposed deployments).
+<p align="center">
+  <img alt="Next.js" src="https://img.shields.io/badge/Next.js-16-black?logo=next.js" />
+  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-6-blue?logo=typescript" />
+  <img alt="Tailwind" src="https://img.shields.io/badge/Tailwind-3-38bdf8?logo=tailwindcss" />
+  <img alt="Docker" src="https://img.shields.io/badge/Docker-ghcr.io-2496ed?logo=docker" />
+  <img alt="License" src="https://img.shields.io/badge/license-MIT-lightgrey" />
+</p>
 
-Configure everything via the built-in `/setup` wizard — fill in your service URLs and API keys in a web form with live "Test connection" buttons, click **Save & apply**, and the dashboard picks up the new config within ~3 seconds. No env-var editing, no compose-file fiddling, no redeploys.
+ComExe brings your homelab onto one page: live system metrics from Prometheus, the health of your
+media and infrastructure services, Plex streams, downloads, speedtests and weather. The first
+thing it shows is the answer to the only question that matters at a glance — **is anything
+wrong?** — and colour only appears when something is.
 
-![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)
-![TypeScript](https://img.shields.io/badge/TypeScript-6-blue?logo=typescript)
-![Tailwind](https://img.shields.io/badge/Tailwind-3-38bdf8?logo=tailwindcss)
-![Docker](https://img.shields.io/badge/Docker-ready-2496ed?logo=docker)
+Everything is set up from a web wizard with live "Test connection" buttons. No database, no
+external state, no secrets in the browser: every upstream call goes through a server-side route.
+
+![ComExe dashboard](docs/screenshots/dashboard.png)
+
+<sub>All screenshots use the built-in demo data (append `?demo=1` to any URL) — no real services involved.</sub>
+
+---
+
+## Highlights
+
+- **Status at a glance** — a summary line reads *All systems normal*, or lists exactly what needs
+  attention: a crossed threshold, a service that's down or rejecting its credentials, *arr health
+  errors (grouped across apps), stale data, Uptime Kuma monitors down, Prometheus exporters down.
+- **Calm by design** — flat cards, one soft accent per metric for its charts, and status colours
+  (green / amber / red) reserved for actual problems, always paired with a word.
+- **Services in one list** — Radarr, Sonarr, Bazarr, Tautulli, qBittorrent, Overseerr, Prowlarr,
+  Pi-hole, Nginx Proxy Manager and Uptime Kuma, each with its own icon, status, key number,
+  download queue or Plex stream, sorted so problems come first.
+- **Alerts with no tab open** — a background collector keeps evaluating thresholds and recording
+  history around the clock, and sends webhooks to Discord, Slack, ntfy or any JSON endpoint,
+  with throttling and quiet hours.
+- **Set up in the browser** — the `/setup` wizard tests each service's credentials live, saves to a
+  mounted volume and applies within seconds. Saved keys are never sent back to the browser, and a
+  blank field keeps the saved one.
+- **Gentle on your homelab** — one server-sent-events stream instead of many pollers, per-origin
+  connection caps, a circuit breaker, memoised heavy calls and hard minimum intervals. (The first
+  version polled every 3 s and crashed the *arr containers; this is the fix.)
+
+## Screenshots
+
+| Light theme (Paper) | Phone |
+|---|---|
+| ![Paper theme](docs/screenshots/dashboard-paper.png) | <img src="docs/screenshots/mobile.png" alt="Phone layout" width="320" /> |
+
+| Settings | Setup wizard |
+|---|---|
+| ![Settings panel](docs/screenshots/settings.png) | ![Setup wizard](docs/screenshots/setup.png) |
 
 ---
 
@@ -23,161 +66,111 @@ Configure everything via the built-in `/setup` wizard — fill in your service U
 
 ### Metrics
 
-- **CPU** — usage %, load 1/5/15, core count, frequency, sparkline history
-- **Memory** — segmented donut (used / ZFS cache / free) with ZFS-aware accounting (`MemTotal − MemAvailable − SReclaimable`)
-- **Filesystems** — pool fullness as the headline, per-mount rows sorted by % full, color-coded by severity
-- **Network** — RX / TX throughput with sparklines, totals, primary interface, established TCP count
-- **GPU** — radial utilisation gauge, temperature (color-coded), power draw, VRAM, power limit, clocks, fan, encoder/decoder utilisation, temp-history sparkline
-- **Speedtest** — download / upload / ping / jitter from SpeedTracker, plus 5-test download-history graph (read-only — never triggers a test)
-- **System** — OS, kernel, arch, hostname, core count, uptime
-- **Grafana** — embedded panel (Node Exporter Full, configurable)
+- **CPU** — usage, load averages, cores and clock, history sparkline
+- **Memory** — used / ZFS cache / free, with ZFS-aware accounting (`MemTotal − MemAvailable − SReclaimable`)
+  so the ARC doesn't look like a leak
+- **Filesystems** — pool fullness plus each dataset under your media path
+- **Network** — download and upload throughput with history, totals, established TCP connections
+- **GPU** — utilisation, temperature, power draw, VRAM, clocks, fan, encoder/decoder load
+- **Speedtest** — latest result and history from SpeedTracker (read-only — it never triggers a test)
+- **System** — OS, kernel, architecture, host, uptime, plus an uptime timeline
+- **Disk health** — SMART temperatures and sector errors when the smartmon exporter is installed
+- **Grafana** — embed any panel; with an API token it renders server-side, no iframe cookies
 
-### Service health
+### Pages
 
-Live status pills for **Radarr · Sonarr · Bazarr · Tautulli · qBittorrent · Overseerr · Pi-hole · Prowlarr · Nginx Proxy Manager · Uptime Kuma**. Each card:
+- **Dashboard** — two columns on wide screens (metrics beside services), one on a phone
+- **Analytics** — history charts for CPU, memory, GPU, disk and network over 1 h – 7 d
+- **Forecast** — uptime / SLA, incidents and MTTR, anomaly detection, and when resources run out
+- **Logs** — container log viewer with search, level filters and live tail (opt-in Docker access)
+- **Setup** and a short **welcome** flow for first runs
 
-- Brand-color gradient accent stripe + brand-color hover glow
-- Hero stat (e.g. `1,369 movies`) with the leading number visually emphasised
-- Numbers smoothly animate between updates (~600 ms ease-out)
-- Live status dot in the header — green / amber / red
-- Click anywhere on the card to open the underlying service in a new tab
-- Cards grouped into *Media stack* and *Infrastructure* categories with live up-counts
+### Everything else
 
-### First-run UX
-
-- **`/setup` wizard** — single-page form with auto-filled URLs, per-row API-key fields, and a **Test** button per service that actually authenticates against your upstream. Concrete error messages on failure ("Wrong API key", "IP banned", "Could not reach …").
-- **Save & apply** — when a writable `/app/data` volume is mounted, the wizard saves your config to disk and the dashboard picks it up within ~3 seconds. No redeploy, no env-var editing.
-- **Hidden cards for unconfigured services** — the dashboard shows only what's been configured. No `—` placeholders cluttering the grid.
-- **First-run banner** — when fewer than 3 services are configured, a friendly hint at the top points at `/setup`.
-- **Settings → Connections** — per-service status (● connected / ● unreachable / ● not configured) with the missing env-var names listed as copy-paste references.
-- **Activity ticker** — rolling feed of recent grabs / imports / streams from Sonarr / Radarr / Tautulli history endpoints.
-
-### Other
-
-- **Router bar** — MikroTik live stats via a server-side proxy, with graceful fallback to a static info row
-- **Weather** — temperature + condition pill in the header (open-meteo, no API key)
-- **Search** — Google search bar; `G` to focus, opens results in a new tab
-- **Bookmarks** — quick-links section, color-coded by category, toggle with `H`. Edit via mounted `bookmarks.json`.
-- **Settings** — per-card visibility, refresh interval (10/15/30/60 s), °C/°F, decimal/binary units, per-service Connections view
-- **Trend deltas** — small `↑X` / `↓X` next to hero numbers when a metric changes meaningfully (CPU %, memory pressure, GPU temp). Sanity guard suppresses output when the delta-to-current ratio is wildly large (catches unit-mismatch bugs).
-- **Alert system** — 2 px cyan healthy line → 36 px amber warning bar → 48 px red critical bar across the top of the page
-- **Keyboard shortcuts** — `G` focus search · `R` force-refresh · `H` toggle bookmarks · `/` filter services · `Ctrl+K` command palette · `?` shortcuts overlay · `Esc` blur input / close panels
-
-### And more (all shipped)
-
-Two themes (Midnight / Paper) · command palette (`Ctrl+K`) ·
-`/analytics`, `/forecast`, and `/logs` pages · alerts with webhooks (Discord / ntfy / Slack /
-Gotify) + quiet hours · Docker container actions (restart / logs / pull-and-restart, opt-in) ·
-SMART disk health · network topology map · MikroTik device list + Wake-on-LAN · multi-server
-fleet view · custom PromQL cards · drag-to-rearrange layout + presets · config backup/restore ·
-SSE live updates · PWA install + offline shell · historical persistence with anomaly detection
-and SLA reports.
-
----
-
-## Tech stack
-
-| Layer | Choice |
-|---|---|
-| Framework | Next.js 16 (App Router — 7 route-segment pages, 29 components) |
-| Language | TypeScript 6 |
-| Styling | Tailwind CSS 3 + inline `style` for dynamic colours |
-| Charts | Canvas API + inline SVG, **zero chart libraries** |
-| Runtime | Node 22 |
-| Container | Multi-stage Docker image (deps → builder → runner) |
-
----
-
-## Architecture
-
-```
-browser
-  │
-  ├── /api/metrics    →  Prometheus              (Promise.all over ~30 PromQL queries)
-  ├── /api/services   →  10 homelab services     (Promise.allSettled fan-out)
-  ├── /api/speedtest  →  SpeedTracker            (read-only history)
-  ├── /api/weather    →  open-meteo              (no auth)
-  └── /api/mikrotik   →  MikroTik REST           (Basic auth)
-```
-
-Those are the core proxies — in total there are **30+ server-side routes** (health, history, alerts, Docker actions, SMART, topology, custom cards, backup, SSE stream, …). The browser never calls internal IPs directly — all credentials stay on the server, all CORS is sidestepped. Routes carry in-memory caches and per-fetch timeouts tuned per upstream.
-
-The frontend is **`app/page.tsx`** (~1,500 lines — the `Dashboard` orchestrator; state, data wiring and the metric grid) plus 26 feature components in `app/components/`. Reusable primitives live in `app/components/primitives.tsx`, not in `page.tsx`.
-
-### Polling
-
-| Route | Interval |
-|---|---|
-| `/api/metrics` | 10 s (configurable) |
-| `/api/services` | 30 s |
-| `/api/mikrotik` | 15 s |
-| `/api/activity` | 120 s |
-| `/api/speedtest` | 600 s |
-| `/api/weather` | 600 s |
-
-Deliberately slow — server-side cache TTLs match the intervals, per-endpoint memoization
-spares the upstream services, and hard interval floors stop user overrides from flooding
-the homelab. A single SSE connection (`/api/stream`) replaces the independent pollers
-when available.
+Two themes (Midnight, Paper) · command palette (`Ctrl+K`) and keyboard shortcuts · bookmarks ·
+MikroTik router bar, device list and Wake-on-LAN · network topology and service dependency map ·
+multi-server fleet view · custom PromQL cards · drag-to-reorder cards and saved layouts ·
+config backup and restore · optional password or auth-proxy login · PWA install.
 
 ---
 
 ## Install
 
-A prebuilt image is published to **`ghcr.io/syedhashmi-bit/comexe:latest`** by GitHub Actions. You don't need to clone or build the repo to run it.
+A prebuilt multi-arch image (amd64 + arm64) is published to
+**`ghcr.io/syedhashmi-bit/comexe:latest`** on every push to `main`. You don't need to clone or build anything.
 
-> **Full install guide is in [INSTALL.md](./INSTALL.md)** — TrueNAS Custom App walkthrough, docker-compose, plain `docker run`, bookmarks customization, Grafana embed setup, and troubleshooting.
+> The full guide — TrueNAS Custom App walkthrough, docker-compose, bookmarks, Grafana and
+> troubleshooting — is in **[INSTALL.md](./INSTALL.md)**.
 
-### Quick start — no env vars to type
+### Quick start
 
 ```bash
 mkdir -p dashboard-data
-curl -fsSL -o bookmarks.json \
-  https://raw.githubusercontent.com/syedhashmi-bit/ComExe/main/bookmarks.example.json
 
 docker run -d \
   --name comexe \
   --network host \
   --restart unless-stopped \
-  -v "$(pwd)/bookmarks.json:/app/bookmarks.json:ro" \
   -v "$(pwd)/dashboard-data:/app/data" \
   ghcr.io/syedhashmi-bit/comexe:latest
 ```
 
-Then visit **`http://<your-host>:3000/setup`** — fill in your TrueNAS IP, tick the services you use, paste each API key, click **Test** to confirm, then **Save & apply**. The cards go green within seconds.
+Open **`http://<your-host>:3000/setup`**, enter your TrueNAS IP, tick the services you run, paste
+each API key, click **Test**, then **Save & apply**.
 
-The `dashboard-data` volume is what makes "Save & apply" persist. Skip that mount and the wizard falls back to "copy this docker-compose.yml" mode (still works, just needs a redeploy).
+The `dashboard-data` mount is what keeps your settings across updates. Without it the wizard
+falls back to generating a `docker-compose.yml` / `docker run` snippet for you to apply yourself.
 
-### Configuration model
+### Updating
 
-- **Wizard-driven (recommended)** — `/setup` writes `data/config.json` to your mounted volume. Edits via the web form take effect within seconds. No restarts, no compose-file edits.
-- **Env vars** — set anything via `docker run -e VAR=value` for headless / immutable deploys. Full list in [`.env.local.example`](./.env.local.example).
-- **Bookmarks** — mount your own JSON file at `/app/bookmarks.json`. Schema in [`bookmarks.example.json`](./bookmarks.example.json).
-- **Precedence**: file > env vars > built-in defaults. Save & apply wins, so the wizard always reflects what's actually live.
-- **No secrets ever in the image**: every credential is read at request time from the file or env. Nothing baked in.
+[`scripts/update-dashboard.sh`](scripts/update-dashboard.sh) is a health-gated updater: it pulls
+the new image, starts it as a candidate on a spare port, only replaces the running container once
+the candidate is healthy, keeps the previous image tagged `:rollback`, and makes sure `/app/data`
+is on a host mount so nothing you configured is lost.
+
+### Configuration
+
+- **Wizard first** — `/setup` writes `data/config.json` on your mounted volume; changes apply in seconds.
+- **Or env vars** — anything can be set with `docker run -e …` for headless deploys; the full list
+  is in [`.env.local.example`](./.env.local.example).
+- **Precedence** — wizard file › env vars › built-in defaults.
+- **No secrets in the image** — credentials are read at request time, never baked in.
+
+### Security
+
+ComExe is built for a single user on a private LAN. Auth is off by default; set
+`DASHBOARD_PASSWORD` for a login page, or `AUTH_PROXY_HEADER` behind Authelia / Authentik /
+Cloudflare Access. It only answers to IP addresses, `localhost` and LAN-style names (anything
+else is refused, which blocks DNS-rebinding attacks); list other hostnames in
+`COMEXE_ALLOWED_HOSTS`. See [INSTALL.md](./INSTALL.md#security-notes).
 
 ---
 
-## Local development
+## Alert thresholds
 
-If you want to hack on the code rather than just run the published image:
+| Metric | Warning | Critical |
+|---|---|---|
+| CPU usage | > 80 % | > 95 % |
+| Memory (real, ZFS-aware) | > 93 % | > 97 % |
+| Filesystem usage | > 85 % | > 95 % |
+| GPU temperature | > 80 °C | > 90 °C |
+| Service unreachable | — | any configured service |
+| Service health checks | ≥ 1 warning | ≥ 1 error |
 
-```powershell
-# PC (PowerShell)
-npm install
-cp .env.local.example .env.local       # edit with your real values
-npm run dev        # localhost:3000
-npm run build      # production build
-npm run lint
-npm test           # vitest — 77 unit tests
-npm run test:e2e   # playwright smoke suite
-npm run storybook  # primitives sandbox on :6006
-```
+[`app/lib/alerts.ts`](app/lib/alerts.ts) and [`app/lib/alert-events.ts`](app/lib/alert-events.ts)
+are authoritative.
 
-CI gates every image publish on `npm run lint`, `npx tsc --noEmit` and `npm test`, and runs
-`npm run test:e2e` as a separate job — run them locally before pushing.
+## Keyboard shortcuts
 
-Push to `main` triggers a fresh GHCR image build via GitHub Actions (`.github/workflows/build.yml`). Pin to a specific version via `:v1.2.3` or `:sha-abc1234` for stability.
+| Key | Action |
+|---|---|
+| `G` | Focus the search bar |
+| `R` | Refresh everything now |
+| `H` | Toggle bookmarks |
+| `/` | Filter services |
+| `Ctrl+K` | Command palette |
+| `?` | Shortcuts overlay |
+| `Esc` | Close panels / leave an input |
 
 ---
 
@@ -195,100 +188,81 @@ Push to `main` triggers a fresh GHCR image build via GitHub Actions (`.github/wo
 
 ---
 
-## Alert thresholds
+## How it works
 
-| Metric | Warning | Critical |
-|---|---|---|
-| CPU usage | > 80 % | > 95 % |
-| Memory usage (real) | > 93 % | > 97 % |
-| Filesystem usage | > 85 % | > 95 % |
-| GPU temperature | > 80 °C | > 90 °C |
-| Service unreachable | — | any single service |
-| Service health errors | ≥ 1 warning | ≥ 1 error |
+```
+browser ──── one SSE stream (/api/stream) ────┐
+                                              ▼
+                              Next.js server routes (33)
+        ┌────────────┬──────────────┬─────────┴───────┬──────────────┐
+   Prometheus   *arr / Plex /   SpeedTracker      MikroTik      open-meteo
+   (~30 PromQL) Pi-hole / … (10)  (read-only)      (REST)       (weather)
+                                              ▲
+            background collector ─────────────┘  alerts, webhooks, history.jsonl
+```
 
-Thresholds live in [`app/lib/alerts.ts`](app/lib/alerts.ts) and the service rules in
-[`app/lib/alert-events.ts`](app/lib/alert-events.ts) — those files are authoritative, not this
-table. There is no "down count" threshold: a single unreachable configured service is critical.
+- **Server-side only** — the browser never calls internal IPs, so credentials stay on the server
+  and CORS never comes up.
+- **One stream, polling as fallback** — `/api/stream` pushes metrics, services, router, activity,
+  speedtest and weather on their own timers; if it fails three times the page falls back to polling.
+- **Load protection** — max 2 sockets per upstream, a per-origin circuit breaker, 5-minute memoisation
+  of heavy library calls, staged batches, and minimum intervals users can't override.
+- **Background collector** — evaluates alerts and appends history even with no tab open; while a
+  tab is connected it reuses the stream's data instead of polling again.
+- **No chart libraries** — every sparkline, donut, gauge and chart is hand-written SVG or Canvas.
 
-Memory uses `MemTotal − MemAvailable − SReclaimable` so ZFS ARC (which is reclaimable under pressure) doesn't trigger false alarms.
-
----
-
-## Keyboard shortcuts
-
-| Key | Action |
+| Layer | Choice |
 |---|---|
-| `G` | Focus the Google search bar |
-| `R` | Force-refresh all metrics immediately |
-| `H` | Toggle the Bookmarks section |
-| `/` | Focus the service filter |
-| `Ctrl+K` | Open the command palette |
-| `?` | Show the shortcuts overlay |
-| `Esc` | Blur search input / close panels |
+| Framework | Next.js 16 (App Router, 7 pages, 29 components) |
+| Language | TypeScript 6 |
+| Styling | Tailwind CSS 3, CSS variables for the two themes |
+| Charts | Inline SVG and Canvas, no chart library |
+| Runtime | Node 22 in a multi-stage Docker image |
+| Tests | Vitest (263 unit tests) and Playwright (end-to-end) |
 
 ---
 
-## Design notes
+## Local development
 
-- **No chart libraries.** Every visualisation (sparklines, donuts, radial gauges, bar charts, segmented bars) is hand-rolled with Canvas or inline SVG.
-- **Sparkline gradient IDs** use `useId()` to avoid SVG `<linearGradient>` collisions across instances. Don't remove this.
-- **Canvas bar chart** uses a `ResizeObserver` to defer drawing until the container has non-zero dimensions — fixes a "only one bar drawn" race on first mount. Tooltip state mutated via a `ref` to avoid React re-renders on every mouse-move.
-- **Card visual contract** — every metric card has a 3 px gradient accent stripe with a colored glow, a subtle radial brand-color background, and a brand-tinted hover state. The shared `<Card>` primitive enforces it.
-- **Animated numbers** — `<AnimatedNumber>` interpolates between updates over 600 ms with ease-out cubic. The `animatedLine()` helper parses any pre-formatted stat string and wraps each numeric literal in an `<AnimatedNumber>` automatically.
-- **Trend deltas** ship a sanity guard — they suppress output when `|delta|/|current| > 5`, catching unit-mismatch bugs (e.g. one endpoint returning Mbps while another returns bits/sec).
+```powershell
+npm install
+npm run dev          # http://localhost:3000 — add ?demo=1 for sample data
+npm run lint
+npx tsc --noEmit
+npm test             # vitest
+npm run test:e2e     # playwright
+npm run storybook    # primitives sandbox on :6006
+```
 
----
+CI runs lint, the type check and the unit tests before any image is published, plus the
+end-to-end suite as a separate job. Architecture notes and conventions live in
+[`CLAUDE.md`](./CLAUDE.md).
 
-## Project structure
+<details>
+<summary>Project structure</summary>
 
 ```
 .
 ├── app/
-│   ├── api/
-│   │   ├── activity/route.ts         Sonarr/Radarr/Tautulli history → activity ticker
-│   │   ├── config/route.ts           GET runtime client config + POST writes data/config.json
-│   │   ├── metrics/route.ts          Prometheus proxy
-│   │   ├── mikrotik/route.ts         Router stats
-│   │   ├── services/route.ts         10-service health checks
-│   │   ├── speedtest/route.ts        SpeedTracker history
-│   │   ├── test-connection/route.ts  Setup-wizard helper — validates upstream creds live
-│   │   ├── weather/route.ts          open-meteo proxy
-│   │   └── …                         +20 more: alerts, auth, backup, docker, grafana,
-│   │                                 health, history, insights, smart, stream, topology…
-│   ├── components/                   Feature components (ServicesPanel, BookmarksPanel,
-│   │                                 CommandPalette, NetworkTopology, DependencyMap, …)
-│   ├── hooks/useEventStream.ts       SSE client with polling fallback
-│   ├── lib/                          21 shared modules — USE THESE, don't re-roll them:
-│   │   ├── server-config.ts          Single-source loadConfig() — file > env > defaults
-│   │   ├── http.ts                   Outbound fetch + timeout + circuit breaker
-│   │   ├── cache.ts                  TTL / keyed-TTL caches
-│   │   ├── json-store.ts             Atomic read/write for everything in data/
-│   │   ├── prometheus.ts             promScalar / promVector
-│   │   ├── validate.ts               Input guards for write routes
-│   │   └── …                         formatters, alerts, alert-events, history,
-│   │                                 circuit-breaker, session-token, docker, types…
-│   ├── analytics/ · forecast/ · logs/  Secondary pages
-│   ├── setup/page.tsx                /setup wizard — tested form + Save & apply button
-│   ├── welcome/page.tsx              First-run 4-step wizard
-│   ├── globals.css                   Keyframes, themes, font imports
-│   ├── icon.svg                      ComExe favicon (Next.js auto-serves)
-│   ├── layout.tsx                    Root layout
-│   └── page.tsx                      Dashboard orchestrator (~1,500 lines)
-├── proxy.ts                       Route guard (auth) — Next 16 rename of middleware.ts
-├── .github/workflows/build.yml   CI: quality gate, build image, push to GHCR
-├── .env.local.example            Env var template (full inventory)
-├── bookmarks.example.json        Schema for the bookmarks file
-├── docker-compose.example.yml    Reference compose config
-├── INSTALL.md                    Step-by-step install guide
-├── CLAUDE.md                     Authoritative architecture / conventions doc
-├── context.md                    Infra inventory, env var names, ports
-├── memory.md                     Past decisions, bug fixes, gotchas
-├── skills.md                     Reusable code patterns
-├── Dockerfile                    Multi-stage build (deps → builder → runner)
-├── next.config.ts
-├── tailwind.config.ts
-└── tsconfig.json
+│   ├── api/                 33 server routes — metrics, services, stream (SSE), alerts,
+│   │                        history, insights, config, test-connection, docker, smart, …
+│   ├── components/          StatusSummary, ServicesPanel, PageHeader, SettingsPanel,
+│   │                        primitives (Card, Sparkline, gauges), …
+│   ├── hooks/               useEventStream (SSE with polling fallback), usePolling
+│   ├── lib/                 27 shared modules — config resolution, http + circuit
+│   │                        breaker, caches, collector, alerts, formatters, …
+│   ├── analytics/ forecast/ logs/ setup/ welcome/ login/
+│   ├── globals.css          Theme tokens (Midnight, Paper) and layout
+│   └── page.tsx             Dashboard
+├── instrumentation.ts       Starts the background collector
+├── proxy.ts                 Auth and hostname guard
+├── scripts/update-dashboard.sh   Health-gated updater for TrueNAS
+├── docs/screenshots/        README images (captured from demo mode)
+├── Dockerfile               Multi-stage build
+└── INSTALL.md · CLAUDE.md · .env.local.example
 ```
+
+</details>
 
 ---
 
