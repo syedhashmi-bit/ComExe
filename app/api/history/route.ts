@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { isJsonContentType } from "@/app/lib/validate";
-import { readHistory, appendHistory, downsample, type HistoryPoint } from "@/app/lib/history";
+import { readHistory, appendHistory, type HistoryPoint } from "@/app/lib/history";
 
 // ── GET /api/history ────────────────────────────────────────────────────────
 // Query params:
@@ -23,13 +23,10 @@ export async function GET(req: Request) {
   const limit   = Math.min(parseInt(url.searchParams.get("limit") ?? "500", 10) || 500, 2000);
 
   const rangeMs = RANGE_MAP[range] ?? RANGE_MAP["24h"];
-  let points = await readHistory({ metric: metric ?? undefined, rangeMs, limit: limit * 2 });
-
-  // Auto-downsample: target ~limit points
-  if (points.length > limit) {
-    const bucketMs = Math.ceil(rangeMs / limit);
-    points = downsample(points, bucketMs);
-  }
+  // Averaged into ~limit buckets across the WHOLE range. This used to read the
+  // newest limit*2 points and downsample those, which at one point per 10–30s
+  // meant "24h" and "7d" charts actually showed the last few hours.
+  const points = await readHistory({ metric: metric ?? undefined, rangeMs, bucketMs: Math.ceil(rangeMs / limit) });
 
   // If a specific metric was requested, strip the others to save bandwidth
   if (metric) {

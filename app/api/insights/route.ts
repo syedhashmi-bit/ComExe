@@ -160,7 +160,10 @@ export async function GET(req: Request) {
   const ms = rangeMs[range] ?? rangeMs["7d"];
 
   try {
-    const points = await readHistory({ rangeMs: ms, limit: 5000 });
+    // ~5,000 averaged buckets spanning the whole range. A plain 5,000-point
+    // limit kept only the newest points, so a 7d/30d SLA, anomaly scan or
+    // disk-full forecast was computed from the last ~14–42 hours.
+    const points = await readHistory({ rangeMs: ms, bucketMs: Math.ceil(ms / 5000) });
 
     // Anomalies
     const anomalies: Anomaly[] = [];

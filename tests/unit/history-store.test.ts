@@ -160,4 +160,27 @@ describe("history store", () => {
     const tail = await readHistory({ rangeMs: 3_000_000, limit: 5 });
     expect(tail.map(p => p.cpu)).toEqual([1995, 1996, 1997, 1998, 1999]);
   });
+
+  // The bug this guards: /analytics and /forecast asked for "7 days" but got a
+  // newest-N slice, so every chart and forecast covered a few hours.
+  it("bucketMs averages across the whole range, not just the newest points", async () => {
+    const { readHistory } = await import("@/app/lib/history");
+    const { promises: fs } = await import("node:fs");
+    const path = await import("node:path");
+    const now = Date.now();
+    // A week of one-a-minute points: cpu 10 for the older half, 50 for the newer.
+    const lines: string[] = [];
+    for (let t = now - 7 * DAY + 60_000; t <= now; t += 60_000) lines.push(line(t, t < now - 3.5 * DAY ? 10 : 50));
+    await fs.writeFile(path.join(process.cwd(), "data", "history.jsonl"), lines.join(""), "utf8");
+
+    const points = await readHistory({ rangeMs: 7 * DAY, bucketMs: (7 * DAY) / 100 });
+    expect(points.length).toBeGreaterThanOrEqual(99);
+    expect(points.length).toBeLessThanOrEqual(101);
+    expect(points[0].ts).toBeLessThan(now - 6.9 * DAY);        // reaches back a week
+    expect(points[points.length - 1].ts).toBeGreaterThan(now - 0.1 * DAY);
+    expect(points[0].cpu).toBe(10);
+    expect(points[points.length - 1].cpu).toBe(50);
+    expect(points.every((p, i) => i === 0 || p.ts > points[i - 1].ts)).toBe(true); // oldest → newest
+    expect(points[0].mem).toBeNull();                          // all-null metric stays null
+  });
 });

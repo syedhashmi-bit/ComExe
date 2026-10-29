@@ -59,15 +59,55 @@ export async function appendHistory(point: HistoryPoint): Promise<void> {
   }
 }
 
+const METRIC_KEYS = ["cpu", "mem", "net_rx", "net_tx", "gpu", "disk_pct"] as const;
+
+// Averages points into fixed time buckets as they stream past, so a long range
+// costs memory per bucket rather than per point. Points arrive newest-first
+// (readHistory reads backwards), so buckets close in descending order.
+function makeBucketer(bucketMs: number, origin: number) {
+  const out: HistoryPoint[] = [];
+  let idx: number | null = null;
+  let n = 0, tsSum = 0;
+  const sum = new Map<string, number>(), cnt = new Map<string, number>();
+  const flush = () => {
+    if (n === 0) return;
+    const p = { ts: Math.round(tsSum / n) } as HistoryPoint;
+    for (const k of METRIC_KEYS) { const c = cnt.get(k) ?? 0; p[k] = c > 0 ? sum.get(k)! / c : null; }
+    out.push(p);
+    n = 0; tsSum = 0; sum.clear(); cnt.clear();
+  };
+  return {
+    add(p: HistoryPoint) {
+      const i = Math.floor((p.ts - origin) / bucketMs);
+      if (i !== idx) { flush(); idx = i; }
+      n++; tsSum += p.ts;
+      for (const k of METRIC_KEYS) {
+        const v = p[k];
+        if (typeof v === "number" && Number.isFinite(v)) { sum.set(k, (sum.get(k) ?? 0) + v); cnt.set(k, (cnt.get(k) ?? 0) + 1); }
+      }
+    },
+    done(): HistoryPoint[] { flush(); return out; },
+  };
+}
+
 // Read history, optionally filtered by metric and time range.
+//
+// `bucketMs` averages into fixed-width buckets across the WHOLE range. Use it
+// for anything that spans hours or days: the alternative, `limit`, keeps only
+// the newest N points, and at one point every 10–30s a 1,600-point limit
+// covered ~4–13h — so "7 days" on /analytics and /forecast was really a few
+// hours, with the x-axis quietly fitted to that.
 export async function readHistory(opts?: {
   metric?: keyof Omit<HistoryPoint, "ts">;
   rangeMs?: number;   // only points within this many ms from now
-  limit?: number;     // max points to return (tail)
+  limit?: number;     // max points to return (tail); ignored with bucketMs
+  bucketMs?: number;  // average into buckets of this width over the full range
 }): Promise<HistoryPoint[]> {
   const cutoff = opts?.rangeMs ? Date.now() - opts.rangeMs : 0;
-  const limit  = opts?.limit;
+  const bucketer = opts?.bucketMs && opts.bucketMs > 0 ? makeBucketer(opts.bucketMs, cutoff) : null;
+  const limit  = bucketer ? undefined : opts?.limit;
   const collected: HistoryPoint[] = [];
+  const finish = () => (bucketer ? bucketer.done() : collected).reverse(); // oldest → newest
 
   // Read BACKWARDS from the end of the file in chunks.
   //
@@ -132,16 +172,17 @@ export async function readHistory(opts?: {
         // A non-numeric ts (a corrupt or hand-edited line) would make every
         // comparison false and defeat the early exit — treat it as corrupt.
         if (typeof p.ts !== "number" || Number.isNaN(p.ts)) continue;
-        if (p.ts < cutoff) return collected.reverse();
+        if (p.ts < cutoff) return finish();
+        if (bucketer) { bucketer.add(p); continue; }
         collected.push(p);
-        if (limit && collected.length >= limit) return collected.reverse();
+        if (limit && collected.length >= limit) return finish();
       }
     }
   } finally {
     await fh.close().catch(() => {});
   }
 
-  return collected.reverse(); // restore oldest → newest
+  return finish();
 }
 
 // Downsample points for charting — average into buckets of `bucketMs` width.
