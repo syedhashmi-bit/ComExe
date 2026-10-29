@@ -218,7 +218,7 @@ browser ──── one SSE stream (/api/stream) ────┐
 | Styling | Tailwind CSS 3, CSS variables for the two themes |
 | Charts | Inline SVG and Canvas, no chart library |
 | Runtime | Node 22 in a multi-stage Docker image |
-| Tests | Vitest (263 unit tests) and Playwright (end-to-end) |
+| Tests | Vitest (269 unit tests) and Playwright (end-to-end) |
 
 ---
 

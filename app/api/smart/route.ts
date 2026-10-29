@@ -40,15 +40,22 @@ export async function GET() {
   const queryAll = makeQueryAll(cfg.prometheusUrl);
 
   try {
-    const [tempResults, powerOnResults, reallocResults, pendingResults, uncorrResults, healthResults, modelResults, serialResults] = await Promise.all([
-      queryAll('smartmon_temperature_celsius_value{smart_id="194"}'),
-      queryAll('smartmon_power_on_hours_value{smart_id="9"}'),
-      queryAll('smartmon_reallocated_sector_ct_value{smart_id="5"}'),
-      queryAll('smartmon_current_pending_sector_value{smart_id="197"}'),
-      queryAll('smartmon_offline_uncorrectable_value{smart_id="198"}'),
-      queryAll('smartmon_device_smart_healthy'),
-      queryAll('smartmon_device_info{smart_id="device_model"}'),
-      queryAll('smartmon_device_info{smart_id="serial_number"}'),
+    // smartmon (the prometheus-community textfile collector) exports each SMART
+    // attribute twice: `_value` is the drive's normalised 0–253 health score,
+    // `_raw_value` is the actual reading. This used to query `_value`, so a
+    // disk "at 100°C" with "200 reallocated sectors" was a perfectly healthy
+    // drive's normalised score — and the fallback health check then flagged
+    // every disk. Device model and serial live as LABELS on one
+    // smartmon_device_info series (device_model / serial_number); filtering
+    // it on smart_id, which that series never has, matched nothing.
+    const [tempResults, powerOnResults, reallocResults, pendingResults, uncorrResults, healthResults, infoResults] = await Promise.all([
+      queryAll("smartmon_temperature_celsius_raw_value"),
+      queryAll("smartmon_power_on_hours_raw_value"),
+      queryAll("smartmon_reallocated_sector_ct_raw_value"),
+      queryAll("smartmon_current_pending_sector_raw_value"),
+      queryAll("smartmon_offline_uncorrectable_raw_value"),
+      queryAll("smartmon_device_smart_healthy"),
+      queryAll("smartmon_device_info"),
     ]);
 
     const temps = buildDiskMap(tempResults);
@@ -59,15 +66,14 @@ export async function GET() {
     const healthMap = buildDiskMap(healthResults);
 
     const modelMap = new Map<string, string>();
-    for (const r of modelResults) {
-      const dev = r.metric.disk ?? r.metric.device ?? r.metric.name ?? "";
-      modelMap.set(dev, r.metric.model_name ?? r.metric.model ?? "Unknown");
-    }
-
     const serialMap = new Map<string, string>();
-    for (const r of serialResults) {
+    for (const r of infoResults) {
       const dev = r.metric.disk ?? r.metric.device ?? r.metric.name ?? "";
-      serialMap.set(dev, r.metric.serial_number ?? r.metric.serial ?? "");
+      if (!dev) continue;
+      const model = r.metric.device_model || r.metric.model_name || r.metric.model || r.metric.product;
+      if (model) modelMap.set(dev, model);
+      const serial = r.metric.serial_number || r.metric.serial;
+      if (serial) serialMap.set(dev, serial);
     }
 
     const allDevices = new Set([...temps.keys(), ...powerOn.keys(), ...realloc.keys(), ...healthMap.keys()]);
