@@ -7,7 +7,7 @@ import { SearchEngineIcon } from "@/app/components/SearchBar";
 import { loadCardOrder, resetCardOrder, saveCardOrder } from "@/app/lib/card-order";
 import { CustomCardEditor } from "@/app/components/CustomCardEditor";
 
-export const CARD_KEYS = ["cpu", "memory", "filesystems", "network", "gpu", "speedtest", "system", "grafana", "services", "activity"] as const;
+export const CARD_KEYS = ["cpu", "memory", "filesystems", "network", "gpu", "speedtest", "system", "grafana", "services", "activity", "calendar"] as const;
 
 
 export function SettingsPanel({ settings, onUpdate, onClose, services }: {
@@ -169,7 +169,7 @@ export function SettingsPanel({ settings, onUpdate, onClose, services }: {
           <div className="grid grid-cols-2" style={{ columnGap: 16, rowGap: 4 }}>
           {CARD_KEYS.map(c => {
             const on = settings.visibleCards[c] !== false;
-            const name = c === "cpu" || c === "gpu" ? c.toUpperCase() : c.charAt(0).toUpperCase() + c.slice(1);
+            const name = c === "cpu" || c === "gpu" ? c.toUpperCase() : c === "calendar" ? "Coming up" : c.charAt(0).toUpperCase() + c.slice(1);
             return (
               <button key={c} type="button" role="switch" aria-checked={on}
                 className="flex items-center gap-3"

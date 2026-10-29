@@ -37,6 +37,7 @@ import { SettingsPanel } from "@/app/components/SettingsPanel";
 import { MikrotikTab } from "@/app/components/MikrotikTab";
 import { GrafanaCard } from "@/app/components/GrafanaCard";
 import { ActivityFeed } from "@/app/components/ActivityFeed";
+import { ComingUp } from "@/app/components/ComingUp";
 import { NetworkChart } from "@/app/components/NetworkChart";
 import { CpuThreads, busiestThreads } from "@/app/components/CpuThreads";
 import { FilesystemsBody } from "@/app/components/FilesystemsBody";
@@ -1295,12 +1296,6 @@ export default function Dashboard() {
                 <CustomCardsGrid refreshInterval={settings.refreshInterval} />
               </ErrorBoundary>
 
-              {/* ── activity feed ── */}
-              {isVisible("activity") && (
-                <ErrorBoundary name="Activity feed">
-                  <ActivityFeed events={activityEvents} loading={activityLoading} />
-                </ErrorBoundary>
-              )}
             </div>
             <div className="dash-side">
               {/* ── Now playing ── */}
@@ -1363,6 +1358,18 @@ export default function Dashboard() {
                     restartingSvc={restartingSvc}
                     restartService={restartService}
                   />
+                </ErrorBoundary>
+              )}
+
+              {/* ── media: recent activity, then what's coming up ── */}
+              {isVisible("activity") && (
+                <ErrorBoundary name="Activity feed">
+                  <ActivityFeed events={activityEvents} loading={activityLoading} />
+                </ErrorBoundary>
+              )}
+              {isVisible("calendar") && (
+                <ErrorBoundary name="Coming up">
+                  <ComingUp timezone={settings.timezone} sonarrUrl={clientConfig?.serviceUrls?.sonarr} />
                 </ErrorBoundary>
               )}
             </div>

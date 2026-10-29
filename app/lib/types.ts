@@ -217,3 +217,21 @@ export interface Incident {
   start: number;
   end:   number | null;              // null while it's still going
 }
+
+// /api/calendar — Sonarr and Radarr calendars for the "Coming up" card
+// (lib/calendar.ts).
+export interface CalendarItem {
+  source:  "sonarr" | "radarr";
+  kind:    "episode" | "digital" | "physical" | "cinema";
+  title:   string;        // series, or "Movie (2026)"
+  detail:  string;        // "S04E09" for episodes; "" for movies
+  at:      number;        // air / release time, ms
+  hasFile: boolean;
+  allDay?: boolean;       // a release date rather than an air time
+}
+
+export interface CalendarFeed {
+  sources:   { sonarr: "ok" | "error" | "unconfigured"; radarr: "ok" | "error" | "unconfigured" };
+  items:     CalendarItem[];   // last 7 days through the next 7, oldest first
+  timestamp: number;
+}

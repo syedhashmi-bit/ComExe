@@ -42,6 +42,8 @@ external state, no secrets in the browser: every upstream call goes through a se
 - **Services in one list** — Radarr, Sonarr, Bazarr, Tautulli, qBittorrent, Overseerr, Prowlarr,
   Pi-hole, Nginx Proxy Manager and Uptime Kuma, each with its own icon, status, key number,
   download queue or Plex stream, sorted so problems come first.
+- **What's coming up** — the week's episodes and movie releases from Sonarr and Radarr, by day,
+  with anything that aired but never downloaded called out, next to recent grabs and watches.
 - **Alerts with no tab open** — a background collector keeps evaluating thresholds and recording
   history around the clock, and sends webhooks to Discord, Slack, ntfy or any JSON endpoint,
   with throttling and quiet hours.
@@ -198,7 +200,7 @@ are authoritative.
 ```
 browser ──── one SSE stream (/api/stream) ────┐
                                               ▼
-                              Next.js server routes (35)
+                              Next.js server routes (36)
         ┌────────────┬──────────────┬─────────┴───────┬──────────────┐
    Prometheus   *arr / Plex /   SpeedTracker      MikroTik      open-meteo
    (~30 PromQL) Pi-hole / … (10)  (read-only)      (REST)       (weather)
@@ -218,12 +220,12 @@ browser ──── one SSE stream (/api/stream) ────┐
 
 | Layer | Choice |
 |---|---|
-| Framework | Next.js 16 (App Router, 7 pages, 33 components) |
+| Framework | Next.js 16 (App Router, 7 pages, 34 components) |
 | Language | TypeScript 6 |
 | Styling | Tailwind CSS 3, CSS variables for the two themes |
 | Charts | Inline SVG and Canvas, no chart library |
 | Runtime | Node 22 in a multi-stage Docker image |
-| Tests | Vitest (289 unit tests) and Playwright (end-to-end) |
+| Tests | Vitest (296 unit tests) and Playwright (end-to-end) |
 
 ---
 
@@ -249,12 +251,12 @@ end-to-end suite as a separate job. Architecture notes and conventions live in
 ```
 .
 ├── app/
-│   ├── api/                 35 server routes — metrics, services, stream (SSE), alerts,
+│   ├── api/                 36 server routes — metrics, services, stream (SSE), alerts,
 │   │                        history, insights, config, test-connection, docker, smart, …
 │   ├── components/          StatusSummary, ServicesPanel, PageHeader, SettingsPanel,
 │   │                        primitives (Card, Sparkline, gauges), …
 │   ├── hooks/               useEventStream (SSE with polling fallback), usePolling
-│   ├── lib/                 29 shared modules — config resolution, http + circuit
+│   ├── lib/                 30 shared modules — config resolution, http + circuit
 │   │                        breaker, caches, collector, alerts, formatters, …
 │   ├── analytics/ forecast/ logs/ setup/ welcome/ login/
 │   ├── globals.css          Theme tokens (Midnight, Paper) and layout

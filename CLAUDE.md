@@ -24,8 +24,8 @@ A single-user, LAN-only homelab dashboard for a TrueNAS Scale host. Next.js 16
 chart library. Every upstream service is reached through a server-side route so
 credentials never enter the browser bundle.
 
-**Scale:** ~15k lines of TS/TSX under `app/` — 35 API routes, 33 components,
-28 lib modules, 7 pages.
+**Scale:** ~15k lines of TS/TSX under `app/` — 36 API routes, 34 components,
+29 lib modules, 7 pages.
 
 **Deployment posture:** one LAN, one user, never exposed to the internet. That
 decision is why auth is optional, why RBAC/multi-user was dropped, and why the
@@ -49,7 +49,7 @@ $env:PATH = "C:\Program Files\nodejs;" + $env:PATH
 npm run dev        # localhost:3000
 npm run build      # local sanity check; CI does the real build
 npm run lint
-npm test           # vitest, 289 unit tests
+npm test           # vitest, 296 unit tests
 npm run test:e2e   # playwright
 npm run storybook  # primitives sandbox on :6006
 ```
@@ -226,7 +226,7 @@ Routes call `await loadConfig()` **once per request** and read
 Cached 5s. POST `/api/config` calls `invalidateConfigCache()` after a write, so
 changes apply in seconds with no redeploy.
 
-### API routes (35)
+### API routes (36)
 
 All server-side proxies. All credentials resolved via `loadConfig()`.
 
@@ -254,6 +254,10 @@ All server-side proxies. All credentials resolved via `loadConfig()`.
 scrape-target health).
 
 **Auth:** `auth/login/` (rate-limited), `auth/logout/`, `auth/status/`.
+
+**Media:** `calendar/` (Sonarr + Radarr calendars, last 7 days through the
+next 7, for the "Coming up" card — `lib/calendar.ts`, cached 15 min, API key in
+the `X-Api-Key` header).
 
 **Observability:** `history/` (ranged + downsampled), `insights/` (z-score
 anomalies, linear-regression forecasts, SLA/MTTR), `smart/` (SMART disk health
@@ -321,7 +325,8 @@ services are configured), `/login`, `/analytics` (interactive area charts over
 
 **Feature components:** `StatusSummary` + `IncidentStrip`, `PageHeader`, `FilesystemsBody`,
 `NetworkChart` (download above / upload below one axis, hover readout),
-`CpuThreads` (per-thread heatmap from `metrics.cpuThreads`), `ServicesPanel`, `ServiceDetailSheet`, `BookmarksPanel`,
+`CpuThreads` (per-thread heatmap from `metrics.cpuThreads`), `ComingUp` (the week's
+episodes and releases by day, plus aired-but-missing), `ServicesPanel`, `ServiceDetailSheet`, `BookmarksPanel`,
 `SettingsPanel`, `SearchBar`, `MikrotikTab`, `GrafanaCard`, `ActivityFeed`,
 `AreaChart`, `CommandPalette`, `KeyboardShortcuts`, `NotificationCenter`,
 `HeaderSparklines`, `UptimeTimeline`, `DiskHealthPanel`, `NetworkTopology`,
@@ -330,8 +335,9 @@ services are configured), `/login`, `/analytics` (interactive area charts over
 
 **Layout.** Below 1280px the dashboard is one column. From 1280px it widens
 (max 1560px) and splits in two — `.dash-columns` / `.dash-main` / `.dash-side`
-in `globals.css`: metric grid, disk health, custom cards and activity on the
-left; Plex now-playing and services on the right. The metric grid
+in `globals.css`: metric grid, system/Grafana, disk health and custom cards on
+the left; the media column on the right — Plex now-playing, services, recent
+activity, then Coming up. The metric grid
 (`.metric-grid`) is `auto-fill, minmax(260px, 1fr)`, so it fills whatever width
 it gets; a full-width item inside it uses `.span-all`. Breakpoint rules live in
 CSS rather than new Tailwind classes.
@@ -565,7 +571,7 @@ collector), `HISTORY_RETENTION_DAYS`, `HISTORY_MAX_SIZE_MB`,
 
 ## Testing
 
-- **Unit** — vitest, `tests/unit/`. 289 tests over 25 files covering `app/lib/*`
+- **Unit** — vitest, `tests/unit/`. 296 tests over 26 files covering `app/lib/*`
   plus `tests/unit/routes/` for API route handlers.
 - **E2E** — Playwright, `tests/e2e/smoke.spec.ts`, run by its own CI job.
 - **Storybook** — `stories/Primitives.stories.tsx`.

@@ -51,9 +51,12 @@ export function NetworkChart({ rx, tx, times, du, height = 150 }: {
     const d = (Math.min(Math.max(v, 0), max) / max) * half;
     return below ? mid + d : mid - d;
   };
+  // A card-coloured chip, so a line running along the top or bottom edge passes
+  // behind the label instead of striking through it.
   const scaleLabel: React.CSSProperties = {
-    position: "absolute", left: 0, fontSize: 12, color: "var(--text-ghost)",
+    position: "absolute", left: 0, fontSize: 12, lineHeight: "16px", color: "var(--text-ghost)",
     fontFamily: "var(--font-mono)", fontVariantNumeric: "tabular-nums", pointerEvents: "none",
+    background: "var(--card)", padding: "0 4px 0 0", borderRadius: 3,
   };
 
   return (

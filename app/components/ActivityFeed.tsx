@@ -16,7 +16,7 @@ export function relativeAgo(unixMs: number): string {
   return `${Math.round(sec / 86400)}d ago`;
 }
 
-function SourceIcon({ source }: { source: string }) {
+export function SourceIcon({ source }: { source: string }) {
   const [err, setErr] = useState(false);
   const src = SVC_ICONS[source];
   if (!src || err) {
