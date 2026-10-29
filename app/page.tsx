@@ -50,10 +50,11 @@ import { BookmarksPanel } from "@/app/components/BookmarksPanel";
 import { KeyboardShortcuts } from "@/app/components/KeyboardShortcuts";
 import { NotificationCenter } from "@/app/components/NotificationCenter";
 import { HeaderSparklines } from "@/app/components/HeaderSparklines";
-import { UptimeTimeline } from "@/app/components/UptimeTimeline";
 import { CommandPalette, type CommandAction } from "@/app/components/CommandPalette";
 import { DiskHealthPanel } from "@/app/components/DiskHealthPanel";
-import { StatusSummary } from "@/app/components/StatusSummary";
+import { StatusSummary, collectIssues } from "@/app/components/StatusSummary";
+import { useTabStatus } from "@/app/hooks/useTabStatus";
+import { seedFromHistory, type SavedPoint } from "@/app/lib/history-seed";
 import { NetworkTopology } from "@/app/components/NetworkTopology";
 import { ServerFleetPanel } from "@/app/components/ServerFleetPanel";
 import { DependencyMap } from "@/app/components/DependencyMap";
@@ -146,7 +147,6 @@ export default function Dashboard() {
   const [txHistory,      setTxHistory]      = useState<number[]>([]);
   // When each rx/tx sample was taken, for the network chart's hover readout.
   const [netTimes,       setNetTimes]       = useState<number[]>([]);
-  const [uptimeHistory,  setUptimeHistory]  = useState<{ ts: number; up: boolean }[]>([]);
 
   const [weather,            setWeather]            = useState<{ temp: number | null; condition: string | null; forecast?: ForecastDay[] } | null>(null);
   const [services,           setServices]           = useState<ServiceResult[] | null>(null);
@@ -211,6 +211,35 @@ export default function Dashboard() {
     setActivityLoading(false);
   }, [demoMode]);
 
+  // Fill the charts from saved history, so a reload doesn't start every
+  // sparkline from "collecting data…". Anything live that already arrived
+  // stays after the seeded points; the last 10s is left to the live feed.
+  useEffect(() => {
+    if (demoMode) return;
+    const mountedAt = Date.now();
+    let cancelled = false;
+    fetch("/api/history?range=1h&limit=360", { cache: "no-store" })
+      .then(r => (r.ok ? r.json() : null))
+      .then((d: { points?: SavedPoint[] } | null) => {
+        if (cancelled || !d?.points?.length) return;
+        const s = seedFromHistory(d.points, mountedAt - 10_000, MAX_HISTORY);
+        setCpuHistory(h => [...s.cpu, ...h].slice(-MAX_HISTORY));
+        setGpuHistory(h => [...s.gpu, ...h].slice(-MAX_HISTORY));
+        setRxHistory(h => [...s.rx, ...h].slice(-MAX_HISTORY));
+        setTxHistory(h => [...s.tx, ...h].slice(-MAX_HISTORY));
+        setNetTimes(h => [...s.times, ...h].slice(-MAX_HISTORY));
+      })
+      .catch(() => { /* charts just fill from live data, as before */ });
+    return () => { cancelled = true; };
+  }, [demoMode]);
+
+  // The browser tab mirrors the status summary: "2 issues · ComExe" + a dot.
+  const tabIssues = useMemo(
+    () => (metrics || services ? collectIssues(metrics, services, clientConfig, demoMode) : null),
+    [metrics, services, clientConfig, demoMode],
+  );
+  useTabStatus(tabIssues);
+
   // Persist settings to localStorage
   useEffect(() => {
     try {
@@ -261,10 +290,8 @@ export default function Dashboard() {
       setNetTimes(h => [...h, data.timestamp ?? Date.now()].slice(-MAX_HISTORY));
       setError(null);
       setLastUpdated(new Date().toLocaleTimeString());
-      setUptimeHistory(h => [...h, { ts: Date.now(), up: true }].slice(-300));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to fetch");
-      setUptimeHistory(h => [...h, { ts: Date.now(), up: false }].slice(-300));
     } finally {
       setLoading(false);
       setTimeout(() => setRefreshing(false), 800);
@@ -375,7 +402,6 @@ export default function Dashboard() {
         setNetTimes(h => [...h, m.timestamp ?? Date.now()].slice(-MAX_HISTORY));
         setError(null); setLoading(false); setLastUpdated(new Date().toLocaleTimeString());
         setRefreshing(true); setTimeout(() => setRefreshing(false), 800);
-        setUptimeHistory(h => [...h, { ts: Date.now(), up: true }].slice(-300));
         break;
       }
       case "services": {
@@ -1243,6 +1269,7 @@ export default function Dashboard() {
                               { label: "Architecture", value: metrics?.sysInfo?.arch     ?? "—", mono: false },
                               { label: "Host",         value: metrics?.sysInfo?.hostname ?? "—", mono: false },
                               { label: "Cores",        value: metrics?.sysInfo?.cpuCores != null ? `${metrics.sysInfo.cpuCores} cores` : "—", mono: false },
+                              { label: "Uptime",       value: fmtUptime(metrics?.uptime ?? null), mono: true  },
                               { label: "Up since",     value: fmtSince(metrics?.uptime ?? null), mono: true  },
                             ] as { label: string; value: string; mono: boolean }[]).map(({ label, value, mono }, i, arr) => (
                               <div key={label}>
@@ -1254,11 +1281,6 @@ export default function Dashboard() {
                                 {i < arr.length - 1 && <div style={{ height: 1, background: "var(--surface-bright)" }} />}
                               </div>
                             ))}
-                            {uptimeHistory.length > 1 && (
-                              <div style={{ marginTop: 8 }}>
-                                <UptimeTimeline history={uptimeHistory} height={20} />
-                              </div>
-                            )}
                           </div>
                         )}
                       </Card>

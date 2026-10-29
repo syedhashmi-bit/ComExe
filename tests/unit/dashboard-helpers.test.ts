@@ -4,6 +4,8 @@ import { niceMax } from "@/app/components/NetworkChart";
 import { fmtDays, forecastSentence } from "@/app/components/FilesystemsBody";
 import { cellLevels } from "@/app/components/IncidentStrip";
 import { fmtDuration } from "@/app/lib/formatters";
+import { seedFromHistory, type SavedPoint } from "@/app/lib/history-seed";
+import { statusIcon, statusTitle } from "@/app/hooks/useTabStatus";
 
 // Small pure helpers behind the CPU thread grid, the network chart, the
 // storage forecast and the incident strip.
@@ -69,5 +71,37 @@ describe("cellLevels", () => {
     expect(levels).toHaveLength(96);
     expect(levels.slice(-3)).toEqual(["warning", null, "critical"]);
     expect(levels.slice(0, 93).every(l => l === null)).toBe(true);
+  });
+});
+
+describe("seedFromHistory", () => {
+  const pt = (ts: number, over: Partial<SavedPoint> = {}): SavedPoint =>
+    ({ ts, cpu: ts / 1000, gpu: null, net_rx: ts, net_tx: ts / 10, ...over });
+
+  it("keeps the newest points before the cutoff, rx/tx/times aligned", () => {
+    const s = seedFromHistory([pt(1000), pt(2000, { net_rx: null }), pt(3000), pt(4000), pt(5000)], 5000, 3);
+    expect(s.cpu).toEqual([2, 3, 4]);          // 5000 is the live feed's; newest 3 before it
+    expect(s.rx).toEqual([3000, 4000]);        // the point with no rx is dropped from all three
+    expect(s.tx).toEqual([300, 400]);
+    expect(s.times).toEqual([3000, 4000]);
+    expect(s.gpu).toEqual([]);                 // no GPU, no GPU line
+  });
+
+  it("returns empty buffers for an empty history", () => {
+    expect(seedFromHistory([], Date.now(), 60)).toEqual({ cpu: [], gpu: [], rx: [], tx: [], times: [] });
+  });
+});
+
+describe("tab status", () => {
+  it("titles the tab by how many things need attention", () => {
+    expect(statusTitle(0)).toBe("ComExe");
+    expect(statusTitle(1)).toBe("1 issue · ComExe");
+    expect(statusTitle(3)).toBe("3 issues · ComExe");
+  });
+
+  it("draws the warning or critical dot into the icon", () => {
+    expect(decodeURIComponent(statusIcon("critical"))).toContain('fill="#f85149"');
+    expect(decodeURIComponent(statusIcon("warning"))).toContain('fill="#d29922"');
+    expect(statusIcon("warning")).toMatch(/^data:image\/svg\+xml,/);
   });
 });

@@ -17,7 +17,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ComExe · live",
+  title: "ComExe",
   description: "ComExe — homelab metrics dashboard",
 };
 

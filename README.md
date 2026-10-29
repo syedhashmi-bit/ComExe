@@ -36,7 +36,8 @@ external state, no secrets in the browser: every upstream call goes through a se
   attention: a crossed threshold, a service that's down or rejecting its credentials, *arr health
   errors (grouped across apps), stale data, Uptime Kuma monitors down, Prometheus exporters down.
   It also remembers: "last incident 10 h ago: Radarr unreachable for 12 min", with a 24-hour strip
-  that shows anything that came and went while you weren't looking.
+  that shows anything that came and went while you weren't looking — and the browser tab shows it
+  too ("2 issues · ComExe" and a coloured dot), so a pinned tab tells you without a look.
 - **Calm by design** — flat cards, one soft accent per metric for its charts, and status colours
   (green / amber / red) reserved for actual problems, always paired with a word.
 - **Services in one list** — Radarr, Sonarr, Bazarr, Tautulli, qBittorrent, Overseerr, Prowlarr,
@@ -80,7 +81,7 @@ external state, no secrets in the browser: every upstream call goes through a se
   established TCP connections
 - **GPU** — utilisation, temperature, power draw, VRAM, clocks, fan, encoder/decoder load
 - **Speedtest** — latest result and history from SpeedTracker (read-only — it never triggers a test)
-- **System** — OS, kernel, architecture, host, uptime, plus an uptime timeline
+- **System** — OS, kernel, architecture, host, cores, uptime and last boot
 - **Disk health** — SMART temperatures and sector errors when the smartmon exporter is installed
 - **Grafana** — embed any panel; with an API token it renders server-side, no iframe cookies
 
@@ -220,12 +221,12 @@ browser ──── one SSE stream (/api/stream) ────┐
 
 | Layer | Choice |
 |---|---|
-| Framework | Next.js 16 (App Router, 7 pages, 34 components) |
+| Framework | Next.js 16 (App Router, 7 pages, 33 components) |
 | Language | TypeScript 6 |
 | Styling | Tailwind CSS 3, CSS variables for the two themes |
 | Charts | Inline SVG and Canvas, no chart library |
 | Runtime | Node 22 in a multi-stage Docker image |
-| Tests | Vitest (296 unit tests) and Playwright (end-to-end) |
+| Tests | Vitest (300 unit tests) and Playwright (end-to-end) |
 
 ---
 
@@ -256,7 +257,7 @@ end-to-end suite as a separate job. Architecture notes and conventions live in
 │   ├── components/          StatusSummary, ServicesPanel, PageHeader, SettingsPanel,
 │   │                        primitives (Card, Sparkline, gauges), …
 │   ├── hooks/               useEventStream (SSE with polling fallback), usePolling
-│   ├── lib/                 30 shared modules — config resolution, http + circuit
+│   ├── lib/                 31 shared modules — config resolution, http + circuit
 │   │                        breaker, caches, collector, alerts, formatters, …
 │   ├── analytics/ forecast/ logs/ setup/ welcome/ login/
 │   ├── globals.css          Theme tokens (Midnight, Paper) and layout

@@ -24,8 +24,8 @@ A single-user, LAN-only homelab dashboard for a TrueNAS Scale host. Next.js 16
 chart library. Every upstream service is reached through a server-side route so
 credentials never enter the browser bundle.
 
-**Scale:** ~15k lines of TS/TSX under `app/` — 36 API routes, 34 components,
-29 lib modules, 7 pages.
+**Scale:** ~15k lines of TS/TSX under `app/` — 36 API routes, 33 components,
+30 lib modules, 7 pages.
 
 **Deployment posture:** one LAN, one user, never exposed to the internet. That
 decision is why auth is optional, why RBAC/multi-user was dropped, and why the
@@ -49,7 +49,7 @@ $env:PATH = "C:\Program Files\nodejs;" + $env:PATH
 npm run dev        # localhost:3000
 npm run build      # local sanity check; CI does the real build
 npm run lint
-npm test           # vitest, 296 unit tests
+npm test           # vitest, 300 unit tests
 npm run test:e2e   # playwright
 npm run storybook  # primitives sandbox on :6006
 ```
@@ -329,7 +329,7 @@ services are configured), `/login`, `/analytics` (interactive area charts over
 episodes and releases by day, plus aired-but-missing), `ServicesPanel`, `ServiceDetailSheet`, `BookmarksPanel`,
 `SettingsPanel`, `SearchBar`, `MikrotikTab`, `GrafanaCard`, `ActivityFeed`,
 `AreaChart`, `CommandPalette`, `KeyboardShortcuts`, `NotificationCenter`,
-`HeaderSparklines`, `UptimeTimeline`, `DiskHealthPanel`, `NetworkTopology`,
+`HeaderSparklines`, `DiskHealthPanel`, `NetworkTopology`,
 `ServerFleetPanel`, `DependencyMap`, `CustomCards` + `CustomCardEditor`,
 `ContainerLogsSheet`, `DraggableCard`, `ErrorBoundary`, `Modal`, `Clock`, `icons`.
 
@@ -355,7 +355,14 @@ a list of what needs attention — crossed thresholds (`healthIssues()` in
 Prometheus exporters down. `collectIssues()` is pure and unit-tested. Below
 it, from the collector's incident log: "Last incident 10h ago: Radarr
 unreachable for 12 min" (only while all is well) and a 24-hour strip of
-15-minute cells — grey unless something was wrong, hover for what.
+15-minute cells — grey unless something was wrong, hover for what. The same
+issue count drives the browser tab (`hooks/useTabStatus.ts`): "2 issues ·
+ComExe" and a warning/critical dot on the tab icon.
+
+**Sparklines** are in-memory buffers (60 samples) in `page.tsx`, filled on load
+from `/api/history?range=1h` via `lib/history-seed.ts` so a reload doesn't
+start them empty. Memory isn't seeded — `history.jsonl` stores total −
+available, the card charts the ZFS-aware total − available − SReclaimable.
 
 **Services panel** is a compact grouped list (`SVC_CATEGORIES` in
 `ServicesPanel.tsx`): *Media* (radarr, sonarr, bazarr, tautulli, qbittorrent,
@@ -571,7 +578,7 @@ collector), `HISTORY_RETENTION_DAYS`, `HISTORY_MAX_SIZE_MB`,
 
 ## Testing
 
-- **Unit** — vitest, `tests/unit/`. 296 tests over 26 files covering `app/lib/*`
+- **Unit** — vitest, `tests/unit/`. 300 tests over 26 files covering `app/lib/*`
   plus `tests/unit/routes/` for API route handlers.
 - **E2E** — Playwright, `tests/e2e/smoke.spec.ts`, run by its own CI job.
 - **Storybook** — `stories/Primitives.stories.tsx`.
