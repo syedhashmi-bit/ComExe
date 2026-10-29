@@ -3,6 +3,8 @@
 import type { ClientConfig, Metrics, ServiceResult } from "@/app/lib/types";
 import { SVC_LABELS, SVC_PORTS } from "@/app/lib/constants";
 import { healthIssues } from "@/app/lib/alerts";
+import { fmtDuration, fmtSmoothAgo } from "@/app/lib/formatters";
+import { IncidentStrip, useIncidents } from "@/app/components/IncidentStrip";
 
 // ── Status summary ──────────────────────────────────────────────────────────
 // The first thing on the dashboard: either "All systems normal" or a short
@@ -12,6 +14,10 @@ import { healthIssues } from "@/app/lib/alerts";
 //
 // Several services with the same problem (say, three *arr apps reporting a
 // health error) share one row rather than three.
+//
+// Below it, the collector's incident log: "last incident 10 h ago: Radarr
+// unreachable for 12 min" when all is well, and a 24-hour strip — so a problem
+// that came and went overnight is still visible in the morning.
 
 type Level = "warning" | "critical";
 
@@ -120,6 +126,7 @@ export function StatusSummary({ metrics, services, servicesUpdatedAt, clientConf
   clientConfig: ClientConfig | null;
   demoMode: boolean;
 }) {
+  const feed = useIncidents(demoMode);
   // Nothing to say until there is data to say it about.
   if (!metrics && !services) return null;
 
@@ -139,17 +146,30 @@ export function StatusSummary({ metrics, services, servicesUpdatedAt, clientConf
   const headline = issues.length === 0 ? "All systems normal"
     : `${issues.length} ${issues.length === 1 ? "thing needs" : "things need"} attention`;
 
+  const showStrip = !!feed?.enabled && feed.now != null;
+  // Only while all is well — with live issues, those are what matter.
+  const last = issues.length === 0 && feed?.last?.end != null && feed.now != null && feed.now - feed.last.end < 7 * 86_400_000
+    ? feed.last : null;
+
   return (
     <section aria-label="Status" style={{
       background: "var(--card)", border: "1px solid var(--border)", borderRadius: 10,
-      padding: issues.length > 0 ? "14px 18px 6px" : "14px 18px",
-      display: "flex", flexDirection: "column", gap: issues.length > 0 ? 8 : 0,
+      padding: issues.length > 0 && !showStrip ? "14px 18px 6px" : "14px 18px",
+      display: "flex", flexDirection: "column", gap: issues.length > 0 || showStrip ? 10 : 0,
     }}>
       <div className="flex flex-wrap items-baseline justify-between" style={{ columnGap: 12, rowGap: 4 }}>
-        <h2 className="flex items-center" style={{ margin: 0, gap: 10, fontSize: 16, fontWeight: 600, color: "var(--text)" }}>
-          <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: 4, background: dot, flexShrink: 0 }} />
-          {headline}
-        </h2>
+        <div className="flex flex-wrap items-baseline" style={{ columnGap: 10, rowGap: 2, minWidth: 0 }}>
+          <h2 className="flex items-center" style={{ margin: 0, gap: 10, fontSize: 16, fontWeight: 600, color: "var(--text)" }}>
+            <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: 4, background: dot, flexShrink: 0 }} />
+            {headline}
+          </h2>
+          {last && (
+            <span style={{ fontSize: 13, color: "var(--text-label)" }}
+              title={`${new Date(last.start).toLocaleString()} – ${new Date(last.end!).toLocaleTimeString()}`}>
+              Last incident {fmtSmoothAgo(last.end)}: {last.title} for {fmtDuration(last.end! - last.start)}
+            </span>
+          )}
+        </div>
         {meta && <span style={{ fontSize: 12, color: "var(--text-label)", fontVariantNumeric: "tabular-nums" }}>{meta}</span>}
       </div>
       {issues.length > 0 && (
@@ -174,6 +194,7 @@ export function StatusSummary({ metrics, services, servicesUpdatedAt, clientConf
           })}
         </ul>
       )}
+      {showStrip && <IncidentStrip incidents={feed!.incidents ?? []} now={feed!.now!} />}
     </section>
   );
 }

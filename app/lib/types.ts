@@ -19,6 +19,8 @@ export interface DiskEntry {
 
 export interface Metrics {
   cpu: number | null;
+  // Busy % per hardware thread, in cpu-number order. Empty when unknown.
+  cpuThreads?: number[];
   memory: { total: number | null; used: number | null; available: number | null; sReclaimable: number | null };
   uptime: number | null;
   disks: DiskEntry[];
@@ -190,4 +192,28 @@ export interface SavedConfig {
   mikrotik?:    { url?: string; username?: string; hasPassword: boolean };
   grafana?:     { baseUrl?: string; dashboardUid?: string; datasourceUid?: string; panelId?: string; panels?: { panelId: string; label: string; size: "sm" | "md" | "lg" }[] };
   preferences?: { searchEngine?: string; timezone?: string; theme?: string };
+}
+
+// /api/storage — the Filesystems card's fill-up forecast (lib/storage.ts).
+export interface StorageInsight {
+  poolPct:      number | null;
+  growthPerDay: number | null;   // bytes/day across the pool; negative = shrinking
+  daysToWarn:   number | null;   // until 85% (the disk warning); 0 = already there; null = not growing
+  daysToFull:   number | null;
+  history:      { ts: number; pct: number }[];   // last 30 days, oldest first
+  datasets:     { mountpoint: string; growthPerDay: number }[];
+  poolState:    string | null;   // "online", "degraded", … (node_zfs_zpool_state)
+  arcHitPct:    number | null;
+  arcSizeBytes: number | null;
+  timestamp:    number;
+}
+
+// A stretch of time something was wrong, from the collector's incident log
+// (lib/incidents.ts, /api/incidents).
+export interface Incident {
+  key:   string;                     // "service:radarr:down", "cpu", "disk:/mnt/…"
+  level: "warning" | "critical";     // the worst it reached
+  title: string;                     // "Radarr unreachable", "High CPU"
+  start: number;
+  end:   number | null;              // null while it's still going
 }

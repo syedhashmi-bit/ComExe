@@ -57,6 +57,18 @@ export function ageColor(unixMs: number | null, opts?: { warnSec?: number; critS
   return "var(--text-faint)";
 }
 
+// How long something lasted, in words: "under a minute", "12 min", "2 h 5 min",
+// "3 d 4 h". Used for incident durations.
+export function fmtDuration(ms: number): string {
+  const min = Math.round(ms / 60_000);
+  if (min < 1) return "under a minute";
+  if (min < 60) return `${min} min`;
+  const h = Math.floor(min / 60), m = min % 60;
+  if (h < 24) return m ? `${h} h ${m} min` : `${h} h`;
+  const d = Math.floor(h / 24), hh = h % 24;
+  return hh ? `${d} d ${hh} h` : `${d} d`;
+}
+
 export function fmtSince(s: number | null): string {
   if (s === null) return "—";
   const b = new Date(Date.now() - s * 1000);

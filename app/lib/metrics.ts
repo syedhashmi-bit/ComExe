@@ -54,6 +54,7 @@ async function fetchMetrics(cfg: ResolvedConfig) {
 
   const r = await resolveNamed({
     cpuIdle:          query(`avg(rate(node_cpu_seconds_total{mode="idle"}[2m])) * 100`),
+    cpuThreadIdle:    queryAll(`rate(node_cpu_seconds_total{mode="idle"}[2m])`),
     memTotal:         query(`node_memory_MemTotal_bytes`),
     memAvailable:     query(`node_memory_MemAvailable_bytes`),
     memSReclaimable:  query(`node_memory_SReclaimable_bytes`),
@@ -98,6 +99,12 @@ async function fetchMetrics(cfg: ResolvedConfig) {
   const targetsDown = scrapeTargets.filter(t => !t.up);
 
   const cpuUsed = r.cpuIdle != null ? 100 - r.cpuIdle : null;
+  // Busy % per hardware thread, in cpu-number order ("cpu" is a string label,
+  // so "10" would sort before "2" without the Number()).
+  const cpuThreads = r.cpuThreadIdle
+    .filter(t => t.metric.cpu != null && !isNaN(t.value))
+    .sort((a, b) => Number(a.metric.cpu) - Number(b.metric.cpu))
+    .map(t => Math.round(Math.min(100, Math.max(0, (1 - t.value) * 100)) * 10) / 10);
   const memUsed = r.memTotal != null && r.memAvailable != null ? r.memTotal - r.memAvailable : null;
   const gpuUtil = r.gpuUtilRatio != null ? r.gpuUtilRatio * 100 : null;
   const gpuName = r.gpuInfoResults[0]?.metric?.modelName ?? r.gpuInfoResults[0]?.metric?.name ?? null;
@@ -164,6 +171,7 @@ async function fetchMetrics(cfg: ResolvedConfig) {
 
   const responseData = {
     cpu: cpuUsed,
+    cpuThreads,
     memory: { total: r.memTotal, used: memUsed, available: r.memAvailable, sReclaimable: r.memSReclaimable },
     uptime: r.uptime,
     disks,

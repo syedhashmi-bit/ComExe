@@ -6,6 +6,7 @@ import type { Metrics, ServiceResult } from "@/app/lib/types";
 export function buildDemoMetrics(): Metrics {
   return {
     cpu: 42.3,
+    cpuThreads: [38.2, 41.5, 22.4, 47.9, 93.1, 30.6, 41.8, 18.3, 55.2, 27.7, 51.4, 39.5],
     memory: { total: 68719476736, used: null, available: 27917287424, sReclaimable: 4294967296 },
     disks: [
       { mountpoint: "/mnt/Pool/Media/Movies", device: "/dev/sda1", fstype: "zfs", total: 8e12, avail: 2.8e12, used: 5.2e12, usedPct: 65 },

@@ -57,6 +57,18 @@ describe("getMetrics — query-to-field mapping", () => {
     expect(m.uptime).toBe(12345);
   });
 
+  it("turns per-thread idle rates into busy % in cpu-number order", async () => {
+    // "cpu" is a string label: sorted as text, cpu10 would land before cpu2.
+    vectors[`rate(node_cpu_seconds_total{mode="idle"}[2m])`] = [
+      { metric: { cpu: "10" }, value: 0.25 },
+      { metric: { cpu: "2" },  value: 0.9 },
+      { metric: { cpu: "0" },  value: 1.02 },   // rate jitter can top 1
+      { metric: { cpu: "1" },  value: NaN },
+    ];
+    const m = await (await load()).getMetrics();
+    expect(m.cpuThreads).toEqual([0, 10, 75]);
+  });
+
   it("maps the GPU queries to the right fields, including ratio → percent", async () => {
     scalars["nvidia_smi_utilization_gpu_ratio"] = 0.42;
     scalars["nvidia_smi_temperature_gpu"] = 61;

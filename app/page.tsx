@@ -37,6 +37,9 @@ import { SettingsPanel } from "@/app/components/SettingsPanel";
 import { MikrotikTab } from "@/app/components/MikrotikTab";
 import { GrafanaCard } from "@/app/components/GrafanaCard";
 import { ActivityFeed } from "@/app/components/ActivityFeed";
+import { NetworkChart } from "@/app/components/NetworkChart";
+import { CpuThreads, busiestThreads } from "@/app/components/CpuThreads";
+import { FilesystemsBody } from "@/app/components/FilesystemsBody";
 import { DraggableCard } from "@/app/components/DraggableCard";
 import { ContainerLogsSheet } from "@/app/components/ContainerLogsSheet";
 import { CustomCardsGrid } from "@/app/components/CustomCards";
@@ -140,6 +143,8 @@ export default function Dashboard() {
   const [gpuTempHistory, setGpuTempHistory] = useState<number[]>([]);
   const [rxHistory,      setRxHistory]      = useState<number[]>([]);
   const [txHistory,      setTxHistory]      = useState<number[]>([]);
+  // When each rx/tx sample was taken, for the network chart's hover readout.
+  const [netTimes,       setNetTimes]       = useState<number[]>([]);
   const [uptimeHistory,  setUptimeHistory]  = useState<{ ts: number; up: boolean }[]>([]);
 
   const [weather,            setWeather]            = useState<{ temp: number | null; condition: string | null; forecast?: ForecastDay[] } | null>(null);
@@ -184,6 +189,7 @@ export default function Dashboard() {
     setGpuTempHistory([48, 49, 50, 51, 52, 51, 50, 52, 53, 52, 51, 52]);
     setRxHistory([20e6, 22e6, 18e6, 24e6, 21e6, 25e6, 23e6, 24e6, 22e6, 24e6]);
     setTxHistory([2.5e6, 3e6, 2.8e6, 3.2e6, 2.9e6, 3.5e6, 3.1e6, 3.2e6, 2.7e6, 3.2e6]);
+    setNetTimes(Array.from({ length: 10 }, (_, i) => Date.now() - (9 - i) * 10_000));
     setWeather({ temp: 18, condition: "Partly cloudy", forecast: [
       { date: "2026-05-13", high: 20, low: 12, code: 2, condition: "Partly cloudy", emoji: "⛅" },
       { date: "2026-05-14", high: 17, low: 10, code: 61, condition: "Light rain", emoji: "🌧️" },
@@ -251,6 +257,7 @@ export default function Dashboard() {
       if (data.gpu?.temperature != null) setGpuTempHistory(h => [...h, data.gpu.temperature!].slice(-MAX_HISTORY));
       setRxHistory(h => [...h, data.network.rxBytesPerSec ?? 0].slice(-MAX_HISTORY));
       setTxHistory(h => [...h, data.network.txBytesPerSec ?? 0].slice(-MAX_HISTORY));
+      setNetTimes(h => [...h, data.timestamp ?? Date.now()].slice(-MAX_HISTORY));
       setError(null);
       setLastUpdated(new Date().toLocaleTimeString());
       setUptimeHistory(h => [...h, { ts: Date.now(), up: true }].slice(-300));
@@ -364,6 +371,7 @@ export default function Dashboard() {
         if (m.gpu?.temperature != null) setGpuTempHistory(h => [...h, m.gpu.temperature!].slice(-MAX_HISTORY));
         setRxHistory(h => [...h, m.network.rxBytesPerSec ?? 0].slice(-MAX_HISTORY));
         setTxHistory(h => [...h, m.network.txBytesPerSec ?? 0].slice(-MAX_HISTORY));
+        setNetTimes(h => [...h, m.timestamp ?? Date.now()].slice(-MAX_HISTORY));
         setError(null); setLoading(false); setLastUpdated(new Date().toLocaleTimeString());
         setRefreshing(true); setTimeout(() => setRefreshing(false), 800);
         setUptimeHistory(h => [...h, { ts: Date.now(), up: true }].slice(-300));
@@ -879,6 +887,9 @@ export default function Dashboard() {
                     </div>
                     <Sparkline data={cpuHistory} color={barColor(cpuPct, "var(--accent-cpu)")} height={48} />
                     <GaugeBar percent={cpuPct} color={barColor(cpuPct, "var(--accent-cpu)")} />
+                    {!loading && (metrics?.cpuThreads?.length ?? 0) > 1 && (
+                      <CpuThreads threads={metrics!.cpuThreads!} />
+                    )}
                     {!loading && (metrics?.sysInfo?.load1 != null) && (
                       <span className="text-xs tabular-nums font-mono" style={{ color: "var(--text-faint)" }}>
                         Load: {metrics.sysInfo.load1?.toFixed(2)} · {metrics.sysInfo.load5?.toFixed(2)} · {metrics.sysInfo.load15?.toFixed(2)}
@@ -886,11 +897,15 @@ export default function Dashboard() {
                     )}
                     {expandedCard === "cpu" && (() => {
                       const s = histStats(cpuHistory);
+                      const busiest = busiestThreads(metrics?.cpuThreads ?? []);
                       return (
                         <div className="flex flex-col gap-0.5 pt-2" style={{ borderTop: "1px solid var(--divider)" }}>
                           <StatRow label="Min" value={s.min != null ? fmtPct(s.min) : "—"} />
                           <StatRow label="Max" value={s.max != null ? fmtPct(s.max) : "—"} />
                           <StatRow label="Average" value={s.avg != null ? fmtPct(s.avg) : "—"} />
+                          {busiest.length > 1 && (
+                            <StatRow label="Busiest threads" value={busiest.map(b => `cpu${b.cpu} ${b.pct.toFixed(0)}%`).join(" · ")} />
+                          )}
                         </div>
                       );
                     })()}
@@ -944,81 +959,10 @@ export default function Dashboard() {
                   <Card label="filesystems" accent="var(--accent-fs)" alertLevel={maxDiskAlert} icon={<IconDisk />}
                     animDelay={100} expanded={expandedCard === "filesystems"} onToggle={() => toggleCard("filesystems")}>
                     {loading ? <Skeleton /> : !metrics?.disks.length ? (
-                      <span className="text-xs" style={{ color: "var(--settings-text)" }}>no filesystems found</span>
-                    ) : (() => {
-                      const PREFIX = "/mnt/Pool/Media/";
-                      const folderName = (mp: string) => mp.startsWith(PREFIX) ? mp.slice(PREFIX.length) : (mp.split("/").pop() ?? mp);
-                      // Documented disk thresholds: warn >85%, critical >95%. Neutral below.
-                      const fsBarColor = (p: number) => p > 95 ? "var(--critical)" : p > 85 ? "var(--warn)" : "var(--accent-fs)";
-                      const sorted = [...metrics.disks].sort((a, b) => b.usedPct - a.usedPct);
-                      const poolUsed  = metrics.pool?.used  ?? null;
-                      const poolTotal = metrics.pool?.total ?? null;
-                      const poolPct   = poolTotal != null && poolUsed != null && poolTotal > 0
-                        ? (poolUsed / poolTotal) * 100 : null;
-                      const poolColor = poolPct == null ? "var(--accent-fs)" : fsBarColor(poolPct);
-                      return (
-                        <div className="flex flex-col gap-3">
-                          {poolTotal != null && poolUsed != null && (
-                            <div className="flex flex-col gap-2">
-                              <div className="flex items-baseline justify-between gap-2">
-                                <div className="flex items-baseline gap-2">
-                                  <span className="font-mono tabular-nums" style={{ fontSize: 26, fontWeight: 600, color: "var(--text)", lineHeight: 1.1, letterSpacing: "-0.01em" }}>
-                                    {fmtBytes(poolUsed, 1, du)}
-                                  </span>
-                                  <span className="text-xs" style={{ color: "var(--text-label)" }}>
-                                    of {fmtBytes(poolTotal, 1, du)}
-                                  </span>
-                                </div>
-                                {poolPct != null && (
-                                  <span className="font-mono tabular-nums" style={{ fontSize: 13, fontWeight: 700, color: poolColor }}>
-                                    {poolPct.toFixed(0)}%
-                                  </span>
-                                )}
-                              </div>
-                              <div className="rounded-full overflow-hidden" style={{ background: "var(--card-hover)", height: 6 }}>
-                                <div className="h-full rounded-full transition-all duration-700" style={{
-                                  width: `${poolPct ?? 0}%`,
-                                  background: `linear-gradient(90deg, ${withAlpha(poolColor, 60)}, ${poolColor})`,
-                                  boxShadow: `0 0 8px ${withAlpha(poolColor, 33)}`,
-                                }} />
-                              </div>
-                            </div>
-                          )}
-                          <div className="flex flex-col" style={{
-                            overflowY: sorted.length > 4 ? "auto" : "visible",
-                            maxHeight: sorted.length > 4 ? 220 : undefined,
-                          }}>
-                            {sorted.map((disk, idx) => {
-                              const name = folderName(disk.mountpoint);
-                              const barC = fsBarColor(disk.usedPct);
-                              return (
-                                <div key={disk.mountpoint} className="flex flex-col gap-1"
-                                  style={{ padding: "5px 0", borderTop: idx > 0 ? "1px solid var(--border-dim)" : "none" }}>
-                                  <div className="flex items-center justify-between gap-2">
-                                    <div className="flex items-center gap-1.5 min-w-0">
-                                      <span style={{ color: "var(--warn)", opacity: 0.55, flexShrink: 0 }}><IconFolder /></span>
-                                      <span className="text-xs font-medium truncate" style={{ color: "var(--text-mid)" }}>{name}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2 shrink-0">
-                                      <span className="text-xs tabular-nums font-mono" style={{ color: "var(--text-faint)" }}>
-                                        {fmtBytes(disk.used, 1, du)}
-                                      </span>
-                                      <span className="tabular-nums font-mono font-semibold" style={{ fontSize: 12, color: barC, minWidth: "2.5ch", textAlign: "right" }}>
-                                        {disk.usedPct.toFixed(0)}%
-                                      </span>
-                                    </div>
-                                  </div>
-                                  <div className="rounded-full overflow-hidden" style={{ background: "var(--card-hover)", height: 4 }}>
-                                    <div className="h-full rounded-full transition-all duration-700"
-                                      style={{ width: `${disk.usedPct}%`, background: barC, boxShadow: `0 0 4px ${withAlpha(barC, 33)}` }} />
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      );
-                    })()}
+                      <span className="text-xs" style={{ color: "var(--text-faint)" }}>No filesystems found under {clientConfig?.fsPathPrefix ?? "the media path"}.</span>
+                    ) : (
+                      <FilesystemsBody metrics={metrics} du={du} fsPathPrefix={clientConfig?.fsPathPrefix ?? "/mnt/Pool/Media/"} />
+                    )}
                   </Card>
                   </DraggableCard></div>
                 )}
@@ -1034,45 +978,34 @@ export default function Dashboard() {
                         borderRadius: 4, padding: "2px 7px", fontSize: 12, color: "var(--accent-network)",
                       }}>{metrics.network.interfaceName}</span>
                     )}
-                    <div className="flex flex-col gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold" style={{ color: "var(--accent-network)" }}>↓</span>
-                        <span className="text-xs" style={{ color: "var(--text-faint)" }}>RX</span>
-                        <span className="text-xs font-medium tabular-nums ml-auto font-mono" style={{ color: "var(--text-secondary)" }}>
-                          {loading ? "—" : `${fmtBytes(metrics?.network.rxBytesPerSec ?? null, 1, du)}/s`}
-                        </span>
-                      </div>
-                      <Sparkline data={rxHistory} color="var(--accent-network)" autoMax height={50} />
-                      <span className="text-xs tabular-nums font-medium" style={{ color: "var(--text-faint)" }}>
-                        ↓ {fmtBytes(metrics?.network.rxBytesTotal ?? null, 1, du)} total
-                      </span>
+                    <div className="flex flex-wrap" style={{ columnGap: 24, rowGap: 8 }}>
+                      {([
+                        { label: "Download", color: "var(--accent-network)",    v: metrics?.network.rxBytesPerSec ?? null },
+                        { label: "Upload",   color: "var(--accent-network-tx)", v: metrics?.network.txBytesPerSec ?? null },
+                      ]).map(x => (
+                        <div key={x.label} className="flex flex-col" style={{ gap: 2 }}>
+                          <span className="flex items-center gap-1.5 text-xs" style={{ color: "var(--text-faint)" }}>
+                            <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: 2, background: x.color }} />{x.label}
+                          </span>
+                          <span className="font-mono tabular-nums" style={{ fontSize: 20, fontWeight: 500, color: "var(--text)", lineHeight: 1.2 }}>
+                            {loading ? "—" : `${fmtBytes(x.v, 1, du)}/s`}
+                          </span>
+                        </div>
+                      ))}
                     </div>
-                    <div style={{ height: 1, background: "var(--surface-bright)" }} />
-                    <div className="flex flex-col gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold" style={{ color: "var(--accent-network-tx)" }}>↑</span>
-                        <span className="text-xs" style={{ color: "var(--text-faint)" }}>TX</span>
-                        <span className="text-xs font-medium tabular-nums ml-auto font-mono" style={{ color: "var(--text-secondary)" }}>
-                          {loading ? "—" : `${fmtBytes(metrics?.network.txBytesPerSec ?? null, 1, du)}/s`}
-                        </span>
-                      </div>
-                      <Sparkline data={txHistory} color="var(--accent-network-tx)" autoMax height={50} />
-                      <span className="text-xs tabular-nums font-medium" style={{ color: "var(--text-faint)" }}>
-                        ↑ {fmtBytes(metrics?.network.txBytesTotal ?? null, 1, du)} total
-                      </span>
-                    </div>
-                    {!loading && metrics?.sysInfo?.tcpEstab != null && (
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs" style={{ color: "var(--text-faint)" }}>TCP</span>
-                        <span className="text-xs tabular-nums font-mono font-medium" style={{ color: "var(--text-muted)" }}>
-                          {metrics.sysInfo.tcpEstab} established
-                        </span>
+                    <NetworkChart rx={rxHistory} tx={txHistory} times={netTimes} du={du} height={140} />
+                    {!loading && (
+                      <div className="flex flex-wrap justify-between text-xs tabular-nums" style={{ columnGap: 12, rowGap: 4, color: "var(--text-faint)", paddingTop: 10, borderTop: "1px solid var(--divider)" }}>
+                        <span>↓ {fmtBytes(metrics?.network.rxBytesTotal ?? null, 1, du)} · ↑ {fmtBytes(metrics?.network.txBytesTotal ?? null, 1, du)} since boot</span>
+                        {metrics?.sysInfo?.tcpEstab != null && (
+                          <span>TCP <span className="font-mono" style={{ color: "var(--text-muted)" }}>{metrics.sysInfo.tcpEstab}</span> established</span>
+                        )}
                       </div>
                     )}
                     {expandedCard === "network" && rxHistory.length > 0 && (
                       <div className="flex flex-col gap-0.5 pt-2" style={{ borderTop: "1px solid var(--divider)" }}>
-                        <StatRow label="Peak RX" value={`${fmtBytes(Math.max(...rxHistory), 1, du)}/s`} />
-                        <StatRow label="Peak TX" value={`${fmtBytes(Math.max(...txHistory), 1, du)}/s`} />
+                        <StatRow label="Peak download" value={`${fmtBytes(Math.max(...rxHistory), 1, du)}/s`} />
+                        <StatRow label="Peak upload" value={`${fmtBytes(Math.max(...txHistory), 1, du)}/s`} />
                       </div>
                     )}
                   </Card>

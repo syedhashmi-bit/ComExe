@@ -11,14 +11,16 @@ const peekMetrics      = vi.fn(() => ({ cpu: 2 }));
 const getServicesFresh = vi.fn(async () => ({ services: [], timestamp: 0 }));
 const peekServices     = vi.fn(() => ({ services: [], timestamp: 0 }));
 const evaluateAndDispatch = vi.fn(async (): Promise<{ fires: unknown[]; quiet: boolean }> => ({ fires: [], quiet: false }));
+const recordIncidents  = vi.fn(async () => {});
 
 beforeEach(() => {
   vi.resetModules();
   resetGlobalSingletons();
-  for (const f of [getMetrics, peekMetrics, getServicesFresh, peekServices, evaluateAndDispatch]) f.mockClear();
+  for (const f of [getMetrics, peekMetrics, getServicesFresh, peekServices, evaluateAndDispatch, recordIncidents]) f.mockClear();
   vi.doMock("@/app/lib/metrics",  () => ({ getMetrics, peekMetrics }));
   vi.doMock("@/app/lib/services", () => ({ getServicesFresh, peekServices }));
   vi.doMock("@/app/lib/alerts-dispatch", () => ({ evaluateAndDispatch, alertWritesSettled: async () => {} }));
+  vi.doMock("@/app/lib/incidents", () => ({ recordIncidents, incidentWritesSettled: async () => {} }));
 });
 afterEach(() => {
   delete process.env.COMEXE_COLLECTOR;
@@ -35,6 +37,12 @@ describe("tick — idle (no SSE clients)", () => {
     expect(getMetrics).toHaveBeenCalledTimes(1);
     expect(getServicesFresh).toHaveBeenCalledTimes(1);
     expect(evaluateAndDispatch).toHaveBeenCalledWith({ metrics: { cpu: 1 }, services: [] });
+  });
+
+  it("records incidents on every tick, alerts enabled or not", async () => {
+    const c = await load();
+    await c.tick(T0);
+    expect(recordIncidents).toHaveBeenCalledWith({ metrics: { cpu: 1 }, services: [], now: T0 });
   });
 
   it("polls metrics every 30s and services every 60s, peeking otherwise", async () => {

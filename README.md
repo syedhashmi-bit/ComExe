@@ -35,6 +35,8 @@ external state, no secrets in the browser: every upstream call goes through a se
 - **Status at a glance** — a summary line reads *All systems normal*, or lists exactly what needs
   attention: a crossed threshold, a service that's down or rejecting its credentials, *arr health
   errors (grouped across apps), stale data, Uptime Kuma monitors down, Prometheus exporters down.
+  It also remembers: "last incident 10 h ago: Radarr unreachable for 12 min", with a 24-hour strip
+  that shows anything that came and went while you weren't looking.
 - **Calm by design** — flat cards, one soft accent per metric for its charts, and status colours
   (green / amber / red) reserved for actual problems, always paired with a word.
 - **Services in one list** — Radarr, Sonarr, Bazarr, Tautulli, qBittorrent, Overseerr, Prowlarr,
@@ -66,11 +68,14 @@ external state, no secrets in the browser: every upstream call goes through a se
 
 ### Metrics
 
-- **CPU** — usage, load averages, cores and clock, history sparkline
+- **CPU** — usage, load averages, cores and clock, history sparkline, and a per-thread heatmap
+  that shows a single pegged thread the average hides
 - **Memory** — used / ZFS cache / free, with ZFS-aware accounting (`MemTotal − MemAvailable − SReclaimable`)
   so the ARC doesn't look like a leak
-- **Filesystems** — pool fullness plus each dataset under your media path
-- **Network** — download and upload throughput with history, totals, established TCP connections
+- **Filesystems** — pool fullness, pool state and ZFS cache hit rate, a fill-up forecast ("reaches
+  85% in about 2 years") from the last week's growth, and each dataset with its weekly growth
+- **Network** — download above and upload below one chart, with a hover readout; totals and
+  established TCP connections
 - **GPU** — utilisation, temperature, power draw, VRAM, clocks, fan, encoder/decoder load
 - **Speedtest** — latest result and history from SpeedTracker (read-only — it never triggers a test)
 - **System** — OS, kernel, architecture, host, uptime, plus an uptime timeline
@@ -193,7 +198,7 @@ are authoritative.
 ```
 browser ──── one SSE stream (/api/stream) ────┐
                                               ▼
-                              Next.js server routes (33)
+                              Next.js server routes (35)
         ┌────────────┬──────────────┬─────────┴───────┬──────────────┐
    Prometheus   *arr / Plex /   SpeedTracker      MikroTik      open-meteo
    (~30 PromQL) Pi-hole / … (10)  (read-only)      (REST)       (weather)
@@ -213,12 +218,12 @@ browser ──── one SSE stream (/api/stream) ────┐
 
 | Layer | Choice |
 |---|---|
-| Framework | Next.js 16 (App Router, 7 pages, 29 components) |
+| Framework | Next.js 16 (App Router, 7 pages, 33 components) |
 | Language | TypeScript 6 |
 | Styling | Tailwind CSS 3, CSS variables for the two themes |
 | Charts | Inline SVG and Canvas, no chart library |
 | Runtime | Node 22 in a multi-stage Docker image |
-| Tests | Vitest (269 unit tests) and Playwright (end-to-end) |
+| Tests | Vitest (289 unit tests) and Playwright (end-to-end) |
 
 ---
 
@@ -244,12 +249,12 @@ end-to-end suite as a separate job. Architecture notes and conventions live in
 ```
 .
 ├── app/
-│   ├── api/                 33 server routes — metrics, services, stream (SSE), alerts,
+│   ├── api/                 35 server routes — metrics, services, stream (SSE), alerts,
 │   │                        history, insights, config, test-connection, docker, smart, …
 │   ├── components/          StatusSummary, ServicesPanel, PageHeader, SettingsPanel,
 │   │                        primitives (Card, Sparkline, gauges), …
 │   ├── hooks/               useEventStream (SSE with polling fallback), usePolling
-│   ├── lib/                 27 shared modules — config resolution, http + circuit
+│   ├── lib/                 29 shared modules — config resolution, http + circuit
 │   │                        breaker, caches, collector, alerts, formatters, …
 │   ├── analytics/ forecast/ logs/ setup/ welcome/ login/
 │   ├── globals.css          Theme tokens (Midnight, Paper) and layout

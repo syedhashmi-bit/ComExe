@@ -20,6 +20,7 @@ import { EventEmitter } from "node:events";
 import { getMetrics, peekMetrics } from "@/app/lib/metrics";
 import { getServicesFresh, peekServices } from "@/app/lib/services";
 import { evaluateAndDispatch, alertWritesSettled } from "@/app/lib/alerts-dispatch";
+import { recordIncidents, incidentWritesSettled } from "@/app/lib/incidents";
 import { globalSingleton } from "@/app/lib/singleton";
 import type { AlertFire } from "@/app/lib/alert-events";
 
@@ -76,8 +77,8 @@ export function collectorStatus() {
   };
 }
 
-// One pass: poll whatever is due (idle only), then evaluate alerts on the
-// latest data. Exported for tests; the loop below is the only production caller.
+// One pass: poll whatever is due (idle only), then record incidents and
+// evaluate alerts on the latest data. Exported for tests; the loop below is the only production caller.
 export async function tick(now = Date.now()): Promise<void> {
   const active = state.clients > 0;
   const metricsDue  = now - state.lastMetrics  >= (active ? ACTIVE_EVAL_MS : IDLE_INTERVALS.metrics);
@@ -94,6 +95,10 @@ export async function tick(now = Date.now()): Promise<void> {
     ]);
     if (metricsDue)  state.lastMetrics  = now;
     if (servicesDue) state.lastServices = now;
+
+    // Before alerts, and regardless of whether alerts are enabled: the
+    // status line's "last incident" and 24 h strip come from this log.
+    await recordIncidents({ metrics, services: services?.services ?? null, now });
 
     const { fires } = await evaluateAndDispatch({
       metrics,
@@ -140,12 +145,12 @@ export function startCollector(): void {
 }
 
 // Stops the loop, tells open SSE streams to close so Next's in-flight drain
-// isn't held open by long-lived connections, and waits for any alerts.json
-// write to land.
+// isn't held open by long-lived connections, and waits for any alerts.json /
+// incidents.json write to land.
 export async function stopCollector(): Promise<void> {
   if (state.stopped) return;
   state.stopped = true;
   if (state.timer) clearTimeout(state.timer);
   state.events.emit("shutdown");
-  await alertWritesSettled();
+  await Promise.all([alertWritesSettled(), incidentWritesSettled()]);
 }

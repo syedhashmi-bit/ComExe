@@ -240,6 +240,13 @@ body {
 .card-info.is-open { opacity: 1; }
 @media (hover: none) { .card-info { opacity: 1; } }
 
+/* CPU per-thread cells print their % only when the cell is wide enough to
+   hold it — each cell is its own size container, so this follows the card's
+   width (and the thread count) without measuring anything in JS. */
+.cpu-thread { container-type: inline-size; }
+.cpu-thread-num { display: none; }
+@container (min-width: 20px) { .cpu-thread-num { display: inline; } }
+
 /* Sparkline empty-state shimmer — used while we have <2 data points. */
 @keyframes sparklineShimmer {
   0%   { background-position: 100% 0; }

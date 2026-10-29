@@ -24,8 +24,8 @@ A single-user, LAN-only homelab dashboard for a TrueNAS Scale host. Next.js 16
 chart library. Every upstream service is reached through a server-side route so
 credentials never enter the browser bundle.
 
-**Scale:** ~15k lines of TS/TSX under `app/` — 33 API routes, 29 components,
-26 lib modules, 7 pages.
+**Scale:** ~15k lines of TS/TSX under `app/` — 35 API routes, 33 components,
+28 lib modules, 7 pages.
 
 **Deployment posture:** one LAN, one user, never exposed to the internet. That
 decision is why auth is optional, why RBAC/multi-user was dropped, and why the
@@ -49,7 +49,7 @@ $env:PATH = "C:\Program Files\nodejs;" + $env:PATH
 npm run dev        # localhost:3000
 npm run build      # local sanity check; CI does the real build
 npm run lint
-npm test           # vitest, 269 unit tests
+npm test           # vitest, 289 unit tests
 npm run test:e2e   # playwright
 npm run storybook  # primitives sandbox on :6006
 ```
@@ -162,8 +162,15 @@ webhooks never fired and `/forecast` filled with gaps.
 - Fires go out on `collectorEvents` → `/api/stream` relays them as `event:
   alert` → `page.tsx` counts them and raises browser notifications. Webhooks
   are the always-on channel; browser notifications only reach a connected tab.
+- Every tick it also feeds `lib/incidents.ts`, which keeps an incident log in
+  `data/incidents.json` — each problem's start, end and worst level, whether or
+  not alerts are enabled. That's what the status line's "last incident" and
+  24-hour strip read (via `/api/incidents`). A source with no data on a tick
+  (metrics or services null) leaves its incidents open rather than closing
+  them, and a problem that recurs within 2 min reopens the same incident.
 - On SIGTERM/SIGINT it emits `shutdown`, which closes open SSE streams so they
-  don't hold Next's drain open, and waits for pending `alerts.json` writes.
+  don't hold Next's drain open, and waits for pending `alerts.json` /
+  `incidents.json` writes.
 - `COMEXE_COLLECTOR=0` disables it (the e2e suite does). Status is reported
   under `collector` in `/api/diagnostics`.
 
@@ -219,7 +226,7 @@ Routes call `await loadConfig()` **once per request** and read
 Cached 5s. POST `/api/config` calls `invalidateConfigCache()` after a write, so
 changes apply in seconds with no redeploy.
 
-### API routes (33)
+### API routes (35)
 
 All server-side proxies. All credentials resolved via `loadConfig()`.
 
@@ -251,8 +258,11 @@ scrape-target health).
 **Observability:** `history/` (ranged + downsampled), `insights/` (z-score
 anomalies, linear-regression forecasts, SLA/MTTR), `smart/` (SMART disk health
 from `smartmon_*`), `alerts/` (GET config+recent / PATCH config — deliberately
-no POST; evaluation is the collector's job), `stream/` (SSE, also relays
-collector alert fires).
+no POST; evaluation is the collector's job), `incidents/` (read-only view of
+the collector's incident log), `storage/` (pool fill-up forecast, zpool state,
+ZFS cache hit rate — `lib/storage.ts`, cached 10 min; heavier queries than the
+metrics stream, so the Filesystems card polls it every 10 min), `stream/` (SSE,
+also relays collector alert fires).
 
 **Infrastructure:** `docker/containers|logs|restart/`, `mikrotik/devices|wol/`,
 `topology/`, `servers/` (multi-server fleet CRUD), `dependencies/` (service
@@ -309,7 +319,9 @@ services are configured), `/login`, `/analytics` (interactive area charts over
   dot. Keyboard-activatable (role="button"). Optional ⓘ popover from `CARD_INFO`,
   shown only on the hovered or focused card (`.card-info` in `globals.css`; always on touch).
 
-**Feature components:** `StatusSummary`, `PageHeader`, `ServicesPanel`, `ServiceDetailSheet`, `BookmarksPanel`,
+**Feature components:** `StatusSummary` + `IncidentStrip`, `PageHeader`, `FilesystemsBody`,
+`NetworkChart` (download above / upload below one axis, hover readout),
+`CpuThreads` (per-thread heatmap from `metrics.cpuThreads`), `ServicesPanel`, `ServiceDetailSheet`, `BookmarksPanel`,
 `SettingsPanel`, `SearchBar`, `MikrotikTab`, `GrafanaCard`, `ActivityFeed`,
 `AreaChart`, `CommandPalette`, `KeyboardShortcuts`, `NotificationCenter`,
 `HeaderSparklines`, `UptimeTimeline`, `DiskHealthPanel`, `NetworkTopology`,
@@ -334,7 +346,10 @@ no hardcoded hex/rgba, no glows.
 a list of what needs attention — crossed thresholds (`healthIssues()` in
 `lib/alerts.ts`), down / auth-failed services, *arr health errors and warnings
 (grouped into one row across apps), stale data, Uptime Kuma monitors down,
-Prometheus exporters down. `collectIssues()` is pure and unit-tested.
+Prometheus exporters down. `collectIssues()` is pure and unit-tested. Below
+it, from the collector's incident log: "Last incident 10h ago: Radarr
+unreachable for 12 min" (only while all is well) and a 24-hour strip of
+15-minute cells — grey unless something was wrong, hover for what.
 
 **Services panel** is a compact grouped list (`SVC_CATEGORIES` in
 `ServicesPanel.tsx`): *Media* (radarr, sonarr, bazarr, tautulli, qbittorrent,
@@ -417,6 +432,7 @@ verification in the proxy.
 | `servers.json` | `/api/servers` |
 | `dependencies.json` | `/api/dependencies` |
 | `history.jsonl` | `lib/history.ts`, appended by `lib/metrics.ts` on every real fetch |
+| `incidents.json` | `lib/incidents.ts`, from the collector; 7 days kept, not in backups |
 
 `data/` is **gitignored and dockerignored** — never commit it, never bake it
 into an image. The directory is created on demand by the Dockerfile
@@ -549,7 +565,7 @@ collector), `HISTORY_RETENTION_DAYS`, `HISTORY_MAX_SIZE_MB`,
 
 ## Testing
 
-- **Unit** — vitest, `tests/unit/`. 269 tests over 22 files covering `app/lib/*`
+- **Unit** — vitest, `tests/unit/`. 289 tests over 25 files covering `app/lib/*`
   plus `tests/unit/routes/` for API route handlers.
 - **E2E** — Playwright, `tests/e2e/smoke.spec.ts`, run by its own CI job.
 - **Storybook** — `stories/Primitives.stories.tsx`.

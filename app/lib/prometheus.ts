@@ -44,3 +44,34 @@ export async function promVector(base: string, query: string, timeoutMs?: number
     value: parseFloat((r.value ?? [0, "NaN"])[1]),
   }));
 }
+
+interface PromRangeResponse {
+  data?: {
+    result?: { metric?: Record<string, string>; values?: [number, string][] }[];
+  };
+}
+
+export interface PromSeries {
+  metric: Record<string, string>;
+  values: { ts: number; value: number }[]; // ts in ms
+}
+
+// Range query (`/api/v1/query_range`). start/end in ms, step in seconds. Points
+// that aren't numbers (NaN, missing scrapes) are dropped.
+export async function promRange(
+  base: string, query: string, startMs: number, endMs: number, stepSec: number, timeoutMs?: number,
+): Promise<PromSeries[]> {
+  const qs = new URLSearchParams({
+    query,
+    start: String(Math.floor(startMs / 1000)),
+    end:   String(Math.floor(endMs / 1000)),
+    step:  String(stepSec),
+  });
+  const json = await fetchJson<PromRangeResponse>(`${base}/api/v1/query_range?${qs}`, { timeoutMs });
+  return (json?.data?.result ?? []).map((r) => ({
+    metric: r.metric ?? {},
+    values: (r.values ?? [])
+      .map(([t, v]) => ({ ts: t * 1000, value: parseFloat(v) }))
+      .filter((p) => !isNaN(p.value)),
+  }));
+}
