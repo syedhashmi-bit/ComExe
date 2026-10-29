@@ -86,7 +86,7 @@ export default function Dashboard() {
   const [refreshing,   setRefreshing]   = useState(false);
   const [settings,     setSettings]     = useState<Settings>(DEFAULT_SETTINGS);
   const [showSettings,   setShowSettings]   = useState(false);
-  const [expandedCard,   setExpandedCard]   = useState<string | null>(null);
+  const [expandedCards,  setExpandedCards]  = useState<ReadonlySet<string>>(() => new Set());
   const [offline,        setOffline]        = useState(false);
   const [showBookmarks,  setShowBookmarks]  = useState(true);
   const [alertsEnabled,  setAlertsEnabled]  = useState(false);
@@ -533,7 +533,7 @@ export default function Dashboard() {
     function onKey(e: KeyboardEvent) {
       const tag = (e.target as HTMLElement)?.tagName;
       const isTyping = tag === "INPUT" || tag === "TEXTAREA";
-      if (e.key === "Escape") { setShowSettings(false); setShowShortcuts(false); setShowNotifications(false); setShowCommandPalette(false); setExpandedCard(null); (e.target as HTMLElement)?.blur?.(); return; }
+      if (e.key === "Escape") { setShowSettings(false); setShowShortcuts(false); setShowNotifications(false); setShowCommandPalette(false); setExpandedCards(new Set()); (e.target as HTMLElement)?.blur?.(); return; }
       if (isTyping) return;
       if (e.key === "?")                  { e.preventDefault(); setShowShortcuts(v => !v); }
       if (e.key === "r" || e.key === "R") { e.preventDefault(); fetchMetrics(); }
@@ -563,7 +563,13 @@ export default function Dashboard() {
   const maxDiskAlert = worstAlert(metrics?.disks.map(d => diskAlertLevel(d.usedPct)) ?? []);
 
   const isVisible  = (k: string) => settings.visibleCards[k] !== false;
-  const toggleCard = (k: string) => setExpandedCard(e => e === k ? null : k);
+  // Each card expands on its own: opening one leaves the others as they are.
+  const toggleCard = (k: string) => setExpandedCards(prev => {
+    const next = new Set(prev);
+    if (!next.delete(k)) next.add(k);
+    return next;
+  });
+  const isExpanded = (k: string) => expandedCards.has(k);
   const du = settings.dataUnit;
   const tu = settings.tempUnit;
 
@@ -861,7 +867,7 @@ export default function Dashboard() {
                   <Card label="cpu" accent="var(--accent-cpu)"
                     subtitle={!loading ? (metrics?.sysInfo?.cpuModel ?? undefined) : undefined}
                     alertLevel={cpuAlert} icon={<IconCPU />}
-                    animDelay={0} expanded={expandedCard === "cpu"} onToggle={() => toggleCard("cpu")}>
+                    animDelay={0} expanded={isExpanded("cpu")} onToggle={() => toggleCard("cpu")}>
                     <div className="flex items-end justify-between gap-2">
                       <div className="flex items-baseline gap-2">
                         <BigValue value={fmtPct(metrics?.cpu ?? null)} loading={loading} />
@@ -896,7 +902,7 @@ export default function Dashboard() {
                         Load: {metrics.sysInfo.load1?.toFixed(2)} · {metrics.sysInfo.load5?.toFixed(2)} · {metrics.sysInfo.load15?.toFixed(2)}
                       </span>
                     )}
-                    {expandedCard === "cpu" && (() => {
+                    {isExpanded("cpu") && (() => {
                       const s = histStats(cpuHistory);
                       const busiest = busiestThreads(metrics?.cpuThreads ?? []);
                       return (
@@ -918,7 +924,7 @@ export default function Dashboard() {
                 {isVisible("memory") && (
                   <div style={{ order: orderIndex("memory") }}><DraggableCard cardKey="memory" onReorder={reorderCards}>
                   <Card label="memory" accent="var(--accent-memory)" alertLevel={memAlert} icon={<IconMemory />}
-                    animDelay={50} expanded={expandedCard === "memory"} onToggle={() => toggleCard("memory")}>
+                    animDelay={50} expanded={isExpanded("memory")} onToggle={() => toggleCard("memory")}>
                     {loading ? <Skeleton /> : (
                       <>
                         <ThreeSegmentDonut
@@ -937,7 +943,7 @@ export default function Dashboard() {
                             <TrendDelta history={memHistory} current={realMemPct} goodDirection="down" suffix="%" />
                           </div>
                         )}
-                        {expandedCard === "memory" && (() => {
+                        {isExpanded("memory") && (() => {
                           const s = histStats(memHistory);
                           return (
                             <div className="flex flex-col gap-0.5 pt-2" style={{ borderTop: "1px solid var(--divider)" }}>
@@ -958,7 +964,7 @@ export default function Dashboard() {
                 {isVisible("filesystems") && (
                   <div style={{ order: orderIndex("filesystems") }}><DraggableCard cardKey="filesystems" onReorder={reorderCards}>
                   <Card label="filesystems" accent="var(--accent-fs)" alertLevel={maxDiskAlert} icon={<IconDisk />}
-                    animDelay={100} expanded={expandedCard === "filesystems"} onToggle={() => toggleCard("filesystems")}>
+                    animDelay={100} expanded={isExpanded("filesystems")} onToggle={() => toggleCard("filesystems")}>
                     {loading ? <Skeleton /> : !metrics?.disks.length ? (
                       <span className="text-xs" style={{ color: "var(--text-faint)" }}>No filesystems found under {clientConfig?.fsPathPrefix ?? "the media path"}.</span>
                     ) : (
@@ -972,7 +978,7 @@ export default function Dashboard() {
                 {isVisible("network") && (
                   <div style={{ order: orderIndex("network") }}><DraggableCard cardKey="network" onReorder={reorderCards}>
                   <Card label="network" accent="var(--accent-network)" icon={<IconNetwork />}
-                    animDelay={150} expanded={expandedCard === "network"} onToggle={() => toggleCard("network")}>
+                    animDelay={150} expanded={isExpanded("network")} onToggle={() => toggleCard("network")}>
                     {!loading && metrics?.network?.interfaceName && (
                       <span className="self-start font-mono" style={{
                         background: "var(--surface)", border: "1px solid var(--border)",
@@ -1003,7 +1009,7 @@ export default function Dashboard() {
                         )}
                       </div>
                     )}
-                    {expandedCard === "network" && rxHistory.length > 0 && (
+                    {isExpanded("network") && rxHistory.length > 0 && (
                       <div className="flex flex-col gap-0.5 pt-2" style={{ borderTop: "1px solid var(--divider)" }}>
                         <StatRow label="Peak download" value={`${fmtBytes(Math.max(...rxHistory), 1, du)}/s`} />
                         <StatRow label="Peak upload" value={`${fmtBytes(Math.max(...txHistory), 1, du)}/s`} />
@@ -1017,7 +1023,7 @@ export default function Dashboard() {
                 {isVisible("gpu") && (
                   <div style={{ order: orderIndex("gpu") }}><DraggableCard cardKey="gpu" onReorder={reorderCards}>
                   <Card label="gpu" accent={gpuColor} alertLevel={gpuTempAlert} icon={<IconGPU />}
-                    animDelay={200} expanded={expandedCard === "gpu"} onToggle={() => toggleCard("gpu")}>
+                    animDelay={200} expanded={isExpanded("gpu")} onToggle={() => toggleCard("gpu")}>
                     {loading ? <Skeleton /> : (
                       <>
                         <div className="flex items-center gap-4">
@@ -1090,7 +1096,7 @@ export default function Dashboard() {
                             <Sparkline data={gpuTempHistory} color={metrics?.gpu?.temperature != null && metrics.gpu.temperature >= 70 ? tempColor(metrics.gpu.temperature) : "var(--accent-gpu)"} autoMax height={28} />
                           </div>
                         )}
-                        {expandedCard === "gpu" && (() => {
+                        {isExpanded("gpu") && (() => {
                           const s  = histStats(gpuHistory);
                           const ts = histStats(gpuTempHistory);
                           return (
@@ -1228,7 +1234,7 @@ export default function Dashboard() {
                   const grafanaSet = !!(clientConfig?.grafana.panelUrl || clientConfig?.grafana.panels?.length);
                   const system = isVisible("system") && (
                       <Card label="system" accent="var(--accent-system)" icon={<IconTerminal />}
-                        expanded={expandedCard === "system"} onToggle={() => toggleCard("system")}>
+                        expanded={isExpanded("system")} onToggle={() => toggleCard("system")}>
                         {loading ? <Skeleton /> : (
                           <div className="flex flex-col gap-0">
                             {([
