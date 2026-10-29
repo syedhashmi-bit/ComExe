@@ -44,7 +44,10 @@ function request(opts: { method: string; path: string; query?: Record<string, st
 // most users think of the container by its bare name. Match either form.
 export async function findContainer(name: string): Promise<{ id: string; name: string; state: string; image: string } | null> {
   const trimmed = name.replace(/^\//, "");
-  const filters = encodeURIComponent(JSON.stringify({ name: [trimmed] }));
+  // Raw JSON: request() URL-encodes every query value. Encoding it here as
+  // well sent `%257B…`, which the daemon rejected, so every lookup returned
+  // null and logs/restart answered "not found" for every container.
+  const filters = JSON.stringify({ name: [trimmed] });
   const r = await request({ method: "GET", path: "/containers/json", query: { all: "true", filters } });
   if (r.status !== 200) return null;
   const list = JSON.parse(r.body) as Array<{ Id: string; Names: string[]; State: string; Image: string }>;
@@ -89,8 +92,10 @@ function demuxDockerLog(buf: Buffer): string {
 export async function containerLogs(name: string, tail = 200): Promise<{ ok: boolean; status: number; logs?: string; message?: string }> {
   const c = await findContainer(name);
   if (!c) return { ok: false, status: 404, message: `Container "${name}" not found` };
+  // A non-numeric ?tail= used to reach the daemon as `tail=NaN`.
+  const lines = Number.isFinite(tail) ? Math.min(Math.max(Math.trunc(tail), 1), 5000) : 200;
   return new Promise(resolve => {
-    const path = `/containers/${c.id}/logs?stdout=true&stderr=true&tail=${tail}&timestamps=true`;
+    const path = `/containers/${c.id}/logs?stdout=true&stderr=true&tail=${lines}&timestamps=true`;
     const req = http.request({
       socketPath: DOCKER_SOCK,
       method:     "GET",
