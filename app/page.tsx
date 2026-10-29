@@ -559,22 +559,22 @@ export default function Dashboard() {
   const tu = settings.tempUnit;
 
   const commandActions = useMemo<CommandAction[]>(() => [
-    { id: "refresh", label: "Refresh metrics", shortcut: "R", section: "Actions", icon: "🔄", action: () => fetchMetrics() },
-    { id: "search", label: "Focus search bar", shortcut: "G", section: "Actions", icon: "🔍", action: () => searchInputRef.current?.focus() },
-    { id: "filter", label: "Focus service filter", shortcut: "/", section: "Actions", icon: "🏷️", action: () => serviceFilterRef.current?.focus() },
-    { id: "bookmarks", label: "Toggle bookmarks", shortcut: "H", section: "Actions", icon: "📌", action: () => setShowBookmarks(v => !v) },
-    { id: "settings", label: "Open settings", section: "Panels", icon: "⚙️", action: () => setShowSettings(true) },
-    { id: "shortcuts", label: "Keyboard shortcuts", shortcut: "?", section: "Panels", icon: "⌨️", action: () => setShowShortcuts(true) },
-    { id: "notifications", label: "Notifications", section: "Panels", icon: "🔔", action: () => setShowNotifications(true) },
-    { id: "topology", label: "Network topology", section: "Panels", icon: "🕸️", action: () => setShowTopology(true) },
-    { id: "fleet", label: "Server fleet", section: "Panels", icon: "🖥️", action: () => setShowServerFleet(true) },
-    { id: "dependencies", label: "Dependency map", section: "Panels", icon: "🔗", action: () => setShowDependencyMap(true) },
-    { id: "analytics", label: "Open analytics", section: "Navigate", icon: "📊", action: () => { router.push("/analytics"); } },
-    { id: "logs", label: "Log viewer", section: "Navigate", icon: "📜", action: () => { router.push("/logs"); } },
-    { id: "forecast", label: "Insights & forecasting", section: "Navigate", icon: "🔮", action: () => { router.push("/forecast"); } },
-    { id: "setup", label: "Setup wizard", section: "Navigate", icon: "🧙", action: () => { router.push("/setup"); } },
-    { id: "truenas", label: "Open TrueNAS UI", section: "Navigate", icon: "🖥️", action: () => window.open(`http://${clientConfig?.truenasIp ?? "192.168.88.196"}`, "_blank") },
-    { id: "prometheus", label: "Open Prometheus", section: "Navigate", icon: "📈", action: () => window.open(`http://${clientConfig?.truenasIp ?? "192.168.88.196"}:30104`, "_blank") },
+    { id: "refresh", label: "Refresh metrics", shortcut: "R", section: "Actions", action: () => fetchMetrics() },
+    { id: "search", label: "Focus search bar", shortcut: "G", section: "Actions", action: () => searchInputRef.current?.focus() },
+    { id: "filter", label: "Focus service filter", shortcut: "/", section: "Actions", action: () => serviceFilterRef.current?.focus() },
+    { id: "bookmarks", label: "Toggle bookmarks", shortcut: "H", section: "Actions", action: () => setShowBookmarks(v => !v) },
+    { id: "settings", label: "Open settings", section: "Panels", action: () => setShowSettings(true) },
+    { id: "shortcuts", label: "Keyboard shortcuts", shortcut: "?", section: "Panels", action: () => setShowShortcuts(true) },
+    { id: "notifications", label: "Notifications", section: "Panels", action: () => setShowNotifications(true) },
+    { id: "topology", label: "Network topology", section: "Panels", action: () => setShowTopology(true) },
+    { id: "fleet", label: "Server fleet", section: "Panels", action: () => setShowServerFleet(true) },
+    { id: "dependencies", label: "Dependency map", section: "Panels", action: () => setShowDependencyMap(true) },
+    { id: "analytics", label: "Open analytics", section: "Navigate", action: () => { router.push("/analytics"); } },
+    { id: "logs", label: "Log viewer", section: "Navigate", action: () => { router.push("/logs"); } },
+    { id: "forecast", label: "Insights & forecasting", section: "Navigate", action: () => { router.push("/forecast"); } },
+    { id: "setup", label: "Setup wizard", section: "Navigate", action: () => { router.push("/setup"); } },
+    { id: "truenas", label: "Open TrueNAS UI", section: "Navigate", action: () => window.open(`http://${clientConfig?.truenasIp ?? "192.168.88.196"}`, "_blank") },
+    { id: "prometheus", label: "Open Prometheus", section: "Navigate", action: () => window.open(`http://${clientConfig?.truenasIp ?? "192.168.88.196"}:30104`, "_blank") },
   ], [fetchMetrics, clientConfig?.truenasIp, router]);
 
   // ── render ─────────────────────────────────────────────────────────────────
@@ -703,12 +703,11 @@ export default function Dashboard() {
                       transition: "opacity 0.15s ease",
                     }}
                   >
-                    <div style={{ fontSize: 12, color: "var(--text-label)", marginBottom: 8, fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase" }}>3-Day Forecast</div>
+                    <div style={{ fontSize: 12, color: "var(--text-label)", marginBottom: 8, fontWeight: 600 }}>3-day forecast</div>
                     <div className="flex flex-col gap-1.5">
                       {weather.forecast.map((d, i) => (
                         <div key={i} className="flex items-center justify-between gap-4" style={{ fontSize: 12 }}>
                           <span style={{ color: "var(--text-muted)", minWidth: 28 }}>{d.date}</span>
-                          <span style={{ fontSize: 14 }}>{d.emoji}</span>
                           <span className="flex-1" style={{ color: "var(--text-label)", fontSize: 12 }}>{d.condition}</span>
                           <span className="font-mono tabular-nums" style={{ color: "var(--text-secondary)" }}>
                             {tu === "F" ? `${Math.round(d.high * 9/5 + 32)}°` : `${d.high}°`}
@@ -866,13 +865,13 @@ export default function Dashboard() {
                           {metrics?.sysInfo?.cpuCores != null && (
                             <span className="tabular-nums" style={{
                               background: "var(--surface)", border: "1px solid var(--border)",
-                              borderRadius: 5, padding: "2px 7px", fontSize: 12, color: "var(--text-muted)",
+                              borderRadius: 5, padding: "2px 7px", fontSize: 12, color: "var(--text-muted)", whiteSpace: "nowrap",
                             }}>{metrics.sysInfo.cpuCores} cores</span>
                           )}
                           {metrics?.sysInfo?.cpuFreqGhz != null && (
                             <span className="tabular-nums font-mono" style={{
                               background: "var(--surface)", border: "1px solid var(--border)",
-                              borderRadius: 5, padding: "2px 7px", fontSize: 12, color: "var(--text-muted)",
+                              borderRadius: 5, padding: "2px 7px", fontSize: 12, color: "var(--text-muted)", whiteSpace: "nowrap",
                             }}>@ {metrics.sysInfo.cpuFreqGhz.toFixed(2)} GHz</span>
                           )}
                         </div>
@@ -889,9 +888,9 @@ export default function Dashboard() {
                       const s = histStats(cpuHistory);
                       return (
                         <div className="flex flex-col gap-0.5 pt-2" style={{ borderTop: "1px solid var(--divider)" }}>
-                          <StatRow label="min" value={s.min != null ? fmtPct(s.min) : "—"} />
-                          <StatRow label="max" value={s.max != null ? fmtPct(s.max) : "—"} />
-                          <StatRow label="avg" value={s.avg != null ? fmtPct(s.avg) : "—"} />
+                          <StatRow label="Min" value={s.min != null ? fmtPct(s.min) : "—"} />
+                          <StatRow label="Max" value={s.max != null ? fmtPct(s.max) : "—"} />
+                          <StatRow label="Average" value={s.avg != null ? fmtPct(s.avg) : "—"} />
                         </div>
                       );
                     })()}
@@ -917,7 +916,7 @@ export default function Dashboard() {
                         {realMemPct > 0 && (
                           <div className="flex items-center justify-center gap-2">
                             <span className="text-xs tabular-nums" style={{ color: "var(--text-faint)" }}>
-                              actual pressure: {realMemPct.toFixed(1)}%
+                              Actual pressure: {realMemPct.toFixed(1)}%
                             </span>
                             <TrendDelta history={memHistory} current={realMemPct} goodDirection="down" suffix="%" />
                           </div>
@@ -926,10 +925,10 @@ export default function Dashboard() {
                           const s = histStats(memHistory);
                           return (
                             <div className="flex flex-col gap-0.5 pt-2" style={{ borderTop: "1px solid var(--divider)" }}>
-                              <StatRow label="total"    value={fmtBytes(memTotal, 1, du)} />
-                              <StatRow label="min used" value={s.min != null ? fmtPct(s.min) : "—"} />
-                              <StatRow label="max used" value={s.max != null ? fmtPct(s.max) : "—"} />
-                              <StatRow label="avg used" value={s.avg != null ? fmtPct(s.avg) : "—"} />
+                              <StatRow label="Total"    value={fmtBytes(memTotal, 1, du)} />
+                              <StatRow label="Min used" value={s.min != null ? fmtPct(s.min) : "—"} />
+                              <StatRow label="Max used" value={s.max != null ? fmtPct(s.max) : "—"} />
+                              <StatRow label="Avg used" value={s.avg != null ? fmtPct(s.avg) : "—"} />
                             </div>
                           );
                         })()}
@@ -1038,7 +1037,7 @@ export default function Dashboard() {
                     <div className="flex flex-col gap-2">
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-bold" style={{ color: "var(--accent-network)" }}>↓</span>
-                        <span className="text-xs uppercase tracking-widest" style={{ color: "var(--text-faint)" }}>rx</span>
+                        <span className="text-xs" style={{ color: "var(--text-faint)" }}>RX</span>
                         <span className="text-xs font-medium tabular-nums ml-auto font-mono" style={{ color: "var(--text-secondary)" }}>
                           {loading ? "—" : `${fmtBytes(metrics?.network.rxBytesPerSec ?? null, 1, du)}/s`}
                         </span>
@@ -1052,7 +1051,7 @@ export default function Dashboard() {
                     <div className="flex flex-col gap-2">
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-bold" style={{ color: "var(--accent-network-tx)" }}>↑</span>
-                        <span className="text-xs uppercase tracking-widest" style={{ color: "var(--text-faint)" }}>tx</span>
+                        <span className="text-xs" style={{ color: "var(--text-faint)" }}>TX</span>
                         <span className="text-xs font-medium tabular-nums ml-auto font-mono" style={{ color: "var(--text-secondary)" }}>
                           {loading ? "—" : `${fmtBytes(metrics?.network.txBytesPerSec ?? null, 1, du)}/s`}
                         </span>
@@ -1064,7 +1063,7 @@ export default function Dashboard() {
                     </div>
                     {!loading && metrics?.sysInfo?.tcpEstab != null && (
                       <div className="flex items-center gap-2">
-                        <span className="text-xs uppercase tracking-widest" style={{ color: "var(--text-faint)" }}>tcp</span>
+                        <span className="text-xs" style={{ color: "var(--text-faint)" }}>TCP</span>
                         <span className="text-xs tabular-nums font-mono font-medium" style={{ color: "var(--text-muted)" }}>
                           {metrics.sysInfo.tcpEstab} established
                         </span>
@@ -1072,8 +1071,8 @@ export default function Dashboard() {
                     )}
                     {expandedCard === "network" && rxHistory.length > 0 && (
                       <div className="flex flex-col gap-0.5 pt-2" style={{ borderTop: "1px solid var(--divider)" }}>
-                        <StatRow label="peak rx" value={`${fmtBytes(Math.max(...rxHistory), 1, du)}/s`} />
-                        <StatRow label="peak tx" value={`${fmtBytes(Math.max(...txHistory), 1, du)}/s`} />
+                        <StatRow label="Peak RX" value={`${fmtBytes(Math.max(...rxHistory), 1, du)}/s`} />
+                        <StatRow label="Peak TX" value={`${fmtBytes(Math.max(...txHistory), 1, du)}/s`} />
                       </div>
                     )}
                   </Card>
@@ -1094,7 +1093,7 @@ export default function Dashboard() {
                               <span className="font-medium tabular-nums font-mono" style={{ fontSize: 22, lineHeight: 1, color: "var(--text)" }}>
                                 {gpuUtil != null ? gpuUtil.toFixed(0) : "—"}
                               </span>
-                              <span className="text-xs uppercase tracking-widest" style={{ color: "var(--text-faint)" }}>%</span>
+                              <span className="text-xs" style={{ color: "var(--text-faint)" }}>%</span>
                             </div>
                           </div>
                           <div className="flex flex-col gap-1 min-w-0">
@@ -1117,10 +1116,10 @@ export default function Dashboard() {
                             )}
                           </div>
                         </div>
-                        <LabeledBar label="vram" right={`${fmtBytes(metrics?.gpu?.memUsed ?? null, 1, du)} / ${fmtBytes(metrics?.gpu?.memTotal ?? null, 1, du)}`}
+                        <LabeledBar label="VRAM" right={`${fmtBytes(metrics?.gpu?.memUsed ?? null, 1, du)} / ${fmtBytes(metrics?.gpu?.memTotal ?? null, 1, du)}`}
                           percent={gpuMemPct} color="var(--accent-gpu)" />
                         {metrics?.gpu?.powerDraw != null && metrics?.gpu?.powerLimit != null && (
-                          <LabeledBar label="power" right={`${metrics.gpu.powerDraw.toFixed(1)} / ${metrics.gpu.powerLimit.toFixed(0)} W`}
+                          <LabeledBar label="Power" right={`${metrics.gpu.powerDraw.toFixed(1)} / ${metrics.gpu.powerLimit.toFixed(0)} W`}
                             percent={gpuPwrPct} color="var(--accent-gpu)" />
                         )}
                         {(() => {
@@ -1152,7 +1151,7 @@ export default function Dashboard() {
                         {gpuTempHistory.length >= 2 && (
                           <div className="flex flex-col gap-1.5">
                             <div className="flex justify-between items-center">
-                              <span className="text-xs uppercase tracking-widest" style={{ color: "var(--text-ghost)" }}>temp history</span>
+                              <span className="text-xs" style={{ color: "var(--text-ghost)" }}>Temperature history</span>
                             </div>
                             <Sparkline data={gpuTempHistory} color={metrics?.gpu?.temperature != null && metrics.gpu.temperature >= 70 ? tempColor(metrics.gpu.temperature) : "var(--accent-gpu)"} autoMax height={28} />
                           </div>
@@ -1162,11 +1161,11 @@ export default function Dashboard() {
                           const ts = histStats(gpuTempHistory);
                           return (
                             <div className="flex flex-col gap-0.5 pt-2" style={{ borderTop: "1px solid var(--divider)" }}>
-                              <StatRow label="util min" value={s.min != null ? fmtPct(s.min) : "—"} />
-                              <StatRow label="util max" value={s.max != null ? fmtPct(s.max) : "—"} />
-                              <StatRow label="util avg" value={s.avg != null ? fmtPct(s.avg) : "—"} />
-                              <StatRow label="temp min" value={fmtTemp(ts.min ?? null, tu)} />
-                              <StatRow label="temp max" value={fmtTemp(ts.max ?? null, tu)} />
+                              <StatRow label="Util min" value={s.min != null ? fmtPct(s.min) : "—"} />
+                              <StatRow label="Util max" value={s.max != null ? fmtPct(s.max) : "—"} />
+                              <StatRow label="Util avg" value={s.avg != null ? fmtPct(s.avg) : "—"} />
+                              <StatRow label="Temp min" value={fmtTemp(ts.min ?? null, tu)} />
+                              <StatRow label="Temp max" value={fmtTemp(ts.max ?? null, tu)} />
                             </div>
                           );
                         })()}
@@ -1217,7 +1216,7 @@ export default function Dashboard() {
                               {latest.serverHost && <span title={latest.serverHost} className="text-xs font-mono truncate" style={{ color: "var(--text-ghost)", maxWidth: 160 }}>{latest.serverHost}</span>}
                             </div>
                             {quality && (
-                              <span className="text-xs font-semibold uppercase tracking-wider shrink-0 mt-0.5"
+                              <span className="text-xs font-semibold shrink-0 mt-0.5"
                                 style={{ color: quality.color, background: quality.bg, border: `1px solid ${quality.border}`, borderRadius: 5, padding: "2px 7px" }}>
                                 {quality.label}
                               </span>
@@ -1228,13 +1227,13 @@ export default function Dashboard() {
                               <span className="font-medium tabular-nums font-mono" style={{ fontSize: 44, lineHeight: 1, color: "var(--text)" }}>
                                 {dl != null ? dl.toFixed(0) : "—"}
                               </span>
-                              <span className="text-xs uppercase tracking-widest mt-0.5" style={{ color: "var(--text-faint)" }}>Mbps ↓</span>
+                              <span className="text-xs mt-0.5" style={{ color: "var(--text-faint)" }}>Mbps ↓</span>
                             </div>
                             <div className="flex flex-col mb-[4px]">
                               <span className="font-medium tabular-nums font-mono" style={{ fontSize: 28, lineHeight: 1, color: "var(--text-secondary)" }}>
                                 {latest.upload != null ? latest.upload.toFixed(0) : "—"}
                               </span>
-                              <span className="text-xs uppercase tracking-widest mt-0.5" style={{ color: "var(--text-faint)" }}>Mbps ↑</span>
+                              <span className="text-xs mt-0.5" style={{ color: "var(--text-faint)" }}>Mbps ↑</span>
                             </div>
                           </div>
                           {(latest.ping != null || latest.jitter != null) && (
@@ -1245,7 +1244,7 @@ export default function Dashboard() {
                                   <span className="text-xs tabular-nums font-medium font-mono" style={{ color: "var(--text-secondary)" }}>
                                     {latest.ping < 10 ? latest.ping.toFixed(1) : latest.ping.toFixed(0)} ms
                                   </span>
-                                  <span className="text-xs uppercase tracking-widest" style={{ color: "var(--text-ghost)" }}>ping</span>
+                                  <span className="text-xs" style={{ color: "var(--text-ghost)" }}>ping</span>
                                 </>
                               )}
                               {latest.jitter != null && (
@@ -1254,14 +1253,14 @@ export default function Dashboard() {
                                   <span className="text-xs tabular-nums font-medium font-mono" style={{ color: "var(--text-label)" }}>
                                     {latest.jitter < 10 ? latest.jitter.toFixed(1) : latest.jitter.toFixed(0)} ms
                                   </span>
-                                  <span className="text-xs uppercase tracking-widest" style={{ color: "var(--text-ghost)" }}>jitter</span>
+                                  <span className="text-xs" style={{ color: "var(--text-ghost)" }}>jitter</span>
                                 </>
                               )}
                             </div>
                           )}
                           {speedtestHistory.length >= 2 && (
                             <div className="flex flex-col gap-1">
-                              <span className="text-xs uppercase tracking-widest" style={{ color: "var(--text-ghost)" }}>download history</span>
+                              <span className="text-xs" style={{ color: "var(--text-ghost)" }}>Download history</span>
                               <Sparkline data={speedtestHistory} color="var(--accent-speedtest)" height={40} />
                             </div>
                           )}
@@ -1271,7 +1270,7 @@ export default function Dashboard() {
                                 title={tsMs ? new Date(tsMs).toLocaleString() : undefined}
                                 className="text-xs tabular-nums"
                                 style={{ color: relColor, fontWeight: isStale ? 600 : 400 }}>
-                                {isStale ? "⚠ " : ""}auto-tested · {rel}
+                                Auto-tested · {rel}
                               </span>
                             )}
                             {speedtestTotalTests != null && (
@@ -1288,25 +1287,27 @@ export default function Dashboard() {
                 )}
 
                 {/* System + Grafana — pinned to the end regardless of card reorder */}
-                {(isVisible("system") || isVisible("grafana")) && (
-                  <div className="span-all grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch" style={{ order: 9999 }}>
-                    {isVisible("system") && (
+                {/* System, then Grafana. With a panel configured they share a
+                    full-width row; without one, System is an ordinary grid cell
+                    and Grafana shrinks to a one-line hint under the grid. */}
+                {(() => {
+                  const grafanaSet = !!(clientConfig?.grafana.panelUrl || clientConfig?.grafana.panels?.length);
+                  const system = isVisible("system") && (
                       <Card label="system" accent="var(--accent-system)" icon={<IconTerminal />}
                         expanded={expandedCard === "system"} onToggle={() => toggleCard("system")}>
                         {loading ? <Skeleton /> : (
                           <div className="flex flex-col gap-0">
                             {([
-                              { emoji: "🐧", label: "os",       value: metrics?.sysInfo?.os       ?? "—", mono: false },
-                              { emoji: "⚙️", label: "kernel",   value: metrics?.sysInfo?.kernel   ?? "—", mono: true  },
-                              { emoji: "🖥️", label: "arch",     value: metrics?.sysInfo?.arch     ?? "—", mono: false },
-                              { emoji: "🌐", label: "host",     value: metrics?.sysInfo?.hostname ?? "—", mono: false },
-                              { emoji: "⚡", label: "cores",    value: metrics?.sysInfo?.cpuCores != null ? `${metrics.sysInfo.cpuCores} cores` : "—", mono: false },
-                              { emoji: "🕐", label: "up since", value: fmtSince(metrics?.uptime ?? null), mono: true  },
-                            ] as { emoji: string; label: string; value: string; mono: boolean }[]).map(({ emoji, label, value, mono }, i, arr) => (
+                              { label: "OS",           value: metrics?.sysInfo?.os       ?? "—", mono: false },
+                              { label: "Kernel",       value: metrics?.sysInfo?.kernel   ?? "—", mono: true  },
+                              { label: "Architecture", value: metrics?.sysInfo?.arch     ?? "—", mono: false },
+                              { label: "Host",         value: metrics?.sysInfo?.hostname ?? "—", mono: false },
+                              { label: "Cores",        value: metrics?.sysInfo?.cpuCores != null ? `${metrics.sysInfo.cpuCores} cores` : "—", mono: false },
+                              { label: "Up since",     value: fmtSince(metrics?.uptime ?? null), mono: true  },
+                            ] as { label: string; value: string; mono: boolean }[]).map(({ label, value, mono }, i, arr) => (
                               <div key={label}>
                                 <div className="flex items-center gap-2 py-2">
-                                  <span style={{ fontSize: 13, width: 18, textAlign: "center", flexShrink: 0 }}>{emoji}</span>
-                                  <span className="text-xs uppercase tracking-widest shrink-0" style={{ color: "var(--text-faint)", minWidth: 46 }}>{label}</span>
+                                  <span className="text-xs shrink-0" style={{ color: "var(--text-faint)" }}>{label}</span>
                                   <span className={`text-xs font-medium ml-auto truncate${mono ? " font-mono" : ""}`}
                                     style={{ color: "var(--text-mid)" }}>{value}</span>
                                 </div>
@@ -1321,8 +1322,10 @@ export default function Dashboard() {
                           </div>
                         )}
                       </Card>
-                    )}
-                    {isVisible("grafana") && (
+                  );
+                  // Not before /api/config answers, or an unconfigured hint
+                  // would flash in place of a configured panel.
+                  const grafana = isVisible("grafana") && clientConfig && (
                       <ErrorBoundary name="Grafana panel">
                         <GrafanaCard
                           baseUrl={clientConfig?.grafana.baseUrl ?? `http://${clientConfig?.truenasIp ?? "localhost"}:30037`}
@@ -1331,9 +1334,19 @@ export default function Dashboard() {
                           tokenSet={clientConfig?.grafanaTokenSet}
                         />
                       </ErrorBoundary>
-                    )}
-                  </div>
-                )}
+                  );
+                  if (grafanaSet && system && grafana) return (
+                    <div className="span-all grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch" style={{ order: 9999 }}>
+                      {system}{grafana}
+                    </div>
+                  );
+                  return (
+                    <>
+                      {system && <div style={{ order: 9999 }}>{system}</div>}
+                      {grafana && <div className="span-all" style={{ order: 10000 }}>{grafana}</div>}
+                    </>
+                  );
+                })()}
               </div>
 
               {/* ── Disk health (SMART) ── */}
@@ -1357,7 +1370,7 @@ export default function Dashboard() {
               )}
             </div>
             <div className="dash-side">
-              {/* ── NOW PLAYING banner ── */}
+              {/* ── Now playing ── */}
               {(() => {
                 const tautulliSvc = services?.find(s => s.name === "tautulli");
                 const streams = tautulliSvc?.streams ?? [];
@@ -1365,14 +1378,14 @@ export default function Dashboard() {
                 return (
                   <div style={{
                     background: "var(--card)", border: "1px solid var(--border)",
-                    borderRadius: 14, padding: "14px 20px",
+                    borderRadius: 10, padding: 16,
                   }}>
-                    <div className="flex items-center gap-3 mb-3">
-                      <span style={{
-                        width: 8, height: 8, borderRadius: "50%", background: "var(--critical)", flexShrink: 0,
+                    <div className="flex items-center gap-2 mb-3">
+                      <span aria-hidden="true" style={{
+                        width: 7, height: 7, borderRadius: "50%", background: "var(--accent-speedtest)", flexShrink: 0,
                       }} />
-                      <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--accent-speedtest)" }}>
-                        Now Playing · {streams.length} stream{streams.length !== 1 ? "s" : ""}
+                      <span style={{ fontSize: 13, color: "var(--text-muted)" }}>
+                        Now playing · {streams.length} stream{streams.length !== 1 ? "s" : ""}
                       </span>
                     </div>
                     <div className="flex flex-col gap-3">

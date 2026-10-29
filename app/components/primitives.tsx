@@ -128,7 +128,7 @@ export function GaugeBar({ percent, color, thin = false, gradient }: { percent: 
     <div className="relative w-full rounded-full overflow-hidden" style={{ background: "var(--surface)", height: thin ? 3 : 5 }}>
       <div
         className="h-full rounded-full transition-all duration-700 ease-out"
-        style={{ width: `${percent}%`, background: gradient ?? color, boxShadow: `0 0 ${thin ? 3 : 6}px ${withAlpha(color, 33)}` }}
+        style={{ width: `${percent}%`, background: gradient ?? color }}
       />
     </div>
   );
@@ -198,7 +198,7 @@ export function RadialGauge({ percent, color, size = 88 }: { percent: number; co
         <circle cx="44" cy="44" r={r} fill="none" stroke="var(--gauge-track)" strokeWidth="6" />
         <circle cx="44" cy="44" r={r} fill="none" stroke={color} strokeWidth="6"
           strokeDasharray={`${filled.toFixed(2)} ${(circ - filled).toFixed(2)}`} strokeLinecap="round"
-          style={{ filter: `drop-shadow(0 0 5px ${withAlpha(color, 40)})`, transition: "stroke-dasharray 0.7s ease" }}
+          style={{ transition: "stroke-dasharray 0.7s ease" }}
         />
       </svg>
     </div>
@@ -287,7 +287,7 @@ export function LabeledBar({ label, right, percent, color, gradient }: {
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex justify-between items-center">
-        <span className="text-xs uppercase tracking-widest" style={{ color: "var(--text-label)" }}>{label}</span>
+        <span className="text-xs" style={{ color: "var(--text-label)" }}>{label}</span>
         <span className="text-xs font-medium tabular-nums" style={{ color: "var(--text-muted)" }}>{right}</span>
       </div>
       <GaugeBar percent={percent} color={color} gradient={gradient} />
@@ -344,7 +344,7 @@ export function Card({
 
   return (
     <div
-      className="flex flex-col cursor-pointer h-full relative overflow-hidden"
+      className="card-shell flex flex-col cursor-pointer h-full relative overflow-hidden"
       role="button"
       tabIndex={0}
       aria-label={externalLink ? `${title} (opens in a new tab)` : title}
@@ -369,8 +369,10 @@ export function Card({
         {icon && <span aria-hidden="true" style={{ color: accent ?? "var(--text-label)", display: "inline-flex" }}>{icon}</span>}
         <span className="shrink-0" style={{ fontSize: 13, color: "var(--text-muted)" }}>{title}</span>
         {subtitle && <span title={subtitle} className="truncate" style={{ fontSize: 12, color: "var(--text-faint)" }}>{subtitle}</span>}
+        {/* Shown on hover / keyboard focus only (globals.css .card-info), so a
+            grid of cards isn't a grid of ⓘ marks. Always shown on touch. */}
         {infoText && (
-          <span className="relative shrink-0" style={{ lineHeight: 1 }}
+          <span className={`card-info relative shrink-0${showInfo ? " is-open" : ""}`} style={{ lineHeight: 1 }}
             onMouseEnter={e => { e.stopPropagation(); setShowInfo(true); }}
             onMouseLeave={() => setShowInfo(false)}
             onClick={e => { e.stopPropagation(); setShowInfo(v => !v); }}>
@@ -414,36 +416,19 @@ export function Card({
 
 export function StatusBanner({ result, visible }: { result: import("@/app/lib/types").HealthResult; visible: boolean }) {
   const { status, reason } = result;
-  if (status === "warning") {
-    return (
-      <div className="flex items-center gap-3 px-4 rounded-lg"
-        style={{
-          background: "rgba(245,158,11,0.07)", border: "1px solid rgba(245,158,11,0.2)",
-          height: 36, opacity: visible ? 1 : 0, transition: "opacity 0.4s ease",
-        }}>
-        <span className="block shrink-0 w-1.5 h-1.5 rounded-full"
-          style={{ background: "var(--warn)" }} />
-        <span className="text-xs tracking-[0.2em] font-semibold uppercase" style={{ color: "var(--warn)" }}>WARNING</span>
-        {reason && <span className="text-xs" style={{ color: "rgba(245,158,11,0.7)" }}>· {reason}</span>}
-      </div>
-    );
-  }
-  if (status === "critical") {
-    return (
-      <div className="flex items-center gap-3 px-4 rounded-lg"
-        style={{
-          background: "rgba(239,68,68,0.07)", border: "1px solid rgba(239,68,68,0.25)",
-          height: 48, opacity: visible ? 1 : 0, transition: "opacity 0.4s ease",
-        }}>
-        <span className="text-sm font-bold leading-none" style={{ color: "var(--critical)" }}>✕</span>
-        <span className="block shrink-0 w-1.5 h-1.5 rounded-full"
-          style={{ background: "var(--critical)" }} />
-        <span className="text-xs tracking-[0.2em] font-semibold uppercase" style={{ color: "var(--critical)" }}>CRITICAL</span>
-        {reason && <span className="text-xs" style={{ color: "rgba(239,68,68,0.7)" }}>· {reason}</span>}
-      </div>
-    );
-  }
-  return null;
+  if (status !== "warning" && status !== "critical") return null;
+  const color = status === "critical" ? "var(--critical)" : "var(--warn)";
+  return (
+    <div className="flex items-center gap-2 px-4 rounded-lg"
+      style={{
+        background: "var(--card)", border: `1px solid ${withAlpha(color, 45)}`,
+        height: 36, opacity: visible ? 1 : 0, transition: "opacity 0.4s ease",
+      }}>
+      <span aria-hidden="true" className="block shrink-0 w-1.5 h-1.5 rounded-full" style={{ background: color }} />
+      <span className="text-xs font-semibold" style={{ color }}>{status === "critical" ? "Critical" : "Warning"}</span>
+      {reason && <span className="text-xs" style={{ color: "var(--text-muted)" }}>· {reason}</span>}
+    </div>
+  );
 }
 
 // ── Small helpers ────────────────────────────────────────────────────────────
@@ -478,7 +463,7 @@ export function SubRow({ label, value, valueColor }: { label: string; value: str
   return (
     <div className="flex justify-between items-center">
       <span className="text-xs" style={{ color: "var(--text-label)" }}>{label}</span>
-      <span className="text-xs font-medium tabular-nums" style={{ color: valueColor ?? "rgba(255,255,255,0.65)" }}>{value}</span>
+      <span className="text-xs font-medium tabular-nums" style={{ color: valueColor ?? "var(--text-muted)" }}>{value}</span>
     </div>
   );
 }
@@ -486,7 +471,7 @@ export function SubRow({ label, value, valueColor }: { label: string; value: str
 export function StatRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between items-center py-0.5">
-      <span className="text-xs uppercase tracking-widest" style={{ color: "var(--text-label)" }}>{label}</span>
+      <span className="text-xs" style={{ color: "var(--text-label)" }}>{label}</span>
       <span className="text-xs tabular-nums font-medium" style={{ color: "var(--text-muted)" }}>{value}</span>
     </div>
   );

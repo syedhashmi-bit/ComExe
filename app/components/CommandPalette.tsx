@@ -117,7 +117,6 @@ export function CommandPalette({ onClose, actions }: CommandPaletteProps) {
                 <div key={section}>
                   <div style={{
                     padding: "8px 16px 4px", fontSize: 12, fontWeight: 600,
-                    textTransform: "uppercase", letterSpacing: "0.08em",
                     color: "var(--text-ghost)",
                   }}>
                     {section}

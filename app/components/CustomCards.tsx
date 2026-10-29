@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Sparkline, GaugeBar, BigValue } from "@/app/components/primitives";
 import { isDemoMode } from "@/app/lib/demo-data";
-import { withAlpha } from "@/app/lib/formatters";
 
 interface CustomCardDef {
   id:       string;
@@ -25,39 +24,34 @@ function CustomCardRenderer({ card, state }: { card: CustomCardDef; state: CardS
   const fmt = (v: number | null) => v != null ? `${Math.round(v * 10) / 10}${card.unit ?? ""}` : "—";
 
   return (
+    // Same flat card as the built-in metrics: the card's colour is its chart
+    // and title dot only, never the number or a stripe.
     <div style={{
       background: "var(--card)", border: "1px solid var(--border)",
-      borderRadius: 14, padding: 18, backdropFilter: "blur(6px)",
+      borderRadius: 10, padding: 16,
       display: "flex", flexDirection: "column", gap: 10,
-      position: "relative", overflow: "hidden",
     }}>
-      <div style={{
-        position: "absolute", top: 0, left: 0, right: 0, height: 3,
-        background: `linear-gradient(90deg, ${card.color}, ${withAlpha(card.color, 60)}, ${withAlpha(card.color, 20)})`,
-      }} />
       <div className="flex items-center gap-2">
-        <span style={{ width: 6, height: 6, borderRadius: 3, background: card.color }} />
-        <span className="text-xs uppercase tracking-widest font-semibold" style={{ color: "var(--text-label)" }}>
-          {card.label}
-        </span>
+        <span aria-hidden="true" style={{ width: 7, height: 7, borderRadius: 4, background: card.color, flexShrink: 0 }} />
+        <span style={{ fontSize: 13, color: "var(--text-muted)" }}>{card.label}</span>
       </div>
 
       {state.error ? (
         <div className="text-xs" style={{ color: "var(--critical)" }}>{state.error}</div>
       ) : card.viz === "number" ? (
-        <div style={{ color: card.color }}>
+        <div style={{ color: "var(--text)" }}>
           <BigValue value={fmt(state.value)} />
         </div>
       ) : card.viz === "gauge" ? (
         <div>
-          <div className="text-[22px] font-bold font-mono" style={{ color: card.color }}>
+          <div className="text-[22px] font-medium font-mono tabular-nums" style={{ color: "var(--text)" }}>
             {fmt(state.value)}
           </div>
           <GaugeBar percent={state.value ?? 0} color={card.color} thin />
         </div>
       ) : card.viz === "bar" ? (
         <div>
-          <div className="text-[14px] font-bold font-mono" style={{ color: card.color }}>
+          <div className="text-[14px] font-medium font-mono tabular-nums" style={{ color: "var(--text)" }}>
             {fmt(state.value)}
           </div>
           <div style={{ display: "flex", gap: 2, height: 40, alignItems: "flex-end", marginTop: 8 }}>
@@ -75,7 +69,7 @@ function CustomCardRenderer({ card, state }: { card: CustomCardDef; state: CardS
         </div>
       ) : (
         <div>
-          <div className="text-[14px] font-bold font-mono" style={{ color: card.color }}>
+          <div className="text-[14px] font-medium font-mono tabular-nums" style={{ color: "var(--text)" }}>
             {fmt(state.value)}
           </div>
           <div style={{ height: 50 }}>

@@ -306,7 +306,8 @@ services are configured), `/login`, `/analytics` (interactive area charts over
   "Speedtest unit mismatch").
 - **`Card`** — flat: `var(--card)`, 1px border, radius 10, no stripe/tint/glow/
   lift. A warning/critical `alertLevel` tints the border and adds a labelled
-  dot. Keyboard-activatable (role="button"). Optional ⓘ popover from `CARD_INFO`.
+  dot. Keyboard-activatable (role="button"). Optional ⓘ popover from `CARD_INFO`,
+  shown only on the hovered or focused card (`.card-info` in `globals.css`; always on touch).
 
 **Feature components:** `StatusSummary`, `PageHeader`, `ServicesPanel`, `ServiceDetailSheet`, `BookmarksPanel`,
 `SettingsPanel`, `SearchBar`, `MikrotikTab`, `GrafanaCard`, `ActivityFeed`,
@@ -534,6 +535,8 @@ collector), `HISTORY_RETENTION_DAYS`, `HISTORY_MAX_SIZE_MB`,
 - Type: nothing under 12px. Roughly 12 (meta) / 13–14 (body) / 16–18
   (headings) / 32+ (headline numbers).
 - Icons: line SVGs, never emoji. Service icons stay full colour (`SVC_ICONS`).
+- Labels and headings are sentence case ("Recent activity", "Peak RX"). No
+  `uppercase` / letter-spaced micro-labels.
 - Side panels (Settings): `min(420px, 100vw)` wide, 24px padding, sentence-case
   13px section headings, controls at least ~34px tall, `role="dialog"`.
 - Fonts: Inter (UI), JetBrains Mono (numbers — `font-mono` or `var(--font-mono)`).

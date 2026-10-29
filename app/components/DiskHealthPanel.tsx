@@ -43,7 +43,7 @@ function readHintHidden(): boolean {
 // (or nothing) instead of a full-width card announcing an absence.
 function Frame({ children }: { children: ReactNode }) {
   return (
-    <div style={{ background: "var(--card)", border: "1px solid var(--border-subtle)", borderRadius: 14, padding: "14px 18px" }}>
+    <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 10, padding: 16 }}>
       {children}
     </div>
   );
@@ -124,8 +124,8 @@ export function DiskHealthPanel() {
             <rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/>
             <line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>
           </svg>
-          <span style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-dim)" }}>
-            Disk Health
+          <span style={{ fontSize: 13, color: "var(--text-muted)" }}>
+            Disk health
           </span>
         </div>
         <span style={{

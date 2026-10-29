@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { withAlpha } from "@/app/lib/formatters";
 
 interface AlertEvent {
   key: string;
@@ -49,7 +48,7 @@ export function NotificationCenter({ onClose }: { onClose: () => void }) {
         }}
       >
         <div className="flex items-center justify-between p-4 pb-2">
-          <span className="text-xs tracking-widest uppercase" style={{ color: "var(--text-dim)", fontWeight: 600 }}>
+          <span style={{ fontSize: 13, color: "var(--text-muted)", fontWeight: 600 }}>
             Notifications
           </span>
           <button onClick={onClose} style={{ color: "var(--text-dim)", background: "none", border: "none", cursor: "pointer", fontSize: 12 }}>
@@ -83,7 +82,7 @@ export function NotificationCenter({ onClose }: { onClose: () => void }) {
           ) : (
             events.map((evt, i) => {
               const isCritical = evt.level === "critical";
-              const accentColor = isCritical ? "#ef4444" : "#f59e0b";
+              const accentColor = isCritical ? "var(--critical)" : "var(--warn)";
               return (
                 <div key={`${evt.key}-${evt.ts}-${i}`} className="flex gap-3 items-start"
                   style={{
@@ -97,15 +96,13 @@ export function NotificationCenter({ onClose }: { onClose: () => void }) {
                   <span className="shrink-0 mt-0.5" style={{
                     width: 8, height: 8, borderRadius: "50%",
                     background: accentColor,
-                    boxShadow: `0 0 6px ${withAlpha(accentColor, 53)}`,
                   }} />
                   <div className="flex flex-col gap-0.5 min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span style={{
-                        fontSize: 12, fontWeight: 700, textTransform: "uppercase",
-                        color: accentColor, letterSpacing: "0.05em",
+                        fontSize: 12, fontWeight: 600, color: accentColor,
                       }}>
-                        {evt.level}
+                        {evt.level.charAt(0).toUpperCase() + evt.level.slice(1)}
                       </span>
                       <span style={{ fontSize: 12, color: "var(--text-ghost)", marginLeft: "auto", fontVariantNumeric: "tabular-nums" }}>
                         {relativeTime(evt.ts)}

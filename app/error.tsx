@@ -3,7 +3,8 @@
 // Route-level error boundary for the dashboard segment. Next.js renders this in
 // place of the page when the server or client render throws, instead of leaving
 // a blank screen. `reset()` re-renders the segment; the reload button is the
-// hard fallback when the error is sticky.
+// hard fallback when the error is sticky. It renders inside the root layout, so
+// the theme tokens apply (global-error.tsx does not get them).
 
 import { useEffect } from "react";
 
@@ -25,18 +26,18 @@ export default function Error({
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: "#0a0c12",
-        color: "#e5e7eb",
+        background: "var(--bg)",
+        color: "var(--text)",
         padding: 24,
         fontFamily: "var(--font-inter), system-ui, sans-serif",
       }}
     >
       <div style={{ maxWidth: 460, textAlign: "center" }}>
-        <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", color: "#ef4444" }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-muted)" }}>
           ComExe
         </div>
         <h1 style={{ fontSize: 20, fontWeight: 600, marginTop: 12 }}>Something went wrong</h1>
-        <p style={{ fontSize: 13, color: "rgba(229,231,235,0.6)", marginTop: 8, lineHeight: 1.5 }}>
+        <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 8, lineHeight: 1.5 }}>
           The dashboard hit an unexpected error while rendering. This is usually transient —
           retry, or reload the page.
         </p>
@@ -45,8 +46,8 @@ export default function Error({
             onClick={reset}
             style={{
               fontSize: 13, fontWeight: 600, padding: "8px 16px", borderRadius: 8,
-              background: "rgba(6,182,212,0.12)", border: "1px solid rgba(6,182,212,0.3)",
-              color: "#06b6d4", cursor: "pointer",
+              background: "var(--brand)", border: "1px solid var(--brand)",
+              color: "var(--bg)", cursor: "pointer",
             }}
           >
             Try again
@@ -55,8 +56,8 @@ export default function Error({
             onClick={() => window.location.reload()}
             style={{
               fontSize: 13, fontWeight: 600, padding: "8px 16px", borderRadius: 8,
-              background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.12)",
-              color: "#e5e7eb", cursor: "pointer",
+              background: "var(--surface)", border: "1px solid var(--border-mid)",
+              color: "var(--text)", cursor: "pointer",
             }}
           >
             Reload

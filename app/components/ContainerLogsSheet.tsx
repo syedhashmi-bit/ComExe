@@ -61,7 +61,7 @@ export function ContainerLogsSheet({ containerName, onClose }: { containerName: 
         style={{ width: 640, maxWidth: "90vw", background: "var(--settings-bg)", borderLeft: "1px solid var(--settings-border)", boxShadow: "-12px 0 40px rgba(0,0,0,0.7)" }}
       >
         <div className="flex items-center gap-3">
-          <span className="text-xs uppercase tracking-widest" style={{ color: "var(--settings-text)" }}>logs · {containerName}</span>
+          <span style={{ fontSize: 13, color: "var(--settings-text)" }}>Logs · <span className="font-mono">{containerName}</span></span>
           <label className="flex items-center gap-1.5 cursor-pointer ml-auto" style={{ fontSize: 12, color: "var(--settings-text)" }}>
             <input type="checkbox" checked={follow} onChange={e => setFollow(e.target.checked)} />
             <span>tail-follow</span>

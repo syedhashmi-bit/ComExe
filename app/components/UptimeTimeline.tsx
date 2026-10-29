@@ -64,8 +64,8 @@ export function UptimeTimeline({ history, height = 32 }: UptimeTimelineProps) {
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between">
-        <span style={{ fontSize: 12, color: "var(--text-dim)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em" }}>
-          Uptime Timeline
+        <span style={{ fontSize: 12, color: "var(--text-dim)", fontWeight: 600 }}>
+          Uptime timeline
         </span>
         <div className="flex items-center gap-3">
           {downSegments.length > 0 && (

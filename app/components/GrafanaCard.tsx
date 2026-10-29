@@ -56,7 +56,7 @@ function GrafanaPanel({ url, label, height, baseUrl, tokenSet }: { url: string; 
             position: "absolute", inset: 0, background: "var(--card-alt)",
             display: "flex", alignItems: "center", justifyContent: "center",
             fontSize: 12, color: "var(--text-ghost)",
-          }}>rendering{label ? ` ${label}` : " panel"}…</div>
+          }}>Rendering{label ? ` ${label}` : " panel"}…</div>
         )}
         {renderError ? (
           <GrafanaFallback
@@ -80,7 +80,7 @@ function GrafanaPanel({ url, label, height, baseUrl, tokenSet }: { url: string; 
           background: "var(--card-alt)",
           display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4,
         }}>
-          <span className="text-xs" style={{ color: "var(--text-ghost)" }}>loading{label ? ` ${label}` : " panel"}…</span>
+          <span className="text-xs" style={{ color: "var(--text-ghost)" }}>Loading{label ? ` ${label}` : " panel"}…</span>
         </div>
       )}
       <iframe
@@ -183,7 +183,7 @@ GF_SECURITY_ALLOW_EMBEDDING=true`}</pre>
           <details style={{ background: "var(--card-alt)", borderRadius: 6, padding: "6px 10px" }}>
             <summary style={{ fontSize: 12, cursor: "pointer", color: "var(--brand)", fontWeight: 600 }}>2. Use a service-account API token</summary>
             <div className="text-xs mt-2" style={{ color: "var(--text-dim)", lineHeight: 1.5 }}>
-              Grafana → Administration → Service accounts → Add → Viewer role → Add token. Then set <code style={{ fontFamily: "monospace" }}>GRAFANA_API_TOKEN</code> on the ComExe container. Coming in a future release: server-side <code style={{ fontFamily: "monospace" }}>/render</code> proxy that uses this.
+              Grafana → Administration → Service accounts → Add → Viewer role → Add token. Then set <code style={{ fontFamily: "monospace" }}>GRAFANA_API_TOKEN</code> on the ComExe container, and ComExe renders the panel server-side as an image — no iframe cookies involved.
             </div>
           </details>
           <details style={{ background: "var(--card-alt)", borderRadius: 6, padding: "6px 10px" }}>
@@ -204,13 +204,48 @@ GF_SECURITY_ALLOW_EMBEDDING=true`}</pre>
       <a href={baseUrl} target="_blank" rel="noopener noreferrer"
         className="text-xs mt-auto"
         style={{ color: accent, textDecoration: "none", alignSelf: "flex-start" }}>
-        open Grafana ↗
+        Open Grafana ↗
       </a>
       <a href={panelUrl} target="_blank" rel="noopener noreferrer"
         className="text-xs"
         style={{ color: "var(--text-faint)", textDecoration: "none", alignSelf: "flex-start" }}>
-        try panel URL directly ↗
+        Try the panel URL directly ↗
       </a>
+    </div>
+  );
+}
+
+// Remembers "Hide" on the not-set-up hint, like Disk health's.
+const HINT_KEY = "comexe:grafana-hint-hidden";
+
+function readHintHidden(): boolean {
+  try { return typeof window !== "undefined" && localStorage.getItem(HINT_KEY) === "1"; }
+  catch { return false; }
+}
+
+// No panel configured: one slim line instead of a 220px box announcing an
+// absence. The dashboard only mounts this once /api/config has loaded, so
+// reading localStorage in the initializer can't cause a hydration mismatch.
+function GrafanaHint() {
+  const [hidden, setHidden] = useState(readHintHidden);
+  if (hidden) return null;
+  return (
+    <div className="flex items-center gap-2" style={{
+      border: "1px dashed var(--border)", borderRadius: 10, padding: "7px 14px",
+      fontSize: 12, color: "var(--text-label)", minWidth: 0,
+    }}>
+      <span aria-hidden="true" className="shrink-0" style={{ display: "inline-flex" }}><IconGrafana /></span>
+      <span className="shrink-0" style={{ color: "var(--text-secondary)", fontWeight: 600 }}>Grafana</span>
+      <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--text-ghost)" }}>
+        not set up · add a dashboard panel in <a href="/setup" style={{ color: "var(--text-label)" }}>setup</a> to show it here
+      </span>
+      <button onClick={() => {
+        setHidden(true);
+        try { localStorage.setItem(HINT_KEY, "1"); } catch { /* private mode etc. */ }
+      }} className="shrink-0" style={{
+        marginLeft: "auto", fontSize: 12, color: "var(--text-label)", background: "none",
+        border: "1px solid var(--border)", borderRadius: 5, padding: "2px 8px", cursor: "pointer",
+      }}>Hide</button>
     </div>
   );
 }
@@ -222,47 +257,30 @@ export function GrafanaCard({ baseUrl, panelUrl, panels, tokenSet }: {
   tokenSet?: boolean;
 }) {
   const allPanels = panels && panels.length > 0 ? panels : panelUrl ? [{ panelId: "default", label: "Panel", size: "lg" as const, url: panelUrl }] : [];
-  const hasAnyPanel = allPanels.length > 0;
+  if (allPanels.length === 0) return <GrafanaHint />;
 
   return (
     <div style={{
       background: "var(--card)", border: "1px solid var(--border)",
-      borderRadius: 14, padding: 18, backdropFilter: "blur(6px)",
+      borderRadius: 10, padding: 16,
       display: "flex", flexDirection: "column", gap: 12,
     }}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span style={{ color: "var(--accent-grafana)" }}><IconGrafana /></span>
-          <span className="text-xs uppercase tracking-widest font-semibold" style={{ color: "var(--text-label)", letterSpacing: "0.15em" }}>grafana</span>
-          {hasAnyPanel && (
-            <span className="text-xs" style={{ color: "var(--text-ghost)" }}>{allPanels.length} panel{allPanels.length !== 1 ? "s" : ""}</span>
-          )}
+          <span aria-hidden="true" style={{ color: "var(--accent-grafana)", display: "inline-flex" }}><IconGrafana /></span>
+          <span style={{ fontSize: 13, color: "var(--text-muted)" }}>Grafana</span>
+          <span className="text-xs" style={{ color: "var(--text-ghost)" }}>{allPanels.length} panel{allPanels.length !== 1 ? "s" : ""}</span>
         </div>
         <a href={baseUrl} target="_blank" rel="noopener noreferrer"
           className="text-xs"
           style={{ color: "var(--text-faint)", textDecoration: "none", transition: "color 0.15s" }}
-          onMouseEnter={e => (e.currentTarget.style.color = "var(--accent-grafana)")}
-          onMouseLeave={e => (e.currentTarget.style.color = "rgba(255,255,255,0.3)")}>
-          open grafana ↗
+          onMouseEnter={e => (e.currentTarget.style.color = "var(--text)")}
+          onMouseLeave={e => (e.currentTarget.style.color = "var(--text-faint)")}>
+          Open Grafana ↗
         </a>
       </div>
 
-      {!hasAnyPanel ? (
-        <div style={{
-          position: "relative", height: 220, borderRadius: 8,
-          background: "var(--surface-dim)",
-          border: "1px dashed var(--border)",
-          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6,
-          padding: 18, textAlign: "center",
-        }}>
-          <span className="text-xs" style={{ color: "var(--text-label)" }}>
-            Grafana embed not configured.
-          </span>
-          <span className="text-xs" style={{ color: "var(--text-ghost)", maxWidth: 360, lineHeight: 1.5 }}>
-            Set <code style={{ color: "var(--accent-grafana)" }}>GRAFANA_DASHBOARD_UID</code> and <code style={{ color: "var(--accent-grafana)" }}>GRAFANA_DATASOURCE_UID</code> env vars to render a panel here. Use the <a href="/setup" style={{ color: "var(--accent-grafana)" }}>setup wizard</a> to add multiple panels.
-          </span>
-        </div>
-      ) : allPanels.length === 1 ? (
+      {allPanels.length === 1 ? (
         <GrafanaPanel url={allPanels[0].url} label={allPanels[0].label} height={220} baseUrl={baseUrl} tokenSet={tokenSet} />
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 10 }}>
@@ -272,7 +290,7 @@ export function GrafanaCard({ baseUrl, panelUrl, panels, tokenSet }: {
             return (
               <div key={p.panelId + i} style={{ gridColumn: `span ${colSpan}` }}>
                 {allPanels.length > 1 && (
-                  <div className="text-xs uppercase tracking-widest mb-1" style={{ color: "var(--text-ghost)" }}>{p.label}</div>
+                  <div className="text-xs mb-1" style={{ color: "var(--text-dim)" }}>{p.label}</div>
                 )}
                 <GrafanaPanel url={p.url} label={p.label} height={h} baseUrl={baseUrl} tokenSet={tokenSet} />
               </div>

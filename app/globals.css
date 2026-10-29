@@ -99,7 +99,6 @@
   --gauge-track:    #23272e;
   --donut-track:    #23272e;
   --donut-bg:       #14161a;
-  --fade-to:        #0c0d10;
 }
 
 .theme-paper {
@@ -166,7 +165,6 @@
   --gauge-track:    #e7e9ed;
   --donut-track:    #e7e9ed;
   --donut-bg:       #ffffff;
-  --fade-to:        #f6f7f9;
 }
 
 * {
@@ -234,11 +232,13 @@ body {
   50%       { opacity: 0.65; box-shadow: 0 0 8px var(--dot-color, var(--ok)); }
 }
 
-/* Activity feed ticker — moves the doubled-events strip from 0% to -50% so the loop is seamless. */
-@keyframes tickerScroll {
-  from { transform: translateX(0); }
-  to   { transform: translateX(-50%); }
-}
+/* Card ⓘ — only on the hovered / focused card. Opacity rather than display so
+   the title row doesn't shift; touch screens (no hover) always show it. */
+.card-info { opacity: 0; transition: opacity 0.15s ease; }
+.card-shell:hover .card-info,
+.card-shell:focus-within .card-info,
+.card-info.is-open { opacity: 1; }
+@media (hover: none) { .card-info { opacity: 1; } }
 
 /* Sparkline empty-state shimmer — used while we have <2 data points. */
 @keyframes sparklineShimmer {

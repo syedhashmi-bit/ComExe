@@ -63,7 +63,7 @@ export function BookmarksPanel({ clientConfig, setClientConfig }: BookmarksPanel
   return (
     <div className="flex flex-col gap-4" style={{ background: "var(--surface-dim)", border: "1px solid var(--border-subtle)", borderRadius: 14, padding: "20px 24px" }}>
       <div className="flex items-center gap-2">
-        <span className="text-xs uppercase" style={{ color: "var(--text-faint)", letterSpacing: "0.15em" }}>bookmarks</span>
+        <span style={{ fontSize: 13, color: "var(--text-muted)" }}>Bookmarks</span>
         <div style={{ marginLeft: "auto", display: "flex", gap: 6, alignItems: "center" }}>
           {editBookmarks ? (
             <>
@@ -105,15 +105,15 @@ export function BookmarksPanel({ clientConfig, setClientConfig }: BookmarksPanel
                   <input type="color" value={col.accentColor} onChange={e => updateColumn(ci, "accentColor", e.target.value)}
                     style={{ width: 16, height: 16, border: "none", background: "none", cursor: "pointer", padding: 0 }} />
                   <input value={col.title} onChange={e => updateColumn(ci, "title", e.target.value)}
-                    className="text-xs uppercase tracking-[0.18em]" placeholder="Section name"
-                    style={{ background: "transparent", border: "none", borderBottom: "1px solid var(--border)", color: col.accentColor, opacity: 0.8, outline: "none", width: "100%", padding: "2px 0" }} />
+                    className="text-xs" placeholder="Section name"
+                    style={{ background: "transparent", border: "none", borderBottom: "1px solid var(--border)", color: "var(--text-muted)", outline: "none", width: "100%", padding: "2px 0" }} />
                   <button onClick={() => removeColumn(ci)} title="Remove section"
                     style={{ color: "var(--critical)", background: "none", border: "none", cursor: "pointer", fontSize: 12, padding: 0, lineHeight: 1, flexShrink: 0 }}>×</button>
                 </>
               ) : (
                 <>
                   <span className="w-2 h-2 rounded-full shrink-0" style={{ background: col.accentColor }} />
-                  <span className="text-xs uppercase tracking-[0.18em]" style={{ color: col.accentColor, opacity: 0.8 }}>{col.title}</span>
+                  <span className="text-xs font-medium" style={{ color: "var(--text-muted)" }}>{col.title}</span>
                 </>
               )}
             </div>

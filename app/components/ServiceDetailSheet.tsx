@@ -65,19 +65,18 @@ export function ServiceDetailSheet({
           <div className="flex flex-col" style={{ flex: 1, minWidth: 0 }}>
             <div className="flex items-center gap-2">
               <span style={{ fontSize: 15, fontWeight: 700, color: "var(--text)" }}>{label}</span>
-              <span className="w-1.5 h-1.5 rounded-full" style={{
-                background: service.stale ? "#f59e0b" : service.up ? "#10b981" : "#ef4444",
-                boxShadow: `0 0 6px ${service.stale ? "#f59e0baa" : service.up ? "#10b981aa" : "#ef444455"}`,
+              <span aria-hidden="true" className="w-1.5 h-1.5 rounded-full" style={{
+                background: service.stale ? "var(--warn)" : service.up ? "var(--ok)" : "var(--critical)",
               }} />
-              <span style={{ fontSize: 12, color: "var(--text-ghost)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
-                {service.stale ? "stale" : service.up ? "online" : "offline"}
+              <span style={{ fontSize: 12, color: "var(--text-dim)" }}>
+                {service.stale ? "Stale" : service.up ? "Online" : "Offline"}
               </span>
               {service.authError && (
                 <span style={{
-                  background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.4)",
-                  color: "#ef4444", borderRadius: 4, padding: "1px 5px",
-                  fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em",
-                }}>AUTH</span>
+                  border: "1px solid color-mix(in srgb, var(--critical) 45%, transparent)",
+                  color: "var(--critical)", borderRadius: 4, padding: "1px 6px",
+                  fontSize: 12, fontWeight: 600,
+                }}>Auth failed</span>
               )}
             </div>
             {resolvedUrl && (
@@ -103,7 +102,7 @@ export function ServiceDetailSheet({
           {/* Stats lines */}
           {service.lines.length > 0 && (
             <section className="flex flex-col gap-2">
-              <span style={{ fontSize: 12, color: "var(--text-ghost)", textTransform: "uppercase", letterSpacing: "0.15em", fontWeight: 700 }}>
+              <span style={{ fontSize: 12, color: "var(--text-dim)", fontWeight: 600 }}>
                 Stats
               </span>
               {service.lines.map((line, i) => (
@@ -129,7 +128,7 @@ export function ServiceDetailSheet({
           {/* Health messages */}
           {service.health && (service.health.error > 0 || service.health.warning > 0) && (
             <section className="flex flex-col gap-2">
-              <span style={{ fontSize: 12, color: "var(--text-ghost)", textTransform: "uppercase", letterSpacing: "0.15em", fontWeight: 700 }}>
+              <span style={{ fontSize: 12, color: "var(--text-dim)", fontWeight: 600 }}>
                 Health · {service.health.error} error{service.health.error === 1 ? "" : "s"} · {service.health.warning} warning{service.health.warning === 1 ? "" : "s"}
               </span>
               {service.health.messages && service.health.messages.length > 0 ? (
@@ -154,7 +153,7 @@ export function ServiceDetailSheet({
           {/* Queue items */}
           {queueItems.length > 0 && (
             <section className="flex flex-col gap-2">
-              <span style={{ fontSize: 12, color: "var(--text-ghost)", textTransform: "uppercase", letterSpacing: "0.15em", fontWeight: 700 }}>
+              <span style={{ fontSize: 12, color: "var(--text-dim)", fontWeight: 600 }}>
                 Active queue · {queueItems.length} item{queueItems.length === 1 ? "" : "s"}
               </span>
               <div className="flex flex-col gap-2">
@@ -187,7 +186,7 @@ export function ServiceDetailSheet({
           {/* Active streams */}
           {streams.length > 0 && (
             <section className="flex flex-col gap-2">
-              <span style={{ fontSize: 12, color: "var(--text-ghost)", textTransform: "uppercase", letterSpacing: "0.15em", fontWeight: 700 }}>
+              <span style={{ fontSize: 12, color: "var(--text-dim)", fontWeight: 600 }}>
                 Active streams · {streams.length}
               </span>
               <div className="flex flex-col gap-2">

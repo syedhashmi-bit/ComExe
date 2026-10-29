@@ -41,8 +41,7 @@ const inputStyle: React.CSSProperties = {
 };
 
 const labelStyle: React.CSSProperties = {
-  fontSize: 12, color: "var(--text-label)", textTransform: "uppercase",
-  letterSpacing: "0.08em", fontWeight: 600, marginBottom: 4,
+  fontSize: 12, color: "var(--text-label)", fontWeight: 600, marginBottom: 4,
 };
 
 export function CustomCardEditor({ onClose }: { onClose: () => void }) {
@@ -121,8 +120,8 @@ export function CustomCardEditor({ onClose }: { onClose: () => void }) {
       display: "flex", flexDirection: "column", gap: 14,
     }}>
       <div className="flex items-center justify-between">
-        <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--text-label)" }}>
-          Custom Cards
+        <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-muted)" }}>
+          Custom cards
         </span>
         <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text-ghost)", cursor: "pointer", fontSize: 14 }}>✕</button>
       </div>
