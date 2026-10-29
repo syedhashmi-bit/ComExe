@@ -6,6 +6,7 @@ import { SVC_COLORS, SVC_ICONS, SVC_LABELS, SVC_PORTS } from "@/app/lib/constant
 import { cleanTitle, fmtEtaShort, fmtSmoothAgo } from "@/app/lib/formatters";
 import { animatedLine, GaugeBar, Skeleton } from "@/app/components/primitives";
 import { ServiceDetailSheet } from "@/app/components/ServiceDetailSheet";
+import { serviceUptime, fmtUptimePct, type IncidentFeed } from "@/app/components/IncidentStrip";
 
 // ── Services panel ──────────────────────────────────────────────────────────
 // A compact grouped list: one row per service with its status in words, the
@@ -84,12 +85,13 @@ export interface ServicesPanelProps {
   setLogsContainer: (name: string | null) => void;
   restartingSvc: string | null;
   restartService: (name: string) => void;
+  incidents?: IncidentFeed | null;   // the collector's log, for each row's 24 h strip
 }
 
 export function ServicesPanel({
   services, servicesLoading, servicesUpdatedAt,
   serviceFilter, setServiceFilter, serviceFilterRef,
-  clientConfig, setLogsContainer, restartingSvc, restartService,
+  clientConfig, setLogsContainer, restartingSvc, restartService, incidents,
 }: ServicesPanelProps) {
   // Which service's detail sheet is open, by name (matches ServiceResult.name).
   const [detailServiceName, setDetailServiceName] = useState<string | null>(null);
@@ -182,6 +184,9 @@ export function ServicesPanel({
                     : s.lines.slice(1).join(" · ");
                   const queue = (s.name === "radarr" || s.name === "sonarr" || s.name === "qbittorrent") && s.up ? (s.queueItems ?? []).slice(0, 3) : [];
                   const streams = s.name === "tautulli" && s.up ? (s.streams ?? []).slice(0, 3) : [];
+                  const uptime = incidents?.enabled && incidents.now != null
+                    ? serviceUptime(incidents.incidents ?? [], s.name, incidents.now, incidents.since ?? incidents.now)
+                    : null;
 
                   return (
                     <div key={s.name} style={{ borderTop: "1px solid var(--border-dim)", padding: "9px 0" }}>
@@ -209,6 +214,22 @@ export function ServicesPanel({
                           </span>
                         )}
                         <span className="flex items-center shrink-0" style={{ gap: 6, marginLeft: "auto" }}>
+                          {uptime && (
+                            <span className="flex items-center" style={{ gap: 8, marginRight: 4 }}
+                              title={uptime.pct != null ? `Last 24 hours: up ${fmtUptimePct(uptime.pct)} of the time` : "Last 24 hours"}>
+                              <span role="img" aria-label={`${label}, last 24 hours${uptime.pct != null ? `: up ${fmtUptimePct(uptime.pct)}` : ""}`}
+                                className="flex" style={{ gap: 1, width: 96, height: 12 }}>
+                                {uptime.cells.map((l, ci) => (
+                                  <span key={ci} style={{ flex: 1, borderRadius: 1, background: l === "critical" ? "var(--critical)" : l === "warning" ? "var(--warn)" : "var(--gauge-track)" }} />
+                                ))}
+                              </span>
+                              {uptime.pct != null && (
+                                <span className="font-mono" style={{ fontSize: 12, color: "var(--text-faint)", minWidth: 44, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+                                  {fmtUptimePct(uptime.pct)}
+                                </span>
+                              )}
+                            </span>
+                          )}
                           {clientConfig?.dockerEnabled && (
                             <>
                               <button onClick={() => setLogsContainer(s.name)} title="View container logs"

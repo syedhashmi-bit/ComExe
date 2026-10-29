@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { fetchJson } from "@/app/lib/http";
 import { createTTLCache } from "@/app/lib/cache";
 import { loadConfig } from "@/app/lib/server-config";
+import type { SpeedtestPoint } from "@/app/lib/types";
 
 // URL + bearer come from loadConfig() per request, NOT process.env. Reading
 // process.env at module scope meant anything saved through the /setup wizard
@@ -24,7 +25,8 @@ interface HistoryRecord {
 }
 
 // 60s in-memory cache so even very-overlapping SSE clients only hit
-// SpeedTracker once per minute. Combined with the 10-minute client poll
+// SpeedTracker once per minute. One call returns the last 20 results — the
+// newest is the card's headline, all 20 feed its history chart. Combined with the 10-minute client poll
 // interval, each SpeedTracker instance sees ~6 requests/hour total.
 const cache = createTTLCache<unknown>(60_000);
 
@@ -48,7 +50,7 @@ export async function GET() {
   //   - Pagination is spatie json-api style `page[size]` — the previously-used
   //     `?take=5` was silently ignored.
   const json = await fetchJson<{ data?: HistoryRecord[]; meta?: { total?: number } }>(
-    `${BASE}/api/v1/results?sort=-created_at&page%5Bsize%5D=5`,
+    `${BASE}/api/v1/results?sort=-created_at&page%5Bsize%5D=20`,
     {
       headers: BEARER ? { Authorization: `Bearer ${BEARER}`, Accept: "application/json" }
                       : { Accept: "application/json" },
@@ -58,7 +60,7 @@ export async function GET() {
   // ignores the sort param the way it ignored `take`.
   const records: HistoryRecord[] = (json?.data ?? []).slice().sort((a, b) =>
     new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime()
-  ).slice(0, 5);
+  ).slice(0, 20);
   const total: number | null = json?.meta?.total ?? null;
 
   // linuxserver/speedtest-tracker v1 API returns download/upload in BYTES/SEC.
@@ -81,14 +83,19 @@ export async function GET() {
     serverHost:     latest.server?.host     ?? null,
   } : null;
 
-  const history = records
-    .map(r => toMbps(r.download))
-    .filter((v): v is number => v !== null)
-    .reverse(); // oldest → newest for sparkline left-to-right
+  // Oldest → newest, for the chart's left-to-right.
+  const tests: SpeedtestPoint[] = records
+    .flatMap(r => {
+      const ts = r.created_at ? Date.parse(r.created_at) : NaN;
+      const download = toMbps(r.download);
+      if (isNaN(ts) || download == null) return [];
+      return [{ ts, download, upload: toMbps(r.upload), ping: r.ping ?? null }];
+    })
+    .reverse();
 
   const data = {
     results:    primary ? [primary] : [],
-    history,
+    tests,
     totalTests: total,
     timestamp:  Date.now(),
   };

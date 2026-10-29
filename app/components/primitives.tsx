@@ -136,8 +136,22 @@ export function GaugeBar({ percent, color, thin = false, gradient }: { percent: 
 
 // ── Sparkline ────────────────────────────────────────────────────────────────
 
-export function Sparkline({ data, color, autoMax = false, height = 32 }: {
-  data: number[]; color: string; autoMax?: boolean; height?: number;
+// The value range a sparkline draws. Default 0–100 (percentages); `autoMax`
+// 0–peak; `fit` the data's own min–max with some headroom, for series that
+// never go near zero (a GPU at 40–45 °C, a 450 Mbps line). On a 0-based scale
+// those drew as a solid block with a line along the top. A flat series is
+// centred rather than pinned to an edge.
+export function sparkRange(data: number[], mode: "pct" | "max" | "fit"): [number, number] {
+  if (mode === "pct") return [0, 100];
+  const hi = Math.max(...data);
+  if (mode === "max") return [0, Math.max(hi, 0.001)];
+  const lo = Math.min(...data);
+  const span = Math.max(hi - lo, Math.abs(hi) * 0.1, 1e-6);
+  return [lo - span * 0.3, hi + span * 0.3];
+}
+
+export function Sparkline({ data, color, autoMax = false, fit = false, height = 32 }: {
+  data: number[]; color: string; autoMax?: boolean; fit?: boolean; height?: number;
 }) {
   const uid = useId();
   // "Collecting data…" state — after a deploy or for a slow-changing
@@ -149,23 +163,22 @@ export function Sparkline({ data, color, autoMax = false, height = 32 }: {
       <div
         style={{
           height, display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: 12, color: "var(--text-ghost)", fontStyle: "italic",
-          letterSpacing: "0.05em",
-          background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.025) 50%, transparent 100%)",
+          fontSize: 12, color: "var(--text-ghost)",
+          background: `linear-gradient(90deg, transparent 0%, ${withAlpha("var(--text)", 3)} 50%, transparent 100%)`,
           backgroundSize: "200% 100%",
           animation: "sparklineShimmer 2.4s linear infinite",
           borderRadius: 4,
         }}
         title="Waiting for additional data points">
-        collecting data…
+        Collecting data…
       </div>
     );
   }
   const W = 100, H = height, PAD = 1;
-  const maxVal = autoMax ? Math.max(...data, 0.001) : 100;
+  const [lo, hi] = sparkRange(data, fit ? "fit" : autoMax ? "max" : "pct");
   const pts = data.map((v, i) => {
     const x = PAD + (i / (data.length - 1)) * (W - PAD * 2);
-    const y = PAD + (1 - Math.min(Math.max(v, 0), maxVal) / maxVal) * (H - PAD * 2);
+    const y = PAD + (1 - (Math.min(Math.max(v, lo), hi) - lo) / (hi - lo)) * (H - PAD * 2);
     return [x.toFixed(2), y.toFixed(2)];
   });
   const line = pts.map((p, i) => `${i === 0 ? "M" : "L"}${p[0]},${p[1]}`).join(" ");
@@ -175,14 +188,14 @@ export function Sparkline({ data, color, autoMax = false, height = 32 }: {
     <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="w-full" style={{ height, display: "block" }}>
       <defs>
         <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%"   stopColor={color} stopOpacity="0.5" />
-          <stop offset="60%"  stopColor={color} stopOpacity="0.18" />
+          <stop offset="0%"   stopColor={color} stopOpacity="0.32" />
           <stop offset="100%" stopColor={color} stopOpacity="0" />
         </linearGradient>
       </defs>
       <path d={area} fill={`url(#${gid})`} />
-      <path d={line} fill="none" stroke={color} strokeWidth="4" strokeLinejoin="round" strokeLinecap="round" opacity="0.18" />
-      <path d={line} fill="none" stroke={color} strokeWidth="2.2" strokeLinejoin="round" strokeLinecap="round" opacity="1" />
+      {/* non-scaling: the viewBox is stretched to the card, which used to
+          thicken the line unevenly (and the old 4px halo was a glow). */}
+      <path d={line} fill="none" stroke={color} strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
     </svg>
   );
 }

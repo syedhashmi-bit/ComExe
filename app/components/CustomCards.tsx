@@ -73,7 +73,7 @@ function CustomCardRenderer({ card, state }: { card: CustomCardDef; state: CardS
             {fmt(state.value)}
           </div>
           <div style={{ height: 50 }}>
-            <Sparkline data={state.history.slice(-60)} color={card.color} height={50} />
+            <Sparkline data={state.history.slice(-60)} color={card.color} fit height={50} />
           </div>
         </div>
       )}

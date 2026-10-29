@@ -24,7 +24,7 @@ A single-user, LAN-only homelab dashboard for a TrueNAS Scale host. Next.js 16
 chart library. Every upstream service is reached through a server-side route so
 credentials never enter the browser bundle.
 
-**Scale:** ~15k lines of TS/TSX under `app/` — 36 API routes, 33 components,
+**Scale:** ~15k lines of TS/TSX under `app/` — 37 API routes, 34 components,
 30 lib modules, 7 pages.
 
 **Deployment posture:** one LAN, one user, never exposed to the internet. That
@@ -49,7 +49,7 @@ $env:PATH = "C:\Program Files\nodejs;" + $env:PATH
 npm run dev        # localhost:3000
 npm run build      # local sanity check; CI does the real build
 npm run lint
-npm test           # vitest, 300 unit tests
+npm test           # vitest, 311 unit tests
 npm run test:e2e   # playwright
 npm run storybook  # primitives sandbox on :6006
 ```
@@ -226,7 +226,7 @@ Routes call `await loadConfig()` **once per request** and read
 Cached 5s. POST `/api/config` calls `invalidateConfigCache()` after a write, so
 changes apply in seconds with no redeploy.
 
-### API routes (36)
+### API routes (37)
 
 All server-side proxies. All credentials resolved via `loadConfig()`.
 
@@ -238,7 +238,7 @@ All server-side proxies. All credentials resolved via `loadConfig()`.
 | `services/` | Thin wrapper over `lib/services.ts`: 10 service health cards, SWR + memoization. |
 | `mikrotik/` | RouterOS stats (Basic auth). 10s cache. |
 | `activity/` | Sonarr + Radarr history + Tautulli watches, merged. 60s cache. |
-| `speedtest/` | SpeedTracker history. **Never triggers tests.** |
+| `speedtest/` | SpeedTracker's last 20 results (headline + history chart). **Never triggers tests.** |
 | `weather/` | open-meteo, no auth, + 3-day forecast. |
 
 > **Metrics queries are a named object** resolved with `resolveNamed()` from
@@ -257,7 +257,9 @@ scrape-target health).
 
 **Media:** `calendar/` (Sonarr + Radarr calendars, last 7 days through the
 next 7, for the "Coming up" card — `lib/calendar.ts`, cached 15 min, API key in
-the `X-Api-Key` header).
+the `X-Api-Key` header), `plex-art/` (Now playing posters via Tautulli's
+`pms_image_proxy`, so no key or Plex token reaches the browser; only
+`/library/metadata/…` paths in, only raster images out, cached 1 h).
 
 **Observability:** `history/` (ranged + downsampled), `insights/` (z-score
 anomalies, linear-regression forecasts, SLA/MTTR), `smart/` (SMART disk health
@@ -314,6 +316,9 @@ services are configured), `/login`, `/analytics` (interactive area charts over
   every numeric literal in `<AnimatedNumber>`. Use this for any pre-formatted
   stat string.
 - **`HeroStat`** — splits `lines[0]` into big leading number + muted suffix.
+- **`Sparkline`** — 0–100 by default; `autoMax` for 0–peak; `fit` for a series that
+  never nears zero (GPU °C, custom cards), which on a 0-based scale drew as a
+  solid block with a line along the top.
 - **`TrendDelta`** — ↑/↓ vs history. Caller sets `goodDirection` so coloring
   matches intent. Has a sanity guard: suppresses output when
   `|delta|/|current| > 5`, which catches unit-mismatch bugs (see `memory.md` →
@@ -324,7 +329,9 @@ services are configured), `/login`, `/analytics` (interactive area charts over
   shown only on the hovered or focused card (`.card-info` in `globals.css`; always on touch).
 
 **Feature components:** `StatusSummary` + `IncidentStrip`, `PageHeader`, `FilesystemsBody`,
-`NetworkChart` (download above / upload below one axis, hover readout),
+`NetworkChart` + `MirroredChart` (one series above the centre line, one below, each
+on its own scale, hover readout — network throughput and speedtest history),
+`NowPlaying` (posters, direct play / transcode / GPU, quality, bitrate),
 `CpuThreads` (per-thread heatmap from `metrics.cpuThreads`), `ComingUp` (the week's
 episodes and releases by day, plus aired-but-missing), `ServicesPanel`, `ServiceDetailSheet`, `BookmarksPanel`,
 `SettingsPanel`, `SearchBar`, `MikrotikTab`, `GrafanaCard`, `ActivityFeed`,
@@ -369,7 +376,10 @@ available, the card charts the ZFS-aware total − available − SReclaimable.
 overseerr, prowlarr) and *Infrastructure* (pihole, nginx, uptimekuma). One row
 per service: status word + dot (the only colour), the app's full-colour icon and
 name (links to its UI in a new tab), key number, detail line, and details /
-logs / restart buttons. Queue items and Plex streams show as a sub-list. Rows
+logs / restart buttons, and a 24-hour strip with an uptime % from the
+collector's incident log (`serviceUptime()` in `IncidentStrip.tsx`; the page
+fetches the log once for this and the status line). Queue items and Plex
+streams show as a sub-list. Rows
 sort by health priority — down/auth → error → warning/stale → busy → idle —
 preserving route order within a tier.
 
@@ -578,7 +588,7 @@ collector), `HISTORY_RETENTION_DAYS`, `HISTORY_MAX_SIZE_MB`,
 
 ## Testing
 
-- **Unit** — vitest, `tests/unit/`. 300 tests over 26 files covering `app/lib/*`
+- **Unit** — vitest, `tests/unit/`. 311 tests over 27 files covering `app/lib/*`
   plus `tests/unit/routes/` for API route handlers.
 - **E2E** — Playwright, `tests/e2e/smoke.spec.ts`, run by its own CI job.
 - **Storybook** — `stories/Primitives.stories.tsx`.

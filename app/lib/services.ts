@@ -393,10 +393,46 @@ interface TautulliSession {
   parent_media_index?: string;
   media_index?: string;
   user?: string;
+  friendly_name?: string;
   progress_percent?: string;
   duration?: number;
   view_offset?: number;
   media_type?: string;
+  state?: string;                          // "playing" | "paused" | "buffering"
+  thumb?: string;
+  grandparent_thumb?: string;
+  transcode_decision?: string;             // "direct play" | "copy" | "transcode"
+  transcode_hw_encoding?: number | string; // 1 when the GPU is encoding
+  video_full_resolution?: string;          // source, e.g. "4k", "1080p"
+  stream_video_full_resolution?: string;   // what's sent to the player
+  bandwidth?: string | number;             // kbps
+  player?: string;
+  product?: string;
+}
+
+// Plex artwork paths look like /library/metadata/123/thumb/1699999999. Only
+// those are passed on to /api/plex-art, which refuses anything else.
+export const PLEX_ART_PATH = /^\/library\/metadata\/\d+\/(thumb|art)(\/\d+)?$/;
+
+const RES = (r?: string) => (r ? (r.toLowerCase() === "4k" ? "4K" : r.replace(/^(\d+)$/, "$1p")) : undefined);
+
+// The Now playing detail for one session. Exported for tests.
+export function streamDetail(s: TautulliSession): Partial<Stream> {
+  const art = s.media_type === "episode" ? (s.grandparent_thumb ?? s.thumb) : s.thumb;
+  const decision = s.transcode_decision === "transcode" ? "Transcode"
+    : s.transcode_decision === "copy" ? "Direct stream"
+    : s.transcode_decision === "direct play" ? "Direct play" : undefined;
+  const src = RES(s.video_full_resolution), out = RES(s.stream_video_full_resolution);
+  const kbps = Number(s.bandwidth);
+  return {
+    art: art && PLEX_ART_PATH.test(art) ? art : undefined,
+    decision,
+    hwTranscode: decision === "Transcode" && String(s.transcode_hw_encoding) === "1" ? true : undefined,
+    quality: decision === "Transcode" && src && out && src !== out ? `${src} → ${out}` : (out ?? src),
+    bitrateKbps: Number.isFinite(kbps) && kbps > 0 ? kbps : undefined,
+    player: s.player || s.product || undefined,
+    paused: s.state === "paused" ? true : undefined,
+  };
 }
 
 function fmtMs(ms: number): string {
@@ -438,7 +474,7 @@ async function tautulli(creds: ServiceCreds): Promise<ServiceResult> {
       const durMs    = s.duration   ?? 0;   // Tautulli duration is milliseconds
       const offMs    = s.view_offset ?? 0;  // view_offset is milliseconds
       const posStr   = durMs > 0 ? `${fmtMs(offMs)} / ${fmtMs(durMs)}` : "";
-      return { title, user: s.user ?? "—", progress, posStr };
+      return { title, user: s.friendly_name || s.user || "—", progress, posStr, ...streamDetail(s) };
     });
 
     // When something IS streaming, the streams panel is the headline; skip the

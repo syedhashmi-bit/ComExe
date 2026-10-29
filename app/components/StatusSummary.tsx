@@ -4,7 +4,7 @@ import type { ClientConfig, Metrics, ServiceResult } from "@/app/lib/types";
 import { SVC_LABELS, SVC_PORTS } from "@/app/lib/constants";
 import { healthIssues } from "@/app/lib/alerts";
 import { fmtDuration, fmtSmoothAgo } from "@/app/lib/formatters";
-import { IncidentStrip, useIncidents } from "@/app/components/IncidentStrip";
+import { IncidentStrip, type IncidentFeed } from "@/app/components/IncidentStrip";
 
 // ── Status summary ──────────────────────────────────────────────────────────
 // The first thing on the dashboard: either "All systems normal" or a short
@@ -119,14 +119,14 @@ export function collectIssues(metrics: Metrics | null, services: ServiceResult[]
   return issues.sort((a, b) => (a.level === b.level ? 0 : a.level === "critical" ? -1 : 1));
 }
 
-export function StatusSummary({ metrics, services, servicesUpdatedAt, clientConfig, demoMode }: {
+export function StatusSummary({ metrics, services, servicesUpdatedAt, clientConfig, demoMode, incidents: feed }: {
   metrics: Metrics | null;
   services: ServiceResult[] | null;
   servicesUpdatedAt: number | null;
   clientConfig: ClientConfig | null;
   demoMode: boolean;
+  incidents: IncidentFeed | null;
 }) {
-  const feed = useIncidents(demoMode);
   // Nothing to say until there is data to say it about.
   if (!metrics && !services) return null;
 

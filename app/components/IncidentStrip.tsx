@@ -15,6 +15,7 @@ const CELL_MS = 15 * 60_000;
 export interface IncidentFeed {
   enabled:   boolean;
   now?:      number;
+  since?:    number;          // when the log started recording
   incidents?: Incident[];
   last?:     Incident | null;
 }
@@ -23,11 +24,12 @@ function demoFeed(): IncidentFeed {
   const now = Date.now(), h = 3_600_000;
   const radarr: Incident = { key: "service:radarr:down", level: "critical", title: "Radarr unreachable", start: now - 10 * h, end: now - 10 * h + 12 * 60_000 };
   const mem: Incident = { key: "mem", level: "warning", title: "High memory", start: now - 20 * h, end: now - 20 * h + 6 * 60_000 };
-  return { enabled: true, now, incidents: [radarr, mem], last: radarr };
+  return { enabled: true, now, since: now - 7 * 24 * h, incidents: [radarr, mem], last: radarr };
 }
 
 // The collector's incident log, refreshed every minute. Demo mode gets a
-// made-up day with two incidents and makes no request.
+// made-up day with two incidents and makes no request. The dashboard calls
+// this once and hands the feed to both the status line and the service rows.
 export function useIncidents(demoMode: boolean): IncidentFeed | null {
   const [feed, setFeed] = useState<IncidentFeed | null>(null);
   const load = useCallback(async () => {
@@ -40,10 +42,13 @@ export function useIncidents(demoMode: boolean): IncidentFeed | null {
   return demoMode ? demoFeed() : feed;
 }
 
-// Worst incident level in each 15-minute cell, oldest cell first. Exported for tests.
-export function cellLevels(incidents: Incident[], now: number): ("warning" | "critical" | null)[] {
-  return Array.from({ length: CELLS }, (_, i) => {
-    const from = now - (CELLS - i) * CELL_MS, to = from + CELL_MS;
+// Worst incident level in each cell (15 minutes by default), oldest first.
+// Exported for tests.
+export function cellLevels(
+  incidents: Incident[], now: number, cells = CELLS, cellMs = CELL_MS,
+): ("warning" | "critical" | null)[] {
+  return Array.from({ length: cells }, (_, i) => {
+    const from = now - (cells - i) * cellMs, to = from + cellMs;
     let level: "warning" | "critical" | null = null;
     for (const inc of incidents) {
       if (inc.start < to && (inc.end ?? now) > from) {
@@ -54,6 +59,27 @@ export function cellLevels(incidents: Incident[], now: number): ("warning" | "cr
     return level;
   });
 }
+
+// One service's last 24 hours: 48 half-hour cells (red where it was down,
+// amber or red where its health check failed) and the share of the window it
+// was reachable. The window starts no earlier than the log itself, so a fresh
+// install doesn't claim a day of uptime it never watched.
+export function serviceUptime(incidents: Incident[], name: string, now: number, since: number) {
+  const mine = incidents.filter(i => i.key === `service:${name}:down` || i.key === `service:${name}:health`);
+  const cells = cellLevels(mine.map(i => (i.key.endsWith(":down") ? { ...i, level: "critical" as const } : i)), now, 48, 30 * 60_000);
+  const from = Math.max(now - 24 * 3_600_000, since);
+  const window = now - from;
+  if (window < 3_600_000) return { cells, pct: null };
+  let down = 0;
+  for (const i of mine) {
+    if (!i.key.endsWith(":down")) continue;
+    const s = Math.max(i.start, from), e = Math.min(i.end ?? now, now);
+    if (e > s) down += e - s;
+  }
+  return { cells, pct: 100 * (1 - down / window) };
+}
+
+export const fmtUptimePct = (pct: number) => (pct >= 99.95 ? "100%" : `${pct.toFixed(1)}%`);
 
 const hhmm = (t: number) => new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 

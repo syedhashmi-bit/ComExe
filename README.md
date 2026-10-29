@@ -42,7 +42,9 @@ external state, no secrets in the browser: every upstream call goes through a se
   (green / amber / red) reserved for actual problems, always paired with a word.
 - **Services in one list** — Radarr, Sonarr, Bazarr, Tautulli, qBittorrent, Overseerr, Prowlarr,
   Pi-hole, Nginx Proxy Manager and Uptime Kuma, each with its own icon, status, key number,
-  download queue or Plex stream, sorted so problems come first.
+  download queue or Plex stream and a 24-hour uptime strip, sorted so problems come first.
+- **Now playing** — Plex streams with their posters, who's watching on what, and whether each is
+  a direct play or a transcode (and whether the GPU is doing it).
 - **What's coming up** — the week's episodes and movie releases from Sonarr and Radarr, by day,
   with anything that aired but never downloaded called out, next to recent grabs and watches.
 - **Alerts with no tab open** — a background collector keeps evaluating thresholds and recording
@@ -80,7 +82,8 @@ external state, no secrets in the browser: every upstream call goes through a se
 - **Network** — download above and upload below one chart, with a hover readout; totals and
   established TCP connections
 - **GPU** — utilisation, temperature, power draw, VRAM, clocks, fan, encoder/decoder load
-- **Speedtest** — latest result and history from SpeedTracker (read-only — it never triggers a test)
+- **Speedtest** — latest result and a chart of the last 20 tests (download, upload, ping on hover)
+  from SpeedTracker (read-only — it never triggers a test)
 - **System** — OS, kernel, architecture, host, cores, uptime and last boot
 - **Disk health** — SMART temperatures and sector errors when the smartmon exporter is installed
 - **Grafana** — embed any panel; with an API token it renders server-side, no iframe cookies
@@ -201,7 +204,7 @@ are authoritative.
 ```
 browser ──── one SSE stream (/api/stream) ────┐
                                               ▼
-                              Next.js server routes (36)
+                              Next.js server routes (37)
         ┌────────────┬──────────────┬─────────┴───────┬──────────────┐
    Prometheus   *arr / Plex /   SpeedTracker      MikroTik      open-meteo
    (~30 PromQL) Pi-hole / … (10)  (read-only)      (REST)       (weather)
@@ -221,12 +224,12 @@ browser ──── one SSE stream (/api/stream) ────┐
 
 | Layer | Choice |
 |---|---|
-| Framework | Next.js 16 (App Router, 7 pages, 33 components) |
+| Framework | Next.js 16 (App Router, 7 pages, 34 components) |
 | Language | TypeScript 6 |
 | Styling | Tailwind CSS 3, CSS variables for the two themes |
 | Charts | Inline SVG and Canvas, no chart library |
 | Runtime | Node 22 in a multi-stage Docker image |
-| Tests | Vitest (300 unit tests) and Playwright (end-to-end) |
+| Tests | Vitest (311 unit tests) and Playwright (end-to-end) |
 
 ---
 
@@ -252,7 +255,7 @@ end-to-end suite as a separate job. Architecture notes and conventions live in
 ```
 .
 ├── app/
-│   ├── api/                 36 server routes — metrics, services, stream (SSE), alerts,
+│   ├── api/                 37 server routes — metrics, services, stream (SSE), alerts,
 │   │                        history, insights, config, test-connection, docker, smart, …
 │   ├── components/          StatusSummary, ServicesPanel, PageHeader, SettingsPanel,
 │   │                        primitives (Card, Sparkline, gauges), …

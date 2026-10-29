@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 // ── lib imports ──────────────────────────────────────────────────────────────
 import { THEMES, SVC_PORTS, normalizeTheme } from "@/app/lib/constants";
 import type {
-  Metrics, Settings, SpeedtestResult, SpeedtestRaw,
+  Metrics, Settings, SpeedtestResult, SpeedtestRaw, SpeedtestPoint,
   ServiceResult, ActivityEvent, ForecastDay, ClientConfig, SearchEngine,
 } from "@/app/lib/types";
 import {
@@ -38,7 +38,8 @@ import { MikrotikTab } from "@/app/components/MikrotikTab";
 import { GrafanaCard } from "@/app/components/GrafanaCard";
 import { ActivityFeed } from "@/app/components/ActivityFeed";
 import { ComingUp } from "@/app/components/ComingUp";
-import { NetworkChart } from "@/app/components/NetworkChart";
+import { NowPlaying } from "@/app/components/NowPlaying";
+import { NetworkChart, MirroredChart } from "@/app/components/NetworkChart";
 import { CpuThreads, busiestThreads } from "@/app/components/CpuThreads";
 import { FilesystemsBody } from "@/app/components/FilesystemsBody";
 import { DraggableCard } from "@/app/components/DraggableCard";
@@ -53,6 +54,7 @@ import { HeaderSparklines } from "@/app/components/HeaderSparklines";
 import { CommandPalette, type CommandAction } from "@/app/components/CommandPalette";
 import { DiskHealthPanel } from "@/app/components/DiskHealthPanel";
 import { StatusSummary, collectIssues } from "@/app/components/StatusSummary";
+import { useIncidents } from "@/app/components/IncidentStrip";
 import { useTabStatus } from "@/app/hooks/useTabStatus";
 import { seedFromHistory, type SavedPoint } from "@/app/lib/history-seed";
 import { NetworkTopology } from "@/app/components/NetworkTopology";
@@ -157,7 +159,7 @@ export default function Dashboard() {
   const [clientConfig,       setClientConfig]       = useState<ClientConfig | null>(null);
   const [speedtestResults,    setSpeedtestResults]    = useState<SpeedtestResult[]>([]);
   const [speedtestLoading,    setSpeedtestLoading]    = useState(true);
-  const [speedtestHistory,    setSpeedtestHistory]    = useState<number[]>([]);
+  const [speedtestTests,      setSpeedtestTests]      = useState<SpeedtestPoint[]>([]);
   const [speedtestTotalTests, setSpeedtestTotalTests] = useState<number | null>(null);
 
   const demoMode = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("demo") === "1";
@@ -201,7 +203,10 @@ export default function Dashboard() {
       { ping: 9.1, download: 440, upload: 40, created_at: new Date(Date.now() - 3600000).toISOString(), timestamp: null, isp: "Telstra", jitter: 1.5, serverName: "Sydney", serverLocation: "Sydney, AU", serverHost: "speedtest.syd.example.com" },
     ]);
     setSpeedtestLoading(false);
-    setSpeedtestHistory([430, 445, 450, 440, 455, 448, 450]);
+    setSpeedtestTests([430, 445, 412, 440, 455, 398, 448, 461, 450, 437, 452, 450].map((download, i, a) => ({
+      ts: Date.now() - (a.length - 1 - i) * 4 * 3_600_000, download,
+      upload: Math.round(download * 0.093 * 10) / 10, ping: 7.5 + (i % 4) * 0.6,
+    })));
     setSpeedtestTotalTests(142);
     setActivityEvents([
       { type: "grabbed", title: "The Bear S04E08", source: "sonarr", timestamp: Date.now() - 300000, subtitle: "WEBDL-1080p" },
@@ -232,6 +237,10 @@ export default function Dashboard() {
       .catch(() => { /* charts just fill from live data, as before */ });
     return () => { cancelled = true; };
   }, [demoMode]);
+
+  // The collector's incident log, fetched once for the status line and the
+  // service rows' 24 h strips.
+  const incidentFeed = useIncidents(demoMode);
 
   // The browser tab mirrors the status summary: "2 issues · ComExe" + a dot.
   const tabIssues = useMemo(
@@ -333,7 +342,7 @@ export default function Dashboard() {
       const data = await res.json();
       const raw: SpeedtestRaw[] = data.results ?? [];
       setSpeedtestResults(raw.map(normalizeSpeedResult));
-      if (Array.isArray(data.history))    setSpeedtestHistory(data.history);
+      if (Array.isArray(data.tests))      setSpeedtestTests(data.tests);
       if (data.totalTests != null)        setSpeedtestTotalTests(data.totalTests);
     } catch {
       setSpeedtestResults([]);
@@ -418,10 +427,10 @@ export default function Dashboard() {
         break;
       }
       case "speedtest": {
-        const d = data as { results?: SpeedtestRaw[]; history?: number[]; totalTests?: number };
+        const d = data as { results?: SpeedtestRaw[]; tests?: SpeedtestPoint[]; totalTests?: number };
         const raw: SpeedtestRaw[] = d.results ?? [];
         setSpeedtestResults(raw.map(normalizeSpeedResult));
-        if (Array.isArray(d.history)) setSpeedtestHistory(d.history);
+        if (Array.isArray(d.tests)) setSpeedtestTests(d.tests);
         if (d.totalTests != null) setSpeedtestTotalTests(d.totalTests);
         setSpeedtestLoading(false);
         break;
@@ -846,7 +855,7 @@ export default function Dashboard() {
           {/* What needs attention, in one place: thresholds, down/auth/health
               problems across services, stale data, Prometheus exporters. */}
           <StatusSummary metrics={metrics} services={services} servicesUpdatedAt={servicesUpdatedAt}
-            clientConfig={clientConfig} demoMode={demoMode} />
+            clientConfig={clientConfig} demoMode={demoMode} incidents={incidentFeed} />
 
           {/* First-run setup banner */}
           {services && (() => {
@@ -1119,7 +1128,7 @@ export default function Dashboard() {
                             <div className="flex justify-between items-center">
                               <span className="text-xs" style={{ color: "var(--text-ghost)" }}>Temperature history</span>
                             </div>
-                            <Sparkline data={gpuTempHistory} color={metrics?.gpu?.temperature != null && metrics.gpu.temperature >= 70 ? tempColor(metrics.gpu.temperature) : "var(--accent-gpu)"} autoMax height={28} />
+                            <Sparkline data={gpuTempHistory} color={metrics?.gpu?.temperature != null && metrics.gpu.temperature >= 70 ? tempColor(metrics.gpu.temperature) : "var(--accent-gpu)"} fit height={28} />
                           </div>
                         )}
                         {isExpanded("gpu") && (() => {
@@ -1224,10 +1233,17 @@ export default function Dashboard() {
                               )}
                             </div>
                           )}
-                          {speedtestHistory.length >= 2 && (
+                          {speedtestTests.length >= 2 && (
                             <div className="flex flex-col gap-1">
-                              <span className="text-xs" style={{ color: "var(--text-ghost)" }}>Download history</span>
-                              <Sparkline data={speedtestHistory} color="var(--accent-speedtest)" height={40} />
+                              <span className="text-xs" style={{ color: "var(--text-ghost)" }}>Last {speedtestTests.length} tests</span>
+                              <MirroredChart
+                                up={{ values: speedtestTests.map(t => t.download), color: "var(--accent-speedtest)", arrow: "↓" }}
+                                down={{ values: speedtestTests.map(t => t.upload ?? 0), color: "var(--accent-network)", arrow: "↑" }}
+                                times={speedtestTests.map(t => t.ts)} height={84} floor={10} fill={false}
+                                fmt={v => `${v < 10 ? v.toFixed(1) : v.toFixed(0)} Mbps`}
+                                ariaLabel={`Download above the line, upload below, last ${speedtestTests.length} speedtests`}
+                                extra={i => speedtestTests[i]?.ping != null ? `ping ${speedtestTests[i].ping!.toFixed(1)} ms` : null}
+                              />
                             </div>
                           )}
                           <div className="flex items-center justify-between flex-wrap gap-1">
@@ -1327,49 +1343,9 @@ export default function Dashboard() {
             </div>
             <div className="dash-side">
               {/* ── Now playing ── */}
-              {(() => {
-                const tautulliSvc = services?.find(s => s.name === "tautulli");
-                const streams = tautulliSvc?.streams ?? [];
-                if (!streams.length) return null;
-                return (
-                  <div style={{
-                    background: "var(--card)", border: "1px solid var(--border)",
-                    borderRadius: 10, padding: 16,
-                  }}>
-                    <div className="flex items-center gap-2 mb-3">
-                      <span aria-hidden="true" style={{
-                        width: 7, height: 7, borderRadius: "50%", background: "var(--accent-speedtest)", flexShrink: 0,
-                      }} />
-                      <span style={{ fontSize: 13, color: "var(--text-muted)" }}>
-                        Now playing · {streams.length} stream{streams.length !== 1 ? "s" : ""}
-                      </span>
-                    </div>
-                    <div className="flex flex-col gap-3">
-                      {streams.map((st, i) => (
-                        <div key={i} className="flex flex-col gap-1.5">
-                          <div className="flex items-baseline justify-between gap-2">
-                            <span className="text-[12px] font-medium truncate" style={{ color: "var(--text-secondary)" }}>{st.title}</span>
-                            {st.posStr && <span className="text-xs tabular-nums font-mono shrink-0" style={{ color: "var(--text-faint)" }}>{st.posStr}</span>}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--text-faint)", flexShrink: 0 }}>
-                              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
-                            </svg>
-                            <span style={{ fontSize: 12, color: "var(--text-label)" }}>{st.user}</span>
-                          </div>
-                          <div style={{ height: 3, background: "var(--border-subtle)", borderRadius: 2 }}>
-                            <div style={{
-                              height: "100%", borderRadius: 2,
-                              width: `${Math.min(100, st.progress)}%`,
-                              background: "var(--data-strong)",
-                            }} />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })()}
+              <ErrorBoundary name="Now playing">
+                <NowPlaying streams={services?.find(s => s.name === "tautulli")?.streams ?? []} />
+              </ErrorBoundary>
 
               {/* ── services ── */}
               {isVisible("services") && (
@@ -1385,6 +1361,7 @@ export default function Dashboard() {
                     setLogsContainer={setLogsContainer}
                     restartingSvc={restartingSvc}
                     restartService={restartService}
+                    incidents={incidentFeed}
                   />
                 </ErrorBoundary>
               )}

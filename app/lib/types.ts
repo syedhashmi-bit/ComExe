@@ -110,7 +110,18 @@ export interface SpeedtestRaw {
 }
 
 export interface ServiceQueueItem { title: string; pct: number; etaSec?: number | null }
-export interface ServiceStream    { title: string; user: string; progress: number; posStr: string }
+export interface ServiceStream {
+  title: string; user: string; progress: number; posStr: string;
+  // Now playing detail from Tautulli's get_activity. All optional: older
+  // payloads and non-Tautulli callers don't have them.
+  art?:         string;                                    // Plex image path, shown via /api/plex-art
+  decision?:    "Direct play" | "Direct stream" | "Transcode";
+  hwTranscode?: boolean;                                   // GPU (NVENC/QSV) transcode
+  quality?:     string;                                    // "1080p", or "4K → 1080p" when transcoding
+  bitrateKbps?: number;
+  player?:      string;                                    // "Living room TV", "iPad"
+  paused?:      boolean;
+}
 export interface ServiceHealth    { warning: number; error: number; messages?: string[] }
 export interface ServiceWeekly    { plays?: number; topShow?: string; topUser?: string }
 export interface ServiceResult {
@@ -234,4 +245,12 @@ export interface CalendarFeed {
   sources:   { sonarr: "ok" | "error" | "unconfigured"; radarr: "ok" | "error" | "unconfigured" };
   items:     CalendarItem[];   // last 7 days through the next 7, oldest first
   timestamp: number;
+}
+
+// One SpeedTracker result for the Speedtest card's history chart (/api/speedtest).
+export interface SpeedtestPoint {
+  ts:       number;          // ms
+  download: number;          // Mbps
+  upload:   number | null;   // Mbps
+  ping:     number | null;   // ms
 }

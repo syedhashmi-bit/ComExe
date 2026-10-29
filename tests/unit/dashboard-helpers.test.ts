@@ -1,8 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { threadColumns, busiestThreads } from "@/app/components/CpuThreads";
-import { niceMax } from "@/app/components/NetworkChart";
+import { niceMax, spanLabel } from "@/app/components/NetworkChart";
+import { sparkRange } from "@/app/components/primitives";
+import { fmtMbps } from "@/app/components/NowPlaying";
 import { fmtDays, forecastSentence } from "@/app/components/FilesystemsBody";
-import { cellLevels } from "@/app/components/IncidentStrip";
+import { cellLevels, serviceUptime, fmtUptimePct } from "@/app/components/IncidentStrip";
 import { fmtDuration } from "@/app/lib/formatters";
 import { seedFromHistory, type SavedPoint } from "@/app/lib/history-seed";
 import { statusIcon, statusTitle } from "@/app/hooks/useTabStatus";
@@ -103,5 +105,57 @@ describe("tab status", () => {
     expect(decodeURIComponent(statusIcon("critical"))).toContain('fill="#f85149"');
     expect(decodeURIComponent(statusIcon("warning"))).toContain('fill="#d29922"');
     expect(statusIcon("warning")).toMatch(/^data:image\/svg\+xml,/);
+  });
+});
+
+describe("sparkRange", () => {
+  it("fits series that never go near zero, and centres a flat one", () => {
+    expect(sparkRange([10, 90], "pct")).toEqual([0, 100]);
+    expect(sparkRange([2, 8], "max")).toEqual([0, 8]);
+    const [lo, hi] = sparkRange([440, 450, 460], "fit");
+    expect(lo).toBeLessThan(440);
+    expect(hi).toBeGreaterThan(460);
+    expect(hi).toBeLessThan(500);                    // not a 0-based scale
+    const [flo, fhi] = sparkRange([45, 45, 45], "fit");
+    expect((flo + fhi) / 2).toBeCloseTo(45);         // flat line sits mid-height
+  });
+});
+
+describe("mirrored chart helpers", () => {
+  it("labels the time span and respects a lower axis floor", () => {
+    expect(spanLabel(10 * 60_000)).toBe("10 min ago");
+    expect(spanLabel(6 * 3_600_000)).toBe("6 h ago");
+    expect(spanLabel(4 * 86_400_000)).toBe("4 days ago");
+    expect(niceMax(452, 10)).toBe(500);              // Mbps, not bytes
+  });
+});
+
+describe("serviceUptime", () => {
+  const now = 1_700_000_000_000, H = 3_600_000;
+  const inc = (key: string, start: number, end: number | null, level: "warning" | "critical" = "critical") =>
+    ({ key, level, title: key, start, end });
+
+  it("marks down time red and health failures by level, and counts only down time", () => {
+    const u = serviceUptime([
+      inc("service:radarr:down", now - 10 * H, now - 10 * H + 12 * 60_000),
+      inc("service:radarr:health", now - 2 * H, now - H, "warning"),
+      inc("service:sonarr:down", now - 5 * H, null),
+    ], "radarr", now, now - 7 * 24 * H);
+    expect(u.cells).toHaveLength(48);
+    expect(u.cells.filter(c => c === "critical")).toHaveLength(1);
+    expect(u.cells.filter(c => c === "warning").length).toBeGreaterThan(0);
+    expect(fmtUptimePct(u.pct!)).toBe("99.2%");      // 12 min of 24 h
+  });
+
+  it("doesn't claim a day of uptime the log never watched", () => {
+    expect(serviceUptime([], "radarr", now, now - 20 * 60_000).pct).toBeNull();
+    expect(fmtUptimePct(serviceUptime([], "radarr", now, now - 3 * H).pct!)).toBe("100%");
+  });
+});
+
+describe("fmtMbps", () => {
+  it("reads bitrates the way players show them", () => {
+    expect(fmtMbps(8200)).toBe("8.2 Mbps");
+    expect(fmtMbps(18_000)).toBe("18 Mbps");
   });
 });
