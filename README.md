@@ -87,6 +87,8 @@ external state, no secrets in the browser: every upstream call goes through a se
 - **System** — OS, kernel, architecture, host, cores, uptime and last boot
 - **Disk health** — SMART temperatures and sector errors when the smartmon exporter is installed
 - **Grafana** — embed any panel; with an API token it renders server-side, no iframe cookies
+- **Last 24 hours** — CPU, memory, network and GPU across the day on the dashboard itself, with
+  the average, the peak and when it happened, and how much data moved
 
 ### Pages
 
@@ -224,12 +226,12 @@ browser ──── one SSE stream (/api/stream) ────┐
 
 | Layer | Choice |
 |---|---|
-| Framework | Next.js 16 (App Router, 7 pages, 34 components) |
+| Framework | Next.js 16 (App Router, 7 pages, 35 components) |
 | Language | TypeScript 6 |
 | Styling | Tailwind CSS 3, CSS variables for the two themes |
 | Charts | Inline SVG and Canvas, no chart library |
 | Runtime | Node 22 in a multi-stage Docker image |
-| Tests | Vitest (311 unit tests) and Playwright (end-to-end) |
+| Tests | Vitest (315 unit tests) and Playwright (end-to-end) |
 
 ---
 

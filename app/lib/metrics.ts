@@ -210,7 +210,12 @@ async function fetchMetrics(cfg: ResolvedConfig) {
   appendHistory({
     ts:       responseData.timestamp,
     cpu:      cpuUsed != null ? Math.round(cpuUsed * 10) / 10 : null,
-    mem:      r.memTotal && memUsed ? Math.round((memUsed / r.memTotal) * 1000) / 10 : null,
+    // The ZFS-aware figure the Memory card shows (total − available −
+    // SReclaimable). Points saved before Oct 2026 are total − available, a
+    // few % higher; they age out of the 30-day window.
+    mem:      r.memTotal && memUsed != null
+      ? Math.round((Math.max(0, memUsed - (r.memSReclaimable ?? 0)) / r.memTotal) * 1000) / 10
+      : null,
     net_rx:   Math.round(netRx),
     net_tx:   Math.round(netTx),
     gpu:      gpuUtil != null ? Math.round(gpuUtil * 10) / 10 : null,

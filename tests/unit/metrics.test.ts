@@ -69,6 +69,14 @@ describe("getMetrics — query-to-field mapping", () => {
     expect(m.cpuThreads).toEqual([0, 10, 75]);
   });
 
+  it("records the same ZFS-aware memory figure in history as the Memory card shows", async () => {
+    scalars["node_memory_MemTotal_bytes"] = 1000;
+    scalars["node_memory_MemAvailable_bytes"] = 400;
+    scalars["node_memory_SReclaimable_bytes"] = 50;
+    await (await load()).getMetrics();
+    expect(appendHistory).toHaveBeenCalledWith(expect.objectContaining({ mem: 55 })); // (1000 − 400 − 50) / 1000
+  });
+
   it("maps the GPU queries to the right fields, including ratio → percent", async () => {
     scalars["nvidia_smi_utilization_gpu_ratio"] = 0.42;
     scalars["nvidia_smi_temperature_gpu"] = 61;

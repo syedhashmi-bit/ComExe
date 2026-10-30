@@ -24,7 +24,7 @@ A single-user, LAN-only homelab dashboard for a TrueNAS Scale host. Next.js 16
 chart library. Every upstream service is reached through a server-side route so
 credentials never enter the browser bundle.
 
-**Scale:** ~15k lines of TS/TSX under `app/` — 37 API routes, 34 components,
+**Scale:** ~15k lines of TS/TSX under `app/` — 37 API routes, 35 components,
 30 lib modules, 7 pages.
 
 **Deployment posture:** one LAN, one user, never exposed to the internet. That
@@ -49,7 +49,7 @@ $env:PATH = "C:\Program Files\nodejs;" + $env:PATH
 npm run dev        # localhost:3000
 npm run build      # local sanity check; CI does the real build
 npm run lint
-npm test           # vitest, 311 unit tests
+npm test           # vitest, 315 unit tests
 npm run test:e2e   # playwright
 npm run storybook  # primitives sandbox on :6006
 ```
@@ -332,6 +332,8 @@ services are configured), `/login`, `/analytics` (interactive area charts over
 `NetworkChart` + `MirroredChart` (one series above the centre line, one below, each
 on its own scale, hover readout — network throughput and speedtest history),
 `NowPlaying` (posters, direct play / transcode / GPU, quality, bitrate),
+`TrendsCard` ("Last 24 hours": CPU / memory / network / GPU from `/api/history`,
+polled every 5 min, gaps left as gaps, links to /analytics),
 `CpuThreads` (per-thread heatmap from `metrics.cpuThreads`), `ComingUp` (the week's
 episodes and releases by day, plus aired-but-missing), `ServicesPanel`, `ServiceDetailSheet`, `BookmarksPanel`,
 `SettingsPanel`, `SearchBar`, `MikrotikTab`, `GrafanaCard`, `ActivityFeed`,
@@ -342,8 +344,8 @@ episodes and releases by day, plus aired-but-missing), `ServicesPanel`, `Service
 
 **Layout.** Below 1280px the dashboard is one column. From 1280px it widens
 (max 1560px) and splits in two — `.dash-columns` / `.dash-main` / `.dash-side`
-in `globals.css`: metric grid, system/Grafana, disk health and custom cards on
-the left; the media column on the right — Plex now-playing, services, recent
+in `globals.css`: metric grid, system/Grafana, disk health, Last 24 hours and
+custom cards on the left; the media column on the right — Plex now-playing, services, recent
 activity, then Coming up. The metric grid
 (`.metric-grid`) is `auto-fill, minmax(260px, 1fr)`, so it fills whatever width
 it gets; a full-width item inside it uses `.span-all`. Breakpoint rules live in
@@ -368,8 +370,9 @@ ComExe" and a warning/critical dot on the tab icon.
 
 **Sparklines** are in-memory buffers (60 samples) in `page.tsx`, filled on load
 from `/api/history?range=1h` via `lib/history-seed.ts` so a reload doesn't
-start them empty. Memory isn't seeded — `history.jsonl` stores total −
-available, the card charts the ZFS-aware total − available − SReclaimable.
+start them empty. Memory isn't seeded: `history.jsonl` stored total − available
+until Oct 2026 and the ZFS-aware total − available − SReclaimable (the card's
+figure) since, so the last hour can still mix the two.
 
 **Services panel** is a compact grouped list (`SVC_CATEGORIES` in
 `ServicesPanel.tsx`): *Media* (radarr, sonarr, bazarr, tautulli, qbittorrent,
@@ -588,7 +591,7 @@ collector), `HISTORY_RETENTION_DAYS`, `HISTORY_MAX_SIZE_MB`,
 
 ## Testing
 
-- **Unit** — vitest, `tests/unit/`. 311 tests over 27 files covering `app/lib/*`
+- **Unit** — vitest, `tests/unit/`. 315 tests over 27 files covering `app/lib/*`
   plus `tests/unit/routes/` for API route handlers.
 - **E2E** — Playwright, `tests/e2e/smoke.spec.ts`, run by its own CI job.
 - **Storybook** — `stories/Primitives.stories.tsx`.

@@ -8,6 +8,7 @@ import { cellLevels, serviceUptime, fmtUptimePct } from "@/app/components/Incide
 import { fmtDuration } from "@/app/lib/formatters";
 import { seedFromHistory, type SavedPoint } from "@/app/lib/history-seed";
 import { statusIcon, statusTitle } from "@/app/hooks/useTabStatus";
+import { summarize, transferred, trendPaths, type TrendPoint } from "@/app/components/TrendsCard";
 
 // Small pure helpers behind the CPU thread grid, the network chart, the
 // storage forecast and the incident strip.
@@ -157,5 +158,36 @@ describe("fmtMbps", () => {
   it("reads bitrates the way players show them", () => {
     expect(fmtMbps(8200)).toBe("8.2 Mbps");
     expect(fmtMbps(18_000)).toBe("18 Mbps");
+  });
+});
+
+describe("Last 24 hours card", () => {
+  const M = 60_000;
+  const p = (ts: number, over: Partial<TrendPoint> = {}): TrendPoint =>
+    ({ ts, cpu: null, mem: null, gpu: null, net_rx: null, net_tx: null, ...over });
+
+  it("summarizes the average and when the peak was", () => {
+    const s = summarize([p(0, { cpu: 10 }), p(5 * M, { cpu: 70 }), p(10 * M, { cpu: 40 }), p(15 * M)], "cpu");
+    expect(s).toEqual({ avg: 40, peak: 70, peakTs: 5 * M });
+    expect(summarize([p(0)], "gpu")).toBeNull();
+  });
+
+  it("adds up bytes moved, but not across a gap in the data", () => {
+    const t = transferred([
+      p(0,      { net_rx: 1000, net_tx: 100 }),
+      p(5 * M,  { net_rx: 1000, net_tx: 100 }),
+      p(65 * M, { net_rx: 1000, net_tx: 100 }),   // an hour with nothing recorded
+    ]);
+    expect(t).toEqual({ rx: 1000 * 300, tx: 100 * 300 });   // only the first 5 min counts
+  });
+
+  it("breaks the line where the data stops instead of bridging it", () => {
+    const from = 0, W = 600, H = 150, DAY = 86_400_000;
+    const { line } = trendPaths([
+      p(DAY / 2, { cpu: 50 }), p(DAY / 2 + 5 * M, { cpu: 50 }),
+      p(DAY / 2 + 3 * 3_600_000, { cpu: 20 }), p(DAY / 2 + 3 * 3_600_000 + 5 * M, { cpu: 20 }),
+    ], "cpu", from, W, H);
+    expect(line.match(/M/g)).toHaveLength(2);       // two runs, not one
+    expect(line.startsWith("M300.0,")).toBe(true);   // placed on a 24 h axis, not stretched
   });
 });

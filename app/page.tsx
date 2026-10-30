@@ -39,6 +39,7 @@ import { GrafanaCard } from "@/app/components/GrafanaCard";
 import { ActivityFeed } from "@/app/components/ActivityFeed";
 import { ComingUp } from "@/app/components/ComingUp";
 import { NowPlaying } from "@/app/components/NowPlaying";
+import { TrendsCard } from "@/app/components/TrendsCard";
 import { NetworkChart, MirroredChart } from "@/app/components/NetworkChart";
 import { CpuThreads, busiestThreads } from "@/app/components/CpuThreads";
 import { FilesystemsBody } from "@/app/components/FilesystemsBody";
@@ -1332,6 +1333,13 @@ export default function Dashboard() {
               {isVisible("system") && (
                 <ErrorBoundary name="Disk health">
                   <DiskHealthPanel />
+                </ErrorBoundary>
+              )}
+
+              {/* ── the day at a glance, from saved history ── */}
+              {isVisible("trends") && (
+                <ErrorBoundary name="Last 24 hours">
+                  <TrendsCard du={du} />
                 </ErrorBoundary>
               )}
 
