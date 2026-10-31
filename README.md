@@ -85,7 +85,9 @@ external state, no secrets in the browser: every upstream call goes through a se
 - **Speedtest** — latest result and a chart of the last 20 tests (download, upload, ping on hover)
   from SpeedTracker (read-only — it never triggers a test)
 - **System** — OS, kernel, architecture, host, cores, uptime and last boot
-- **Disk health** — SMART temperatures and sector errors when the smartmon exporter is installed
+- **Disk health** — every drive in one table, problems first: temperature against warm/hot limits
+  suited to disks or NVMe, age, bad sectors and the last 24 hours; click a drive for its week and
+  every SMART reading (needs the smartmon script — see INSTALL.md)
 - **Grafana** — embed any panel; with an API token it renders server-side, no iframe cookies
 - **Last 24 hours** — CPU, memory, network and GPU across the day on the dashboard itself, with
   the average, the peak and when it happened, and how much data moved
@@ -262,7 +264,7 @@ end-to-end suite as a separate job. Architecture notes and conventions live in
 │   ├── components/          StatusSummary, ServicesPanel, PageHeader, SettingsPanel,
 │   │                        primitives (Card, Sparkline, gauges), …
 │   ├── hooks/               useEventStream (SSE with polling fallback), usePolling
-│   ├── lib/                 31 shared modules — config resolution, http + circuit
+│   ├── lib/                 32 shared modules — config resolution, http + circuit
 │   │                        breaker, caches, collector, alerts, formatters, …
 │   ├── analytics/ forecast/ logs/ setup/ welcome/ login/
 │   ├── globals.css          Theme tokens (Midnight, Paper) and layout

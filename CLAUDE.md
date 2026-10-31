@@ -25,7 +25,7 @@ chart library. Every upstream service is reached through a server-side route so
 credentials never enter the browser bundle.
 
 **Scale:** ~15k lines of TS/TSX under `app/` — 37 API routes, 35 components,
-30 lib modules, 7 pages.
+32 lib modules, 7 pages.
 
 **Deployment posture:** one LAN, one user, never exposed to the internet. That
 decision is why auth is optional, why RBAC/multi-user was dropped, and why the
@@ -49,7 +49,7 @@ $env:PATH = "C:\Program Files\nodejs;" + $env:PATH
 npm run dev        # localhost:3000
 npm run build      # local sanity check; CI does the real build
 npm run lint
-npm test           # vitest, 316 unit tests
+npm test           # vitest, 327 unit tests
 npm run test:e2e   # playwright
 npm run storybook  # primitives sandbox on :6006
 ```
@@ -591,7 +591,7 @@ collector), `HISTORY_RETENTION_DAYS`, `HISTORY_MAX_SIZE_MB`,
 
 ## Testing
 
-- **Unit** — vitest, `tests/unit/`. 316 tests over 27 files covering `app/lib/*`
+- **Unit** — vitest, `tests/unit/`. 327 tests over 27 files covering `app/lib/*`
   plus `tests/unit/routes/` for API route handlers.
 - **E2E** — Playwright, `tests/e2e/smoke.spec.ts`, run by its own CI job.
 - **Storybook** — `stories/Primitives.stories.tsx`.
@@ -627,6 +627,15 @@ needed. Two gotchas:
 when it isn't installed. smartmon.sh reports NVMe drives' health only, so the
 smart route takes their temperature from `node_hwmon_temp_celsius{chip="nvme_*",sensor="temp1"}`
 and model from `node_nvme_info` — for drives smartmon already lists, never on their own.
+The Disk health panel is a table: each drive's temperature on a shared 20–80 °C
+scale (warm/hot from 50/55 °C for disks, 70/80 °C for NVMe), age, bad sectors and
+a 24 h line (`/api/smart` adds half-hourly history, cached 5 min, and
+`readAt` from `smartmon_smartctl_run` — older than 30 min reads as "the cron job
+may have stopped"). Rows sort problems first, then warmest; part numbers become
+"WD Red 8 TB" via `lib/drive-names.ts` (WD and Seagate; unknown models stay as-is).
+Clicking a row opens `/api/smart?device=/dev/sda`: 7 days of temperatures and every
+SMART attribute, cached 5 min per drive. The device is matched against
+`/^/dev/[a-z][a-z0-9]{1,15}$/` before it goes anywhere near a PromQL label matcher.
 
 **Memory accounting** — TrueNAS ZFS ARC inflates raw `MemAvailable`. Use
 `MemTotal - MemAvailable - SReclaimable` as real-used. Warn >93%, critical >97%

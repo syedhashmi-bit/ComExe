@@ -247,6 +247,28 @@ body {
 .cpu-thread-num { display: none; }
 @container (min-width: 20px) { .cpu-thread-num { display: inline; } }
 
+/* Disk health table (DiskHealthPanel): five columns on a wide card, four
+   (no 24 h line) on a medium one, and just drive, temperature and bad sectors
+   on a phone. Container queries, so it follows the card's width wherever the
+   card sits. */
+.disk-table { container-type: inline-size; }
+.disk-row {
+  display: grid;
+  grid-template-columns: 180px minmax(150px, 1fr) 110px 100px 170px;
+  column-gap: 16px;
+  align-items: center;
+}
+.disk-row-click { border-radius: 6px; transition: background 0.15s ease; }
+.disk-row-click:hover { background: var(--card-hover); }
+@container (max-width: 780px) {
+  .disk-row { grid-template-columns: 180px minmax(150px, 1fr) 110px 100px; }
+  .disk-col-spark { display: none !important; }
+}
+@container (max-width: 600px) {
+  .disk-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr) auto; column-gap: 12px; }
+  .disk-col-age { display: none !important; }
+}
+
 /* Sparkline empty-state shimmer — used while we have <2 data points. */
 @keyframes sparklineShimmer {
   0%   { background-position: 100% 0; }

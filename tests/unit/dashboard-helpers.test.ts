@@ -9,6 +9,9 @@ import { fmtDuration } from "@/app/lib/formatters";
 import { seedFromHistory, type SavedPoint } from "@/app/lib/history-seed";
 import { statusIcon, statusTitle } from "@/app/hooks/useTabStatus";
 import { summarize, transferred, trendPaths, type TrendPoint } from "@/app/components/TrendsCard";
+import { tempLimits, scalePct, diskErrors, fmtAge, sortDisks, attrLabel } from "@/app/components/DiskHealthPanel";
+import { friendlyDriveName } from "@/app/lib/drive-names";
+import type { SmartDisk } from "@/app/lib/types";
 
 // Small pure helpers behind the CPU thread grid, the network chart, the
 // storage forecast and the incident strip.
@@ -189,5 +192,76 @@ describe("Last 24 hours card", () => {
     ], "cpu", from, W, H);
     expect(line.match(/M/g)).toHaveLength(2);       // two runs, not one
     expect(line.startsWith("M300.0,")).toBe(true);   // placed on a 24 h axis, not stretched
+  });
+});
+
+describe("Disk health table", () => {
+  const disk = (over: Partial<SmartDisk> = {}): SmartDisk => ({
+    device: "/dev/sda", kind: "sata", model: "WD", serial: "", temperature: 40, powerOnHours: 1000,
+    reallocatedSectors: 0, pendingSectors: 0, uncorrectableSectors: 0, healthy: true, history: [], ...over,
+  });
+
+  it("uses drive-appropriate warm and hot limits", () => {
+    expect(tempLimits("sata")).toEqual({ warn: 50, crit: 55 });
+    expect(tempLimits("nvme")).toEqual({ warn: 70, crit: 80 });
+    expect(scalePct(20)).toBe(0);
+    expect(scalePct(50)).toBe(50);
+    expect(scalePct(95)).toBe(100);
+  });
+
+  it("totals bad sectors and says when a drive doesn't report them", () => {
+    expect(diskErrors(disk()).total).toBe(0);
+    expect(diskErrors(disk({ reallocatedSectors: 8, pendingSectors: 1 }))).toEqual({ total: 9, detail: "8 reallocated · 1 pending · 0 uncorrectable" });
+    expect(diskErrors(disk({ reallocatedSectors: null, pendingSectors: null, uncorrectableSectors: null })))
+      .toEqual({ total: null, detail: "Not reported" });
+  });
+
+  it("writes ages in years once a drive is past one", () => {
+    expect(fmtAge(62_200)).toBe("7.1 years");
+    expect(fmtAge(2_400)).toBe("100 days");
+  });
+});
+
+describe("friendlyDriveName", () => {
+  it("reads family and size out of WD and Seagate part numbers", () => {
+    expect(friendlyDriveName("WDC WD60PURZ-85ZUFY1")).toBe("WD Purple 6 TB");
+    expect(friendlyDriveName("WDC WD40EFPX-68C6CN0")).toBe("WD Red Plus 4 TB");
+    expect(friendlyDriveName("WDC WD80EFAX-68KNBN0")).toBe("WD Red 8 TB");
+    expect(friendlyDriveName("WDC WD101KFBX-68R56N0")).toBe("WD Red Pro 10 TB");
+    expect(friendlyDriveName("WDC WD4003FFBX-68MU3N0")).toBe("WD Red Pro 4 TB");
+    expect(friendlyDriveName("WDC WD10EZEX-08WN4A0")).toBe("WD Blue 1 TB");
+    expect(friendlyDriveName("ST4000VN008-2DR166")).toBe("Seagate IronWolf 4 TB");
+    expect(friendlyDriveName("ST16000NM001G-2KK103")).toBe("Seagate Exos 16 TB");
+  });
+
+  it("leaves anything it doesn't recognise alone", () => {
+    expect(friendlyDriveName("CUSU CV3500Q 512GB")).toBeNull();
+    expect(friendlyDriveName("WDC WD40ZZZZ-00")).toBeNull();
+    expect(friendlyDriveName("")).toBeNull();
+  });
+});
+
+describe("Disk health ordering and labels", () => {
+  const disk = (device: string, over: Partial<SmartDisk> = {}): SmartDisk => ({
+    device, kind: "sata", model: "WD", serial: "", temperature: 40, powerOnHours: 1000,
+    reallocatedSectors: 0, pendingSectors: 0, uncorrectableSectors: 0, healthy: true, history: [], ...over,
+  });
+
+  it("puts problems first, then the warmest, then by name", () => {
+    const order = sortDisks([
+      disk("/dev/sda", { temperature: 40 }),
+      disk("/dev/sdb", { temperature: 46 }),
+      disk("/dev/sdc", { temperature: 52 }),                       // warm
+      disk("/dev/sdd", { temperature: 38, pendingSectors: 2 }),    // bad sectors
+      disk("/dev/nvme0", { kind: "nvme", temperature: 60 }),       // fine for NVMe
+      disk("/dev/sde", { temperature: 40 }),
+    ]).map(d => d.device);
+    expect(order).toEqual(["/dev/sdd", "/dev/sdc", "/dev/nvme0", "/dev/sdb", "/dev/sda", "/dev/sde"]);
+  });
+
+  it("names SMART attributes readably, and copes with unknown ones", () => {
+    expect(attrLabel("reallocated_sector_ct")).toBe("Reallocated sectors");
+    expect(attrLabel("udma_crc_error_count")).toBe("Cable / interface errors");
+    expect(attrLabel("head_flying_hours")).toBe("Head flying hours");
   });
 });

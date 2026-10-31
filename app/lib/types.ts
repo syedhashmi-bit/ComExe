@@ -254,3 +254,34 @@ export interface SpeedtestPoint {
   upload:   number | null;   // Mbps
   ping:     number | null;   // ms
 }
+
+// /api/smart — one drive in the Disk health panel.
+export interface SmartDisk {
+  device:               string;                         // "/dev/sda", "/dev/nvme0"
+  kind:                 "nvme" | "sata" | "sas" | null; // from smartmon's `type` label
+  model:                string;
+  serial:               string;
+  temperature:          number | null;                  // °C
+  powerOnHours:         number | null;
+  reallocatedSectors:   number | null;
+  pendingSectors:       number | null;
+  uncorrectableSectors: number | null;
+  healthy:              boolean;
+  history:              number[];                       // °C over the last 24 h, oldest first
+}
+
+export interface SmartFeed {
+  disks:     SmartDisk[];
+  readAt:    number | null;   // ms: when the SMART script last ran (smartmon_smartctl_run)
+  timestamp: number;
+  error?:    string;
+}
+
+// /api/smart?device=/dev/sda — one drive in detail, for the panel's expanded row.
+export interface SmartDetail {
+  device:     string;
+  attributes: { id: number | null; name: string; value: number }[];  // e.g. { 5, "reallocated_sector_ct", 0 }
+  firmware:   string | null;
+  serial:     string | null;
+  history:    { ts: number; value: number }[];                        // °C over 7 days, oldest first
+}
