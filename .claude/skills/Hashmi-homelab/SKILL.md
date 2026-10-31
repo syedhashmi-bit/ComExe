@@ -1,6 +1,6 @@
 ---
 name: Hashmi-homelab
-description: Apply Syed Hashmi's homelab context, stack conventions, and communication preferences when answering ANY dev or infrastructure question. Use this skill broadly — whenever the user asks about code, Docker, networking, terminal commands, TrueNAS, Next.js, the homelab dashboard, or any of the running services (Plex, *arr stack, Grafana, Pi-hole, etc.). Trigger even when the user doesn't explicitly mention their setup, because their environment (TrueNAS Scale at 192.168.88.196, MikroTik router, Windows PC with Claude Code, Next.js 15 dashboard) determines the correct answer. Apply this skill for command syntax choice (PowerShell vs bash), code style (TypeScript, server-side routes), Docker patterns (docker run, --network host), and response style (concise, direct, no fluff).
+description: Apply Syed Hashmi's homelab context, stack conventions, and communication preferences when answering ANY dev or infrastructure question. Use this skill broadly — whenever the user asks about code, Docker, networking, terminal commands, TrueNAS, Next.js, the homelab dashboard, or any of the running services (Plex, *arr stack, Grafana, Pi-hole, etc.). Trigger even when the user doesn't explicitly mention their setup, because their environment (TrueNAS Scale at 192.168.88.196, MikroTik router, Windows PC with Claude Code, Next.js 16 dashboard ComExe) determines the correct answer. Apply this skill for command syntax choice (PowerShell vs bash), code style (TypeScript, server-side routes), Docker patterns (docker run, --network host), and response style (concise, direct, no fluff).
 ---
 
 # Hashmi Homelab Context
@@ -18,20 +18,20 @@ This skill captures the user's homelab environment, stack conventions, and commu
 - **Network**: flat `192.168.88.0/24`, local-only access for now (Cloudflare Tunnel planned)
 
 ### Primary Project
-- **Repo**: `syedhashmi-bit/homelab-dashboard` (GitHub)
-- **Stack**: Next.js 15, T
+- **ComExe** — repo `syedhashmi-bit/ComExe` (GitHub), image `ghcr.io/syedhashmi-bit/comexe:latest`
+- **Stack**: Next.js 16 (App Router), React 19, TypeScript, Tailwind 3
 
-### Paths
-- **Dashboard repo on TrueNAS**: `/mnt/Pool/Media/homelab-dashboard`
-- **Update script on TrueNAS**: `/root/update-dashboard.sh` (wraps `git pull` + docker rebuild)
+### How ComExe runs on TrueNAS
+- A TrueNAS **custom app** named `comexe` (Apps → Install via YAML; container `ix-comexe-comexe-1`)
+- Settings, including every service credential, in `/root/comexe-data/config.json`, written by the `/setup` wizard
+- The image is built by GitHub Actions, never on TrueNAS
 
 ### Update Workflow
 1. Edit code on Windows PC (Claude Code)
-2. `git push` from PC
-3. SSH / open TrueNAS Shell
-4. Run `/root/update-dashboard.sh`
+2. `git push` from PC — CI tests, builds and publishes the image
+3. TrueNAS: **Apps → comexe → Update** (TrueNAS checks once a day; `midclt call app.image.op.check_update 2>/dev/null || midclt call app.image.check_update` checks now)
 
-Never suggest Docker Compose for the dashboard or other one-off containers — the user prefers `docker run`. If a service genuinely benefits from compose (multi-container with internal networking), say so explicitly and let them decide.
+For one-off containers the user prefers `docker run` over Docker Compose. ComExe itself is the exception: it runs as a TrueNAS app (compose YAML) so it shows and updates in Apps — the user's choice. If another service genuinely benefits from compose (multi-container with internal networking), say so explicitly and let them decide.
 
 ### Running Services on TrueNAS
 Media: Plex, Radarr, Sonarr, Bazarr, Tautulli, Prowlarr, qBittorrent, Overseerr, Cleanuparr
@@ -64,7 +64,7 @@ Use these exact metric names in PromQL — do not invent variations.
 - **Sensitive credentials → server-side Next.js API routes** (`app/api/.../route.ts`). Never put API keys, tokens, or service URLs with auth in client components or `NEXT_PUBLIC_*` env vars.
 - **Comments in code blocks** should be brief and explain *why*, not *what*.
 - **Node 22**, **npm** (not pnpm/yarn/bun).
-- **Next.js 15 App Router** patterns — server components by default, `'use client'` only when needed.
+- **Next.js 16 App Router** patterns — server components by default, `'use client'` only when needed.
 
 ## Terminal Command Conventions
 
@@ -78,26 +78,13 @@ git push origin main
 
 **On TrueNAS Shell (bash):**
 ```bash
-/root/update-dashboard.sh
+docker logs --tail 50 ix-comexe-comexe-1
 ```
 ````
 
 - **Windows PC tasks** → PowerShell syntax (`$env:VAR`, `Set-Location`, backticks for line continuation, etc.)
-- **TrueNAS tasks** → bash/zsh syntax
+- **TrueNAS tasks** → bash/zsh syntax (the root shell is zsh)
 - **Docker commands always run on TrueNAS Shell**, never on the PC.
-
-For the dashboard specifically, the canonical rebuild command on TrueNAS is:
-```bash
-docker stop homelab-dashboard 2>/dev/null
-docker rm homelab-dashboard 2>/dev/null
-cd /mnt/Pool/Media/homelab-dashboard && git pull
-docker build -t homelab-dashboard .
-docker run -d --name homelab-dashboard --network host --restart unless-stopped \
-  -e PLEX_TOKEN=xxx \
-  -e SONARR_API_KEY=xxx \
-  homelab-dashboard
-```
-(But the user usually just runs `/root/update-dashboard.sh` which wraps this.)
 
 ## Communication Style
 
@@ -120,29 +107,19 @@ JSON with title, user, and progress percentage.
 
 ## Secrets & Env Vars
 
-**Always inject secrets at `docker run` time using `-e` flags. Never bake secrets into the Docker image.**
+**Secrets are supplied at runtime. Never bake them into the Docker image.**
 
 - On the PC during dev: secrets live in `.env.local` (gitignored)
-- On TrueNAS at runtime: pass each secret via `-e VAR=value` on `docker run`
+- ComExe on TrueNAS: the `/setup` wizard saves them to `config.json` in the app's data folder; anything else goes under `environment:` in the app's YAML
+- Other containers on TrueNAS: pass each secret via `-e VAR=value` on `docker run`
 - The Dockerfile must NOT `COPY .env.local` or set secret values via `ENV`
-- Public/non-secret config (e.g. `NEXT_PUBLIC_*`, port numbers) can be baked in
-
-Example:
-```bash
-docker run -d --name homelab-dashboard --network host --restart unless-stopped \
-  -e PLEX_TOKEN=xxx \
-  -e SONARR_API_KEY=xxx \
-  -e RADARR_API_KEY=xxx \
-  homelab-dashboard
-```
-
-The `/root/update-dashboard.sh` script holds the actual values and is the source of truth — when adding a new secret, it must be added there.
+- Public/non-secret config (e.g. port numbers) can be baked in
 
 ## Defaults to Assume
 
 When the user doesn't specify, assume:
-- They're asking about the homelab dashboard project unless context says otherwise
-- New widgets/features go in the dashboard repo
+- They're asking about ComExe unless context says otherwise
+- New widgets/features go in the ComExe repo
 - Service URLs use `http://192.168.88.196:<port>` on the LAN
-- Secrets are injected via `-e` on `docker run`, not baked into the image
+- Secrets are supplied at runtime (wizard config, app YAML, or `docker run -e`), not baked into the image
 - Any monitoring data already has a Prometheus exporter — check before suggesting they install something new

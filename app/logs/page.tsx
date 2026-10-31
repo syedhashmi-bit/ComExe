@@ -441,7 +441,8 @@ function DockerSetup() {
         ))}
       </ol>
       <p style={{ fontSize: 12, color: "var(--text-faint)", lineHeight: 1.6, marginTop: 14 }}>
-        On TrueNAS, <span style={code}>update-dashboard.sh --enable-docker</span> adds all three and keeps them on later updates.
+        In a TrueNAS app&apos;s YAML these are <span style={code}>environment</span>, <span style={code}>volumes</span> and <span style={code}>group_add</span> (INSTALL.md has the snippet);
+        with <span style={code}>update-dashboard.sh</span>, <span style={code}>--enable-docker</span> adds all three.
         The socket is root-equivalent: only the dashboard&apos;s known services (plus <span style={code}>COMEXE_DOCKER_ALLOW</span>) can be read or restarted.
       </p>
     </div>

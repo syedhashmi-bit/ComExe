@@ -138,10 +138,13 @@ falls back to generating a `docker-compose.yml` / `docker run` snippet for you t
 
 ### Updating
 
-[`scripts/update-dashboard.sh`](scripts/update-dashboard.sh) is a health-gated updater: it pulls
-the new image, starts it as a candidate on a spare port, only replaces the running container once
-the candidate is healthy, keeps the previous image tagged `:rollback`, and makes sure `/app/data`
-is on a host mount so nothing you configured is lost.
+Installed as a TrueNAS app (Install via YAML — see [INSTALL.md](INSTALL.md)), ComExe updates like
+any other app: the Apps page shows **Update** once a new image is published.
+
+For a plain `docker run` install, [`scripts/update-dashboard.sh`](scripts/update-dashboard.sh) is a
+health-gated updater: it pulls the new image, starts it as a candidate on a spare port, only
+replaces the running container once the candidate is healthy, keeps the previous image tagged
+`:rollback`, and makes sure `/app/data` is on a host mount so nothing you configured is lost.
 
 ### Configuration
 
@@ -271,7 +274,7 @@ end-to-end suite as a separate job. Architecture notes and conventions live in
 │   └── page.tsx             Dashboard
 ├── instrumentation.ts       Starts the background collector
 ├── proxy.ts                 Auth and hostname guard
-├── scripts/update-dashboard.sh   Health-gated updater for TrueNAS
+├── scripts/update-dashboard.sh   Health-gated updater for docker run installs
 ├── docs/screenshots/        README images (captured from demo mode)
 ├── Dockerfile               Multi-stage build
 └── INSTALL.md · CLAUDE.md · .env.local.example

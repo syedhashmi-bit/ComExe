@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # ── ComExe health-gated deploy ───────────────────────────────────────────────
-# Drop-in replacement for /root/update-dashboard.sh on TrueNAS.
+# For ComExe run as a plain `docker run` container named "comexe". Installed
+# as a TrueNAS app (Install via YAML), TrueNAS manages the container: update
+# it from the Apps page instead — this script refuses to touch it.
 #
 # The old script was `docker pull && docker stop && docker rm && docker run`.
 # If the new image was broken the old container was already gone — downtime
@@ -56,7 +58,15 @@ for arg in "$@"; do
   esac
 done
 
-docker inspect "$NAME" >/dev/null 2>&1 || die "Container '$NAME' not found. Deploy it once by hand first."
+if ! docker inspect "$NAME" >/dev/null 2>&1; then
+  # A TrueNAS app runs as compose project ix-<app> (container ix-comexe-comexe-1).
+  # Replacing that container from here would fight TrueNAS's own management.
+  if [ -n "$(docker ps -aq --filter label=com.docker.compose.project=ix-comexe)" ]; then
+    die "ComExe runs as the TrueNAS app 'comexe' — update it from Apps. To check for a new image now:
+    midclt call app.image.op.check_update 2>/dev/null || midclt call app.image.check_update"
+  fi
+  die "Container '$NAME' not found. Deploy it once by hand first."
+fi
 
 # Reuse the running container's env so secrets live in exactly one place (the
 # container) instead of being duplicated into this script. Image-level vars are

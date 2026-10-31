@@ -675,7 +675,7 @@ export default function Dashboard() {
             <a href={`${versionInfo.repoUrl}/commits/main`} target="_blank" rel="noopener noreferrer"
               style={{ color: "#0a0c12", textDecoration: "underline", fontWeight: 700 }}>
               {versionInfo.latest?.slice(0, 7)}
-            </a>. Run <code style={{ fontFamily: "monospace" }}>update-dashboard.sh</code> to pull.
+            </a>. Update it from TrueNAS Apps, or pull the new image.
           </span>
           <button onClick={() => {
             setUpdateDismissed(true);

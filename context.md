@@ -1,6 +1,6 @@
 # Project Context
 
-Infrastructure inventory. **Env var names only — no plaintext secrets.** Real values live in `.env.local` (gitignored) on the PC and in `/root/update-dashboard.sh` on TrueNAS.
+Infrastructure inventory. **Env var names only — no plaintext secrets.** Real values live in `.env.local` (gitignored) on the PC and, on TrueNAS, in `config.json` in the app's data folder (written by the `/setup` wizard).
 
 ## Always read first
 - `CLAUDE.md` — architecture + hard rules (authoritative)
@@ -153,7 +153,8 @@ Only mounts under `/mnt/Pool/Media/` displayed. Excluded fstypes (filtered at Pr
 | Location | Role |
 |----------|------|
 | `.env.local` (PC, gitignored) | Local dev — Next.js loads automatically |
-| `/root/update-dashboard.sh` (TrueNAS) | Production — passes `-e VAR=value` to `docker run` |
+| `data/config.json` (TrueNAS app's data folder) | Production — written by the `/setup` wizard; takes precedence over env |
+| TrueNAS app YAML (Apps → comexe → Edit) | Production env vars, if any (`environment:`) |
 | Repo / Dockerfile | **Never.** No `COPY .env*`, no `ENV` for secret values |
 | `.env.local.example` (PC, tracked) | Template — env var names + placeholder values, no real secrets |
 
@@ -161,5 +162,5 @@ When adding a new secret:
 1. Add env var name to the appropriate table above.
 2. Add a row to `.env.local.example` with a placeholder.
 3. Add to `.env.local` on PC with the real value.
-4. Add `-e NEW_VAR=value` to `/root/update-dashboard.sh` on TrueNAS.
-5. Read it server-side only via `process.env.NEW_VAR` in an API route — never in a client component, never via `NEXT_PUBLIC_*`.
+4. Set it on TrueNAS: through the `/setup` wizard if it has a field there, otherwise under `environment:` in the app's YAML.
+5. Read it server-side only, through `loadConfig()` inside the handler — never in a client component, never via `NEXT_PUBLIC_*`.

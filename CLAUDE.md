@@ -65,12 +65,23 @@ git commit -m "..."
 git push
 ```
 
+Production runs as a **TrueNAS custom app** named `comexe` (Apps → Install via
+YAML; container `ix-comexe-comexe-1`), so it updates like any other app: once
+CI publishes, the Apps page shows **Update**. TrueNAS checks custom apps'
+`:latest` digest against GHCR once a day, and only with Apps → Configuration →
+Settings → "Check for docker image updates" on. To check now:
+
 ```bash
-/root/update-dashboard.sh
+midclt call app.image.op.check_update 2>/dev/null || midclt call app.image.check_update
 ```
 
-`scripts/update-dashboard.sh` is the canonical version of that script — copy it
-to `/root/` on TrueNAS. It is **health-gated**: pulls the new image, starts it
+The app's YAML holds only `COMEXE_DOCKER_ENABLED`, the `/app/data` mount, the
+Docker socket and its `group_add`; service credentials live in
+`data/config.json`, written by the `/setup` wizard. TrueNAS gives custom apps a
+placeholder icon; INSTALL.md → "App icon" has the unofficial metadata edit.
+
+`scripts/update-dashboard.sh` is for **plain `docker run`** installs — it
+refuses to touch a TrueNAS app install. It is **health-gated**: pulls the new image, starts it
 as a candidate container on a spare port, waits for the Docker `HEALTHCHECK` to
 report healthy, and only then promotes it. A failed candidate leaves the running
 container untouched and exits non-zero. The previous image is retagged
@@ -490,10 +501,12 @@ restart fail for every TrueNAS container. Restart excludes ComExe itself.
 `/api/docker/containers` lists only allowed containers and names the rest.
 Keep both the env gate and the allowlist on any new Docker-touching route.
 
-The image runs as uid 1001, so the socket also needs `--group-add <socket gid>`.
-`update-dashboard.sh --enable-docker` adds the env var, the mount and the group
-once; the script carries `HostConfig.GroupAdd` over on every update (it
-didn't, so a hand-added group vanished on the first update).
+The image runs as uid 1001, so the socket also needs the socket's group: in a
+TrueNAS app or compose file that's `group_add`, with `docker run` it's
+`--group-add`. For `docker run` installs, `update-dashboard.sh --enable-docker`
+adds the env var, the mount and the group once; the script carries
+`HostConfig.GroupAdd` over on every update (it didn't, so a hand-added group
+vanished on the first update).
 
 ---
 
@@ -501,8 +514,10 @@ didn't, so a hand-added group vanished on the first update).
 
 Server-side only. **Never** prefix with `NEXT_PUBLIC_` — that bakes the value
 into the client bundle and forces a rebuild to change it. All listed in
-`.env.local.example`. Production values live in `/root/update-dashboard.sh` on
-TrueNAS as `-e` flags. Never hardcoded in source, never in the image.
+`.env.local.example`. In production most values come from `data/config.json`
+(the `/setup` wizard), which takes precedence over env; anything set as env
+goes in the TrueNAS app's YAML (or `-e` flags for a `docker run` install).
+Never hardcoded in source, never in the image.
 
 **Required for anything meaningful:** `TRUENAS_IP` (default `192.168.88.196`),
 plus API keys for whichever services you use.

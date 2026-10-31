@@ -2,7 +2,7 @@
 
 Three install paths, in order from "easiest" to "most flexible":
 
-1. **TrueNAS Scale Custom App** — point-and-click via the TrueNAS web UI
+1. **TrueNAS Scale app** — Install via YAML in the TrueNAS web UI; shows in **Apps** and updates from there
 2. **Docker Compose** — for any homelab Docker host
 3. **Plain `docker run`** — for the command-line type
 
@@ -59,9 +59,70 @@ The **`-v ./dashboard-data:/app/data`** mount is what makes Save & apply work. S
 
 ---
 
-## Path 1 — TrueNAS Scale Custom App (UI)
+## Path 1 — TrueNAS Scale app
 
-Works on TrueNAS Scale 24.10 (Electric Eel) and later.
+Works on TrueNAS Scale 24.10 (Electric Eel) and later. ComExe shows in **Apps** like any
+other app, and the Apps page offers **Update** when a new image is published (see
+[Updating](#updating)).
+
+1. In the TrueNAS shell, make a folder for ComExe's settings, owned by the image's user (uid 1001):
+
+   ```bash
+   mkdir -p /mnt/Pool/Configs/comexe-data && chown -R 1001:1001 /mnt/Pool/Configs/comexe-data
+   ```
+
+2. **Apps** → **Discover Apps** → **⋮** (top right) → **Install via YAML**.
+3. **Name**: `comexe`. Lowercase letters, digits and dashes only; `ComExe` is rejected.
+4. **Custom Config**: paste this, with your own data path:
+
+   ```yaml
+   services:
+     comexe:
+       image: ghcr.io/syedhashmi-bit/comexe:latest
+       restart: unless-stopped
+       network_mode: host
+       volumes:
+         - "/mnt/Pool/Configs/comexe-data:/app/data"
+   ```
+
+5. **Save**, then open **http://&lt;truenas-ip&gt;:3000/setup** and fill in your services. The
+   wizard saves keys and passwords to the data folder, so the YAML holds no secrets.
+
+To configure with environment variables instead of the wizard, add an `environment:` block
+under `comexe:`. Quote each value, and write a literal `$` as `$$` (compose expands `$`):
+
+```yaml
+    environment:
+      TRUENAS_IP: "192.168.88.196"
+      RADARR_API_KEY: "your-radarr-key"
+```
+
+For the Logs page and restart buttons, see
+[Container logs and restarts](#container-logs-and-restarts-optional).
+
+### App icon (optional, unofficial)
+
+TrueNAS gives every custom app the same placeholder icon and has no setting for it. Adding an
+icon to the app's metadata works: it survives edits and updates, and is lost if the app is
+deleted and reinstalled.
+
+```bash
+cp /mnt/.ix-apps/app_configs/comexe/metadata.yaml /root/comexe-metadata.yaml.bak
+python3 - <<'EOF'
+import yaml
+p = '/mnt/.ix-apps/app_configs/comexe/metadata.yaml'
+d = yaml.safe_load(open(p))
+d['metadata']['icon'] = 'https://cdn.jsdelivr.net/gh/syedhashmi-bit/ComExe@main/app/icon.svg'
+yaml.safe_dump(d, open(p, 'w'))
+EOF
+midclt call -j app.metadata.generate 2>/dev/null || midclt call -j app.metadata_generate
+```
+
+Then reload the Apps page. (The last command's name differs between TrueNAS releases, so it
+tries both.) If comexe shows an error afterwards, copy the backup back over the metadata file
+and run that last command again.
+
+### Using the Custom App form instead
 
 1. **Apps** → **Discover Apps** → top-right click **Custom App**
 2. **Application Name**: `comexe`
@@ -276,7 +337,20 @@ socket. They're off until the container gets three things:
 --group-add $(stat -c %g /var/run/docker.sock)   # the image runs as uid 1001
 ```
 
-On TrueNAS with `update-dashboard.sh`, one run adds all three and later updates keep them:
+In a TrueNAS app or Docker Compose, the same three go under the service (merge them into any
+`environment:` and `volumes:` you already have):
+
+```yaml
+    environment:
+      COMEXE_DOCKER_ENABLED: "1"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    group_add:
+      - "999"   # the socket's group id: stat -c %g /var/run/docker.sock
+```
+
+With a plain `docker run` container and `scripts/update-dashboard.sh`, one run adds all three and
+later updates keep them:
 
 ```bash
 /root/update-dashboard.sh --enable-docker
@@ -292,12 +366,24 @@ socket is root-equivalent, which is why this is opt-in.
 
 ## Updating
 
-Pull the latest image and re-run:
+**TrueNAS app:** when a new image is published, comexe shows **Update** in **Apps**; click it.
+TrueNAS checks once a day, and only while **Apps → Configuration → Settings → Check for docker
+image updates** is ticked. To check straight away (the method's name differs between TrueNAS
+releases, so this tries both):
 
 ```bash
-docker pull ghcr.io/syedhashmi-bit/comexe:latest
-docker compose up -d         # or run your update-dashboard.sh script
+midclt call app.image.op.check_update 2>/dev/null || midclt call app.image.check_update
 ```
+
+**Docker Compose:**
+
+```bash
+docker compose pull && docker compose up -d
+```
+
+**Plain `docker run`:** [`scripts/update-dashboard.sh`](scripts/update-dashboard.sh) (copy it to
+`/root/`) pulls the new image, starts it beside the old one, and only swaps once it's healthy,
+keeping the previous image tagged `:rollback`.
 
 GitHub Actions builds a new `:latest` image on every push to the repo's `main` branch. You can also pin to a specific version (`:v1.2.3`) or short SHA (`:sha-abc1234`) for stability.
 

@@ -264,9 +264,11 @@ git commit -m "..."
 git push
 ```
 
+Then on TrueNAS, once CI has published: **Apps → comexe → Update**. TrueNAS
+only checks once a day; to check now:
+
 ```bash
-# TrueNAS (bash) — pulls latest image, restarts container
-/root/update-dashboard.sh
+midclt call app.image.op.check_update 2>/dev/null || midclt call app.image.check_update
 ```
 
 Why CI not local Docker: `next build` SIGSEGV'd non-deterministically on the TrueNAS host but works reliably on Ubuntu runners. See `memory.md` → "Build moved off Docker" for the diagnostic trail.
@@ -316,10 +318,10 @@ Cache the read result for ~60s so we're not hitting disk per-request.
 
 ## Env vars
 
-All credentials are server-side `process.env.*`. Never hardcoded, never `NEXT_PUBLIC_`. See `context.md` for the full table and `.env.local.example` for the template.
+All credentials are server-side, resolved through `loadConfig()` (wizard config, then `process.env.*`, then defaults). Never hardcoded, never `NEXT_PUBLIC_`. See `context.md` for the full table and `.env.local.example` for the template.
 
 When adding a new credential:
-1. `process.env.NEW_VAR ?? ""` in the relevant route
+1. Add it to `lib/server-config.ts` and read it via `loadConfig()` inside the handler — never `process.env` at module scope
 2. Add to `.env.local.example` with placeholder
 3. Add to `.env.local` (gitignored) for local dev
-4. Add `-e NEW_VAR='...'` line to `/root/update-dashboard.sh` on TrueNAS
+4. On TrueNAS, set it in the `/setup` wizard if it has a field, otherwise under `environment:` in the app's YAML
