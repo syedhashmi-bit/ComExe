@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { withAlpha } from "@/app/lib/formatters";
 
 // ── ContainerLogsSheet ───────────────────────────────────────────────────────
 // Side-sheet that shows the last 200 lines of a container's logs. Tail-follow
@@ -71,7 +72,7 @@ export function ContainerLogsSheet({ containerName, onClose }: { containerName: 
 
         {loading && <div className="text-xs" style={{ color: "var(--text-faint)" }}>loading logs…</div>}
         {error && (
-          <div style={{ fontSize: 12, color: "var(--critical)", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 6, padding: "8px 10px" }}>
+          <div style={{ fontSize: 12, color: "var(--critical)", background: withAlpha("var(--critical)", 8), border: `1px solid ${withAlpha("var(--critical)", 30)}`, borderRadius: 6, padding: "8px 10px" }}>
             {error}
           </div>
         )}
