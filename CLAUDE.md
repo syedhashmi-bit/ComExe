@@ -49,7 +49,7 @@ $env:PATH = "C:\Program Files\nodejs;" + $env:PATH
 npm run dev        # localhost:3000
 npm run build      # local sanity check; CI does the real build
 npm run lint
-npm test           # vitest, 327 unit tests
+npm test           # vitest, 340 unit tests
 npm run test:e2e   # playwright
 npm run storybook  # primitives sandbox on :6006
 ```
@@ -479,9 +479,21 @@ range cutoff rather than parsing the whole file.
 ### Docker control (opt-in)
 
 `/api/docker/*` is disabled unless `COMEXE_DOCKER_ENABLED=1`, because the socket
-is root-equivalent. Container names are checked against a built-in allowlist
-(the known service names) plus `COMEXE_DOCKER_ALLOW`. Keep both the env gate and
-the allowlist on any new Docker-touching route.
+is root-equivalent. Everything goes through `lib/docker.ts`: `findContainer(name)`
+resolves a container name (the Logs page) or an app name (the services panel
+sends "radarr", "overseerr") to a container, and `isAllowedContainer` checks the
+**resolved** container's app against the built-in allowlist plus
+`COMEXE_DOCKER_ALLOW`. TrueNAS apps are compose projects `ix-<app>` — Radarr is
+`ix-radarr-radarr-1` beside a one-shot `ix-radarr-permissions-1` — so the app
+comes from the compose labels; exact-name matching used to make logs and
+restart fail for every TrueNAS container. Restart excludes ComExe itself.
+`/api/docker/containers` lists only allowed containers and names the rest.
+Keep both the env gate and the allowlist on any new Docker-touching route.
+
+The image runs as uid 1001, so the socket also needs `--group-add <socket gid>`.
+`update-dashboard.sh --enable-docker` adds the env var, the mount and the group
+once; the script carries `HostConfig.GroupAdd` over on every update (it
+didn't, so a hand-added group vanished on the first update).
 
 ---
 
@@ -591,7 +603,7 @@ collector), `HISTORY_RETENTION_DAYS`, `HISTORY_MAX_SIZE_MB`,
 
 ## Testing
 
-- **Unit** — vitest, `tests/unit/`. 327 tests over 27 files covering `app/lib/*`
+- **Unit** — vitest, `tests/unit/`. 340 tests over 27 files covering `app/lib/*`
   plus `tests/unit/routes/` for API route handlers.
 - **E2E** — Playwright, `tests/e2e/smoke.spec.ts`, run by its own CI job.
 - **Storybook** — `stories/Primitives.stories.tsx`.
@@ -609,8 +621,9 @@ needed. Two gotchas:
 > **Remaining gap:** route coverage is mostly the security-critical paths (the
 > Grafana SSRF guard, the Content-Type guard on all 13 write handlers), plus
 > `lib/metrics.ts` (field mapping, ZFS pool maths), `lib/services.ts`
-> (unconfigured short-circuit, stale fallback) and the collector. Still
-> untested: `insights`'s z-score/regression maths and the Docker allowlists.
+> (unconfigured short-circuit, stale fallback), the collector and the Docker
+> routes (app-name resolution, allowlist). Still untested: `insights`'s
+> z-score/regression maths.
 >
 > Shared state lives on `globalThis` (see "Background collector"), which
 > `vi.resetModules()` does not clear — call `resetGlobalSingletons()` from

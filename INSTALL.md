@@ -265,6 +265,31 @@ the panel takes their temperature and model from node-exporter's own
 
 ---
 
+## Container logs and restarts (optional)
+
+The **Logs** page and the services panel's Logs / restart buttons read the Docker
+socket. They're off until the container gets three things:
+
+```bash
+-e COMEXE_DOCKER_ENABLED=1
+-v /var/run/docker.sock:/var/run/docker.sock
+--group-add $(stat -c %g /var/run/docker.sock)   # the image runs as uid 1001
+```
+
+On TrueNAS with `update-dashboard.sh`, one run adds all three and later updates keep them:
+
+```bash
+/root/update-dashboard.sh --enable-docker
+```
+
+Only the services ComExe knows about can be read or restarted (Radarr, Sonarr, Seerr,
+Plex, Pi-hole, Nginx Proxy Manager, Uptime Kuma, Prometheus, Grafana, node-exporter, …).
+TrueNAS apps are matched by app name, so `ix-radarr-radarr-1` counts as `radarr`. Add
+others by app or container name: `-e COMEXE_DOCKER_ALLOW=kavita,audiobookshelf`. The
+socket is root-equivalent, which is why this is opt-in.
+
+---
+
 ## Updating
 
 Pull the latest image and re-run:

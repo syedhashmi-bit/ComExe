@@ -6,9 +6,20 @@ import { PageHeader, PageTitle } from "@/app/components/PageHeader";
 interface ContainerInfo {
   id: string;
   name: string;
+  app: string;
+  service: string | null;
   image: string;
   state: string;
   status: string;
+}
+
+// "ix-radarr-radarr-1" → "radarr", "ix-radarr-permissions-1" → "radarr · permissions".
+// Falls back to the container name when two would read the same.
+function containerLabels(list: ContainerInfo[]): Map<string, string> {
+  const label = (c: ContainerInfo) => (!c.service || c.service === c.app ? c.app : `${c.app} · ${c.service}`);
+  const seen = new Map<string, number>();
+  for (const c of list) seen.set(label(c), (seen.get(label(c)) ?? 0) + 1);
+  return new Map(list.map(c => [c.name, seen.get(label(c))! > 1 ? c.name : label(c)]));
 }
 
 interface LogLine {
@@ -36,12 +47,22 @@ function extractTimestamp(line: string): string | null {
   return null;
 }
 
+// Docker prefixes every line with its own RFC 3339 timestamp (the route asks
+// for timestamps=true), so each line showed its time twice. Show it once, in
+// local time, and keep the line's own text.
+const DOCKER_TS = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(\.\d+)?Z /;
+const TS_FMT: Intl.DateTimeFormatOptions = { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false };
+
 function parseLogs(raw: string): LogLine[] {
-  return raw.split("\n").filter(l => l.trim()).map(text => ({
-    text,
-    level: detectLevel(text),
-    ts: extractTimestamp(text),
-  }));
+  return raw.split("\n").filter(l => l.trim()).map(line => {
+    const m = line.match(DOCKER_TS);
+    const text = m ? line.slice(m[0].length) : line;
+    return {
+      text,
+      level: detectLevel(text),
+      ts: m ? new Date(`${m[1]}Z`).toLocaleString([], TS_FMT) : extractTimestamp(text),
+    };
+  });
 }
 
 const LEVEL_COLORS: Record<LogLine["level"], string> = {
@@ -62,6 +83,8 @@ const LEVEL_OPTIONS: { key: LevelFilter; label: string }[] = [
 
 export default function LogsPage() {
   const [containers, setContainers] = useState<ContainerInfo[]>([]);
+  const [hidden, setHidden] = useState<string[]>([]);
+  const [disabled, setDisabled] = useState(false);
   const [selected, setSelected] = useState<string>("");
   const [logs, setLogs] = useState<LogLine[]>([]);
   const [loading, setLoading] = useState(false);
@@ -80,7 +103,9 @@ export default function LogsPage() {
       .then(r => r.json())
       .then(d => {
         if (d.containers) setContainers(d.containers);
-        if (d.message) setError(d.message);
+        if (d.hidden) setHidden(d.hidden);
+        if (d.disabled) setDisabled(true);
+        else if (d.message) setError(d.message);
       })
       .catch(e => setError(e.message));
   }, []);
@@ -143,8 +168,10 @@ export default function LogsPage() {
     debug: logs.filter(l => l.level === "debug").length,
   };
 
-  const running = containers.filter(c => c.state === "running");
-  const stopped = containers.filter(c => c.state !== "running");
+  const labels = containerLabels(containers);
+  const byLabel = (a: ContainerInfo, b: ContainerInfo) => labels.get(a.name)!.localeCompare(labels.get(b.name)!);
+  const running = containers.filter(c => c.state === "running").sort(byLabel);
+  const stopped = containers.filter(c => c.state !== "running").sort(byLabel);
 
   return (
     <div style={{ background: "var(--bg)", minHeight: "100vh", color: "var(--text)" }}>
@@ -164,14 +191,14 @@ export default function LogsPage() {
             {running.length > 0 && (
               <optgroup label="Running">
                 {running.map(c => (
-                  <option key={c.id} value={c.name}>{c.name}</option>
+                  <option key={c.id} value={c.name}>{labels.get(c.name)}</option>
                 ))}
               </optgroup>
             )}
             {stopped.length > 0 && (
               <optgroup label="Stopped">
                 {stopped.map(c => (
-                  <option key={c.id} value={c.name}>{c.name}</option>
+                  <option key={c.id} value={c.name}>{labels.get(c.name)}</option>
                 ))}
               </optgroup>
             )}
@@ -235,7 +262,7 @@ export default function LogsPage() {
             <input
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Search logs... (regex supported)"
+              placeholder="Search logs…"
               style={{
                 width: "100%", fontSize: 12, background: "var(--card)",
                 color: "var(--text)", border: "1px solid var(--border-mid)",
@@ -281,7 +308,9 @@ export default function LogsPage() {
 
       {/* Log output */}
       <div className="px-3 sm:px-6 pb-8" style={{ maxWidth: 1560, margin: "0 auto" }}>
-        {!selected ? (
+        {disabled ? (
+          <DockerSetup />
+        ) : !selected ? (
           <div className="flex flex-col items-center justify-center gap-3" style={{ height: 400, color: "var(--text-ghost)" }}>
             <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
@@ -293,6 +322,11 @@ export default function LogsPage() {
                 : `${containers.length} container${containers.length !== 1 ? "s" : ""} available`
               }
             </span>
+            {hidden.length > 0 && (
+              <span style={{ fontSize: 12, maxWidth: 480, textAlign: "center", lineHeight: 1.6 }}>
+                Not in the allowlist: {hidden.join(", ")}. Add names to <span className="font-mono">COMEXE_DOCKER_ALLOW</span> to open their logs here.
+              </span>
+            )}
           </div>
         ) : loading && logs.length === 0 ? (
           <div className="flex items-center justify-center" style={{ height: 400, color: "var(--text-ghost)", fontSize: 12 }}>
@@ -350,7 +384,7 @@ export default function LogsPage() {
                           </td>
                           {line.ts && (
                             <td style={{
-                              padding: "2px 8px", whiteSpace: "nowrap",
+                              padding: "2px 8px", whiteSpace: "nowrap", width: 1,
                               color: "var(--text-ghost)", fontSize: 12,
                               verticalAlign: "top", fontVariantNumeric: "tabular-nums",
                             }}>
@@ -379,6 +413,37 @@ export default function LogsPage() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// Shown when the server has no Docker access: what to add to the container.
+function DockerSetup() {
+  // No ligatures: JetBrains Mono joins "--" into one long dash, and these get copied.
+  const code = { fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text)", fontVariantLigatures: "none" };
+  const steps: [string, React.ReactNode][] = [
+    ["Turn it on", <span key="e" style={code}>-e COMEXE_DOCKER_ENABLED=1</span>],
+    ["Mount the socket", <span key="v" style={code}>-v /var/run/docker.sock:/var/run/docker.sock</span>],
+    ["Let uid 1001 open it", <span key="g" style={code}>--group-add $(stat -c %g /var/run/docker.sock)</span>],
+  ];
+  return (
+    <div style={{ maxWidth: 620, margin: "48px auto", background: "var(--card)", border: "1px solid var(--border)", borderRadius: 10, padding: 20 }}>
+      <div style={{ fontSize: 16, color: "var(--text)", fontWeight: 600 }}>Docker access is off</div>
+      <p style={{ fontSize: 13, color: "var(--text-muted)", lineHeight: 1.6, marginTop: 6 }}>
+        Logs and the services panel&apos;s restart buttons read the Docker socket, which ComExe only opens when asked to.
+        Add these to the container&apos;s <span style={code}>docker run</span>:
+      </p>
+      <ol style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+        {steps.map(([label, value], i) => (
+          <li key={label} className="flex flex-wrap items-baseline gap-x-3 gap-y-1" style={{ fontSize: 13, color: "var(--text-muted)" }}>
+            <span style={{ minWidth: 150 }}>{i + 1}. {label}</span>{value}
+          </li>
+        ))}
+      </ol>
+      <p style={{ fontSize: 12, color: "var(--text-faint)", lineHeight: 1.6, marginTop: 14 }}>
+        On TrueNAS, <span style={code}>update-dashboard.sh --enable-docker</span> adds all three and keeps them on later updates.
+        The socket is root-equivalent: only the dashboard&apos;s known services (plus <span style={code}>COMEXE_DOCKER_ALLOW</span>) can be read or restarted.
+      </p>
     </div>
   );
 }

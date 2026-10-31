@@ -4,10 +4,10 @@
 // the dashboard works fine on hosts where it isn't mounted.
 //
 // Security note: the Docker socket is root-equivalent. The /api/docker/*
-// routes enforce a container-name allowlist (only the configured service
-// names) so an attacker who reaches the dashboard can't `exec` into arbitrary
-// containers or pull arbitrary images. That's not a substitute for putting
-// the dashboard behind auth before exposing it.
+// routes enforce an allowlist (only the configured service names) so an
+// attacker who reaches the dashboard can't read or restart arbitrary
+// containers. That's not a substitute for putting the dashboard behind auth
+// before exposing it.
 
 import http from "node:http";
 
@@ -40,29 +40,104 @@ function request(opts: { method: string; path: string; query?: Record<string, st
   });
 }
 
-// Engine API "name" filter requires exact match including leading slash, but
-// most users think of the container by its bare name. Match either form.
-export async function findContainer(name: string): Promise<{ id: string; name: string; state: string; image: string } | null> {
-  const trimmed = name.replace(/^\//, "");
-  // Raw JSON: request() URL-encodes every query value. Encoding it here as
-  // well sent `%257B…`, which the daemon rejected, so every lookup returned
-  // null and logs/restart answered "not found" for every container.
-  const filters = JSON.stringify({ name: [trimmed] });
-  const r = await request({ method: "GET", path: "/containers/json", query: { all: "true", filters } });
-  if (r.status !== 200) return null;
-  const list = JSON.parse(r.body) as Array<{ Id: string; Names: string[]; State: string; Image: string }>;
-  // /containers/json name filter is substring — narrow to exact match
-  for (const c of list) {
-    if (c.Names.some(n => n.replace(/^\//, "") === trimmed)) {
-      return { id: c.Id, name: c.Names[0]?.replace(/^\//, "") ?? trimmed, state: c.State, image: c.Image };
-    }
-  }
-  return null;
+// What a socket failure means, for whoever reads it in the UI. The image runs
+// as uid 1001, so a mounted socket it can't open is the usual first failure.
+export function socketHint(e: unknown): string {
+  const err = e as NodeJS.ErrnoException;
+  if (err?.code === "ENOENT") return `No Docker socket at ${DOCKER_SOCK}. Mount it into the container: -v /var/run/docker.sock:/var/run/docker.sock`;
+  if (err?.code === "EACCES") return `ComExe can't open ${DOCKER_SOCK}. The container runs as uid 1001: add --group-add with the socket's group id (stat -c %g ${DOCKER_SOCK}).`;
+  return `Docker socket error: ${err?.message ?? String(e)}`;
 }
 
-export async function restartContainer(name: string): Promise<{ ok: boolean; status: number; message: string }> {
-  const c = await findContainer(name);
-  if (!c) return { ok: false, status: 404, message: `Container "${name}" not found` };
+export interface Container {
+  id:      string;
+  name:    string;
+  app:     string;          // what the allowlist and the services panel call it
+  service: string | null;   // compose service, e.g. "radarr" or "permissions"
+  image:   string;
+  state:   string;
+  status:  string;
+  created: number;
+}
+
+// TrueNAS Scale runs each app as a compose project named "ix-<app>": Radarr is
+// "ix-radarr-radarr-1", beside one-shot helpers like "ix-radarr-permissions-1".
+// Matching only exact container names meant "radarr" found nothing and the
+// allowlist turned away every real name. Other compose stacks are known by
+// their service name, plain containers by their own.
+export function appOf(name: string, labels: Record<string, string> = {}): { app: string; service: string | null } {
+  const project = labels["com.docker.compose.project"] ?? "";
+  const service = labels["com.docker.compose.service"] || null;
+  if (project.startsWith("ix-")) return { app: project.slice(3), service };
+  return { app: service ?? name, service };
+}
+
+interface RawContainer { Id: string; Names?: string[]; Image?: string; State?: string; Status?: string; Created?: number; Labels?: Record<string, string> | null }
+
+export async function listContainers(): Promise<Container[]> {
+  const r = await request({ method: "GET", path: "/containers/json", query: { all: "true" } });
+  if (r.status !== 200) throw new Error(r.body.trim() || `Docker API answered HTTP ${r.status}`);
+  return (JSON.parse(r.body) as RawContainer[]).map(c => {
+    const name = c.Names?.[0]?.replace(/^\//, "") ?? c.Id.slice(0, 12);
+    return {
+      id: c.Id, name, ...appOf(name, c.Labels ?? {}),
+      image: c.Image ?? "", state: c.State ?? "", status: c.Status ?? "", created: c.Created ?? 0,
+    };
+  }).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+// ── Allowlist ────────────────────────────────────────────────────────────────
+// The services the dashboard knows about, by app name. Restart leaves out
+// ComExe itself. COMEXE_DOCKER_ALLOW (comma-separated app or container names)
+// extends both.
+const BUILTIN_ALLOW = new Set([
+  "radarr", "sonarr", "bazarr", "tautulli", "qbittorrent", "prowlarr",
+  "overseerr", "seerr", "jellyseerr",
+  "plex",
+  "pihole", "pi-hole",
+  "nginx", "nginx-proxy-manager", "npm",
+  "uptime-kuma", "uptimekuma",
+  "grafana", "prometheus", "node-exporter",
+  "speedtracker", "speedtest-tracker",
+  "comexe",
+]);
+
+export function isAllowedContainer(c: Pick<Container, "name" | "app">, opts: { restart?: boolean } = {}): boolean {
+  const extra = (process.env.COMEXE_DOCKER_ALLOW ?? "").split(",").map(s => s.trim()).filter(Boolean);
+  return [c.app, c.name].some(n =>
+    extra.includes(n) || (BUILTIN_ALLOW.has(n) && !(opts.restart && n === "comexe")));
+}
+
+// Services-panel names whose app goes by something else.
+const APP_ALIASES: Record<string, string[]> = {
+  overseerr:  ["overseerr", "seerr", "jellyseerr"],
+  nginx:      ["nginx-proxy-manager", "nginx", "npm"],
+  uptimekuma: ["uptime-kuma", "uptimekuma"],
+  pihole:     ["pihole", "pi-hole"],
+};
+
+const HELPER = /^(permissions|init|upgrade|migrat)/;
+
+// The container a name refers to: an exact container name first (the Logs
+// page sends those), else the main container of that app (the services panel
+// sends "radarr" or "overseerr", not "ix-seerr-seerr-1"). Pure.
+export function pickContainer(list: Container[], name: string): Container | null {
+  const want = name.replace(/^\//, "");
+  const exact = list.find(c => c.name === want);
+  if (exact) return exact;
+  const apps = APP_ALIASES[want] ?? [want];
+  const score = (c: Container) =>
+    (c.state === "running" ? 4 : 0) +
+    (c.service == null || c.service === c.app || apps.includes(c.service) ? 2 : 0) +
+    (c.service && HELPER.test(c.service) ? 0 : 1);
+  return list.filter(c => apps.includes(c.app)).sort((a, b) => score(b) - score(a))[0] ?? null;
+}
+
+export async function findContainer(name: string): Promise<Container | null> {
+  return pickContainer(await listContainers(), name);
+}
+
+export async function restartContainer(c: Container): Promise<{ ok: boolean; status: number; message: string }> {
   const r = await request({ method: "POST", path: `/containers/${c.id}/restart`, query: { t: 10 } });
   if (r.status >= 200 && r.status < 300) return { ok: true, status: r.status, message: `Restarted ${c.name}` };
   return { ok: false, status: r.status, message: r.body || `Restart failed (HTTP ${r.status})` };
@@ -89,9 +164,7 @@ function demuxDockerLog(buf: Buffer): string {
   return parts.join("");
 }
 
-export async function containerLogs(name: string, tail = 200): Promise<{ ok: boolean; status: number; logs?: string; message?: string }> {
-  const c = await findContainer(name);
-  if (!c) return { ok: false, status: 404, message: `Container "${name}" not found` };
+export async function containerLogs(c: Container, tail = 200): Promise<{ ok: boolean; status: number; logs?: string; message?: string; container?: string }> {
   // A non-numeric ?tail= used to reach the daemon as `tail=NaN`.
   const lines = Number.isFinite(tail) ? Math.min(Math.max(Math.trunc(tail), 1), 5000) : 200;
   return new Promise(resolve => {
@@ -107,13 +180,13 @@ export async function containerLogs(name: string, tail = 200): Promise<{ ok: boo
       res.on("end", () => {
         const buf = Buffer.concat(chunks);
         if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
-          resolve({ ok: true, status: res.statusCode, logs: demuxDockerLog(buf) });
+          resolve({ ok: true, status: res.statusCode, logs: demuxDockerLog(buf), container: c.name });
         } else {
           resolve({ ok: false, status: res.statusCode ?? 0, message: buf.toString("utf8") || "Logs fetch failed" });
         }
       });
     });
-    req.on("error",   e => resolve({ ok: false, status: 0, message: e.message }));
+    req.on("error",   e => resolve({ ok: false, status: 0, message: socketHint(e) }));
     req.on("timeout", () => { req.destroy(); resolve({ ok: false, status: 0, message: "docker socket timeout" }); });
     req.end();
   });
