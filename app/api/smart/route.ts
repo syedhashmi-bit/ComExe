@@ -48,7 +48,12 @@ export async function GET() {
     // every disk. Device model and serial live as LABELS on one
     // smartmon_device_info series (device_model / serial_number); filtering
     // it on smart_id, which that series never has, matched nothing.
-    const [tempResults, powerOnResults, reallocResults, pendingResults, uncorrResults, healthResults, infoResults] = await Promise.all([
+    //
+    // NVMe drives: smartmon.sh reports only their health and serial — no
+    // attributes, and an empty device_model. node_exporter's own collectors
+    // fill in what they can: the kernel's composite temperature sensor
+    // (hwmon chip "nvme_nvme0", sensor temp1) and the model (node_nvme_info).
+    const [tempResults, powerOnResults, reallocResults, pendingResults, uncorrResults, healthResults, infoResults, nvmeTempResults, nvmeInfoResults] = await Promise.all([
       queryAll("smartmon_temperature_celsius_raw_value"),
       queryAll("smartmon_power_on_hours_raw_value"),
       queryAll("smartmon_reallocated_sector_ct_raw_value"),
@@ -56,6 +61,8 @@ export async function GET() {
       queryAll("smartmon_offline_uncorrectable_raw_value"),
       queryAll("smartmon_device_smart_healthy"),
       queryAll("smartmon_device_info"),
+      queryAll(`node_hwmon_temp_celsius{chip=~"nvme_.+",sensor="temp1"}`),
+      queryAll("node_nvme_info"),
     ]);
 
     const temps = buildDiskMap(tempResults);
@@ -76,7 +83,20 @@ export async function GET() {
       if (serial) serialMap.set(dev, serial);
     }
 
+    // The drives smartmon reports. node_exporter's NVMe metrics below only fill
+    // gaps for these; on their own they don't mean disk health is set up.
     const allDevices = new Set([...temps.keys(), ...powerOn.keys(), ...realloc.keys(), ...healthMap.keys()]);
+
+    // Keyed like smartmon's disk label: chip "nvme_nvme0" / device "nvme0" → "/dev/nvme0".
+    for (const r of nvmeTempResults) {
+      const dev = r.metric.chip ? `/dev/${r.metric.chip.replace(/^nvme_/, "")}` : "";
+      if (dev && !temps.has(dev) && isFinite(r.value)) temps.set(dev, Math.round(r.value));
+    }
+    for (const r of nvmeInfoResults) {
+      const dev = r.metric.device ? `/dev/${r.metric.device}` : "";
+      if (dev && !modelMap.has(dev) && r.metric.model) modelMap.set(dev, r.metric.model.trim());
+      if (dev && !serialMap.has(dev) && r.metric.serial) serialMap.set(dev, r.metric.serial.trim());
+    }
 
     const disks: SmartDisk[] = Array.from(allDevices).map(dev => {
       const reallocVal = realloc.get(dev) ?? null;

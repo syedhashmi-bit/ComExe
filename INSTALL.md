@@ -230,6 +230,41 @@ environment:
 
 ---
 
+## Disk health (SMART, optional)
+
+The Disk health panel reads the `smartmon_*` metrics written by the community
+[`smartmon.sh`](https://github.com/prometheus-community/node-exporter-textfile-collector-scripts)
+script through node-exporter's textfile collector. Until they exist it shows a one-line
+"not set up" hint. On the TrueNAS host, as root:
+
+```bash
+mkdir -p /mnt/Pool/monitoring/scripts /mnt/Pool/monitoring/textfile
+curl -fsSL -o /mnt/Pool/monitoring/scripts/smartmon.sh \
+  https://raw.githubusercontent.com/prometheus-community/node-exporter-textfile-collector-scripts/master/smartmon.sh
+```
+
+Give node-exporter the folder and the flag (keep your existing flags):
+
+```bash
+docker run -d --name node-exporter --restart unless-stopped --network host --pid host \
+  -v /:/host:ro,rslave -v /mnt/Pool/monitoring/textfile:/textfile:ro \
+  prom/node-exporter --path.rootfs=/host --collector.textfile.directory=/textfile
+```
+
+Mount the folder explicitly — it may not be visible through the `/host` mount. Then add a
+cron job (**System → Advanced → Cron Jobs**, user `root`, schedule `*/5 * * * *`):
+
+```bash
+bash /mnt/Pool/monitoring/scripts/smartmon.sh > /mnt/Pool/monitoring/textfile/smartmon.prom.tmp && mv /mnt/Pool/monitoring/textfile/smartmon.prom.tmp /mnt/Pool/monitoring/textfile/smartmon.prom
+```
+
+`curl -s localhost:9100/metrics | grep -c '^smartmon_'` should then be above 0. Spun-down
+disks are skipped, not woken. For NVMe drives smartmon.sh reports only health and serial;
+the panel takes their temperature and model from node-exporter's own
+`node_hwmon_temp_celsius` and `node_nvme_info`.
+
+---
+
 ## Updating
 
 Pull the latest image and re-run:

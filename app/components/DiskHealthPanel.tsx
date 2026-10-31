@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { usePollingInterval } from "@/app/hooks/usePolling";
 import { isDemoMode } from "@/app/lib/demo-data";
-import { withAlpha } from "@/app/lib/formatters";
 
 interface SmartDisk {
   device: string;
@@ -146,7 +145,6 @@ export function DiskHealthPanel() {
               <span style={{
                 width: 6, height: 6, borderRadius: "50%",
                 background: disk.healthy ? "var(--ok)" : "var(--critical)",
-                boxShadow: `0 0 4px ${withAlpha(disk.healthy ? "var(--ok)" : "var(--critical)", 40)}`,
               }} />
               <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text)", fontFamily: "monospace" }}>
                 {disk.device}

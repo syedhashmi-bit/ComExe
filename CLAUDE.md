@@ -49,7 +49,7 @@ $env:PATH = "C:\Program Files\nodejs;" + $env:PATH
 npm run dev        # localhost:3000
 npm run build      # local sanity check; CI does the real build
 npm run lint
-npm test           # vitest, 315 unit tests
+npm test           # vitest, 316 unit tests
 npm run test:e2e   # playwright
 npm run storybook  # primitives sandbox on :6006
 ```
@@ -591,7 +591,7 @@ collector), `HISTORY_RETENTION_DAYS`, `HISTORY_MAX_SIZE_MB`,
 
 ## Testing
 
-- **Unit** — vitest, `tests/unit/`. 315 tests over 27 files covering `app/lib/*`
+- **Unit** — vitest, `tests/unit/`. 316 tests over 27 files covering `app/lib/*`
   plus `tests/unit/routes/` for API route handlers.
 - **E2E** — Playwright, `tests/e2e/smoke.spec.ts`, run by its own CI job.
 - **Storybook** — `stories/Primitives.stories.tsx`.
@@ -622,7 +622,11 @@ needed. Two gotchas:
 
 **Prometheus** — single instance at `${TRUENAS_IP}:30104`. GPU metrics use
 `nvidia_smi_*`. Network device is `enp4s0`. SMART metrics come from
-`smartmon_*` and degrade gracefully when the exporter isn't installed.
+`smartmon_*` (the smartmon.sh textfile script on a 5-min cron, into node-exporter's
+`--collector.textfile.directory`; INSTALL.md → Disk health) and degrade gracefully
+when it isn't installed. smartmon.sh reports NVMe drives' health only, so the
+smart route takes their temperature from `node_hwmon_temp_celsius{chip="nvme_*",sensor="temp1"}`
+and model from `node_nvme_info` — for drives smartmon already lists, never on their own.
 
 **Memory accounting** — TrueNAS ZFS ARC inflates raw `MemAvailable`. Use
 `MemTotal - MemAvailable - SReclaimable` as real-used. Warn >93%, critical >97%
