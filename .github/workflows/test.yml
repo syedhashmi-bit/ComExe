@@ -36,7 +36,10 @@ jobs:
   # before, and three of the eight specs had been failing unnoticed as a
   # result (a selector that could never match, plus two hydration races).
   e2e:
-    runs-on: ubuntu-latest
+    # Pinned: when ubuntu-latest moved to 26.04, `playwright install` failed
+    # with "Playwright does not support chromium on ubuntu26.04-x64". Move this
+    # to ubuntu-latest again once @playwright/test supports that image.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
 
