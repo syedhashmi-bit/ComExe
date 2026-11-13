@@ -5,7 +5,7 @@
 //
 // IMPORTANT: server-only. Never import from "use client" modules.
 
-import { loadConfig, type ServiceCreds } from "@/app/lib/server-config";
+import { loadConfig, type ServiceCreds, type ServiceName } from "@/app/lib/server-config";
 // Every outbound call in this file goes through fetchWithTimeout, which installs
 // the per-origin undici socket cap AND runs the circuit breaker. This module makes
 // more upstream calls than any other, and for a long time it used bare fetch() —
@@ -360,6 +360,66 @@ async function sonarr(creds: ServiceCreds): Promise<ServiceResult> {
   }
 }
 
+// Lidarr is the music *arr: Radarr's shape on API v1. The key travels in the
+// X-Api-Key header, as in lib/calendar.ts, so it stays out of access logs.
+interface LidarrArtist {
+  statistics?: { albumCount?: number; trackFileCount?: number; trackCount?: number; sizeOnDisk?: number };
+}
+async function lidarr(creds: ServiceCreds): Promise<ServiceResult> {
+  if (!creds.configured) return unconfigured("lidarr", creds.envVar ?? ["LIDARR_API_KEY"]);
+  const BASE = creds.url;
+  const H    = { "X-Api-Key": creds.apiKey ?? "" };
+  try {
+    // Artist list = whole library, memoized 5 min like Radarr's movies and
+    // Sonarr's series. Only the queue is fetched fresh each poll.
+    const artists = await apiFetchMemo(`lidarr:artists:${BASE}`, 300_000, () =>
+      apiFetch(`${BASE}/api/v1/artist`, H) as Promise<LidarrArtist[]>
+    );
+    const [wantedData, queueData, cutoffData, healthData] = await Promise.all([
+      apiFetchMemoOpt(`lidarr:missing:${BASE}`, 180_000, () =>
+        apiFetchOpt(`${BASE}/api/v1/wanted/missing?pageSize=1`, H) as Promise<{ totalRecords?: number } | null>
+      ),
+      apiFetchOpt(`${BASE}/api/v1/queue?pageSize=3&sortKey=timeleft&includeUnknownArtistItems=false`, H) as Promise<{
+        totalRecords: number;
+        records: ArrQueueRecord[];
+      } | null>,
+      apiFetchMemoOpt(`lidarr:cutoff:${BASE}`, 300_000, () =>
+        apiFetchOpt(`${BASE}/api/v1/wanted/cutoff?pageSize=1`, H) as Promise<{ totalRecords?: number } | null>
+      ),
+      apiFetchMemoOpt(`lidarr:health:${BASE}`, 180_000, () =>
+        apiFetchOpt(`${BASE}/api/v1/health`, H) as Promise<ArrHealthRecord[] | null>
+      ),
+    ]);
+    const sum = (k: keyof NonNullable<LidarrArtist["statistics"]>) => artists.reduce((s, a) => s + (a.statistics?.[k] ?? 0), 0);
+    const tracks      = sum("trackCount");
+    const pct         = tracks > 0 ? Math.round((sum("trackFileCount") / tracks) * 100) : 100;
+    const missing     = wantedData?.totalRecords ?? 0;
+    const cutoffUnmet = cutoffData?.totalRecords ?? 0;
+    const records     = queueData?.records ?? [];
+    const queueItems: QueueItem[] = records.slice(0, 3).map(r => ({
+      title: r.title,
+      pct:   r.size > 0 ? Math.round(((r.size - r.sizeleft) / r.size) * 100) : 0,
+      etaSec: parseTimeleft(r.timeleft),
+    }));
+    const lines = [`${artists.length} artists · ${fmtSize(sum("sizeOnDisk"))}`];
+    const summaryBits = [`${sum("albumCount")} albums`];
+    if (missing     > 0) summaryBits.push(`${missing} missing albums`);
+    if (cutoffUnmet > 0) summaryBits.push(`${cutoffUnmet} cutoff unmet`);
+    lines.push(summaryBits.join(" · "));
+    if ((queueData?.totalRecords ?? 0) > 0) lines.push(`${queueData!.totalRecords} in queue`);
+    return {
+      name: "lidarr", up: true, configured: true, url: BASE, pct, lines,
+      queueItem:  queueItems[0] ?? null,
+      queueItems: queueItems.length > 0 ? queueItems : undefined,
+      health:     summarizeHealth(healthData),
+    };
+  } catch (e) {
+    const isAuth = e instanceof AuthError;
+    const up = await checkReachable(BASE);
+    return { name: "lidarr", up: up || isAuth, configured: true, url: BASE, authError: isAuth, lines: isAuth ? ["check api key"] : up ? ["—"] : [] };
+  }
+}
+
 async function bazarr(creds: ServiceCreds): Promise<ServiceResult> {
   if (!creds.configured) return unconfigured("bazarr", creds.envVar ?? ["BAZARR_API_KEY"]);
   const KEY      = creds.apiKey ?? "";
@@ -654,6 +714,46 @@ async function overseerr(creds: ServiceCreds): Promise<ServiceResult> {
   }
 }
 
+// nexbeat (music requests for Lidarr) has one call made for dashboards:
+// requests by state plus the library size. An administrator's token counts
+// everyone's requests; anyone else's counts only their own (scope "mine").
+interface NexbeatDashboard {
+  requests_enabled?: boolean;
+  requests?: { waiting?: number; running?: number; failed?: number; done_last_7_days?: number };
+  library?:  { artists?: number; albums?: number };
+}
+export function nexbeatResult(d: NexbeatDashboard, url: string): ServiceResult {
+  const r = d.requests ?? {};
+  const failed = r.failed ?? 0;
+  const lines = [`${r.waiting ?? 0} waiting · ${r.running ?? 0} running`];
+  const detail: string[] = [];
+  if (d.requests_enabled === false) detail.push("requests not set up");
+  if ((r.done_last_7_days ?? 0) > 0) detail.push(`${r.done_last_7_days} done this week`);
+  if (d.library) detail.push(`${d.library.artists ?? 0} artists · ${d.library.albums ?? 0} albums`);
+  if (detail.length > 0) lines.push(detail.join(" · "));
+  return {
+    name: "nexbeat", up: true, configured: true, url, lines,
+    // A failed request needs someone to retry or withdraw it, so it shows as a
+    // warning on the row and in the status line.
+    health: failed > 0
+      ? { warning: 1, error: 0, messages: [`${failed} request${failed === 1 ? "" : "s"} failed. Retry or withdraw ${failed === 1 ? "it" : "them"} in nexbeat.`] }
+      : undefined,
+  };
+}
+async function nexbeat(creds: ServiceCreds): Promise<ServiceResult> {
+  if (!creds.configured) return unconfigured("nexbeat", creds.envVar ?? ["NEXBEAT_API_KEY"]);
+  try {
+    const data = await apiFetchMemo(`nexbeat:dashboard:${creds.url}`, 120_000, () =>
+      apiFetch(`${creds.url}/api/v1/dashboard`, { Authorization: `Bearer ${creds.apiKey ?? ""}` }) as Promise<NexbeatDashboard>
+    );
+    return nexbeatResult(data, creds.url);
+  } catch (e) {
+    const isAuth = e instanceof AuthError;
+    const up = await checkReachable(creds.url);
+    return { name: "nexbeat", up: up || isAuth, configured: true, url: creds.url, authError: isAuth, lines: isAuth ? ["check api token"] : up ? ["—"] : [] };
+  }
+}
+
 async function pihole(creds: ServiceCreds): Promise<ServiceResult> {
   if (!creds.configured) return unconfigured("pihole", creds.envVar ?? ["PIHOLE_PASSWORD"]);
   const BASE = creds.url;
@@ -882,24 +982,21 @@ async function nginxProxy(creds: ServiceCreds): Promise<ServiceResult> {
 
 // Hits all 10 upstream services (in 2 batches to avoid a thundering herd)
 // and produces the cached payload shape. Per-service stale fallback applied.
+// Two staged batches, 250 ms apart, so the upstreams aren't all hit at once.
+// Each entry carries its own name: it keys both cfg.services and the result,
+// where a separate names array could drift out of line with the calls.
+const BATCHES: [ServiceName, (creds: ServiceCreds) => Promise<ServiceResult>][][] = [
+  [["radarr", radarr], ["sonarr", sonarr], ["lidarr", lidarr], ["bazarr", bazarr], ["tautulli", tautulli], ["qbittorrent", qbittorrent]],
+  [["overseerr", overseerr], ["nexbeat", nexbeat], ["pihole", pihole], ["prowlarr", prowlarr], ["nginx", nginxProxy], ["uptimekuma", uptimeKuma]],
+];
+
 async function fetchAllServicesData(cfg: Awaited<ReturnType<typeof loadConfig>>) {
-  const names = ["radarr","sonarr","bazarr","tautulli","qbittorrent","overseerr","pihole","prowlarr","nginx","uptimekuma"];
-  const batch1 = await Promise.allSettled([
-    radarr(cfg.services.radarr),
-    sonarr(cfg.services.sonarr),
-    bazarr(cfg.services.bazarr),
-    tautulli(cfg.services.tautulli),
-    qbittorrent(cfg.services.qbittorrent),
-  ]);
-  await new Promise(r => setTimeout(r, 250));
-  const batch2 = await Promise.allSettled([
-    overseerr(cfg.services.overseerr),
-    pihole(cfg.services.pihole),
-    prowlarr(cfg.services.prowlarr),
-    nginxProxy(cfg.services.nginx),
-    uptimeKuma(cfg.services.uptimekuma),
-  ]);
-  const settled = [...batch1, ...batch2];
+  const settled: PromiseSettledResult<ServiceResult>[] = [];
+  for (const [i, batch] of BATCHES.entries()) {
+    if (i > 0) await new Promise(r => setTimeout(r, 250));
+    settled.push(...await Promise.allSettled(batch.map(([name, fetcher]) => fetcher(cfg.services[name]))));
+  }
+  const names = BATCHES.flat().map(([name]) => name);
   const now = Date.now();
   const results: ServiceResult[] = settled.map((r, i) => {
     const name = names[i];
@@ -943,9 +1040,8 @@ function refresh(): Promise<void> {
 // instead of blocking on a ~16s cold-start service fetch. The next poll or
 // SSE event (within seconds) will replace this with real data.
 function buildLoadingPlaceholder(): ServicesPayload {
-  const names = ["radarr","sonarr","bazarr","tautulli","qbittorrent","overseerr","pihole","prowlarr","nginx","uptimekuma"];
   return {
-    services: names.map(name => ({
+    services: BATCHES.flat().map(([name]) => ({
       name, up: true, configured: true, lines: ["loading…"],
     })),
     timestamp: Date.now(),

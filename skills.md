@@ -38,7 +38,7 @@ Data fetching is **server-side** in Next.js API routes. The browser only talks t
 | `app/api/speedtest/route.ts` | SpeedTracker history (read-only, never trigger) |
 | `app/api/weather/route.ts` | Open-Meteo |
 | `app/api/mikrotik/route.ts` | MikroTik proxy (Basic auth) |
-| `app/api/activity/route.ts` | Sonarr + Radarr history + Tautulli watches |
+| `app/api/activity/route.ts` | Sonarr + Radarr + Lidarr history + Tautulli watches |
 
 Plus ~27 more: auth, alerts, backup, config, diagnostics, docker/*, grafana/*, health,
 history, insights, servers, smart, stream (SSE), test-connection, topology, version.

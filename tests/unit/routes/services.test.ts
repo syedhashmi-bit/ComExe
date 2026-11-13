@@ -7,7 +7,7 @@ import { resetGlobalSingletons } from "../helpers/singletons";
 // network, a cold cache answers immediately with a placeholder, and a
 // previously-good service is served stale rather than blank when it fails.
 
-const NAMES = ["radarr","sonarr","bazarr","tautulli","qbittorrent","overseerr","pihole","prowlarr","nginx","uptimekuma"];
+const NAMES = ["radarr","sonarr","lidarr","bazarr","tautulli","qbittorrent","overseerr","nexbeat","pihole","prowlarr","nginx","uptimekuma"];
 
 function creds(configured: boolean, url = "http://svc.invalid") {
   return { url, configured, apiKey: configured ? "k" : undefined, envVar: configured ? undefined : ["X_API_KEY"] };
@@ -48,7 +48,7 @@ describe("services module", () => {
     const { GET } = await import("@/app/api/services/route");
     const body = await GET().json();
     expect(body.loading).toBe(true);
-    expect(body.services).toHaveLength(10);
+    expect(body.services.map((s: { name: string }) => s.name)).toEqual(NAMES);
   });
 
   it("returns unconfigured cards without calling the network", async () => {
@@ -89,5 +89,68 @@ describe("services module", () => {
     const second = await getServicesFresh();
     const stale = second!.services.find(s => s.name === "overseerr")!;
     expect(stale).toMatchObject({ up: true, stale: true, lines: good.lines });
+  });
+
+  it("reads Lidarr's library, queue and health over API v1, key in a header", async () => {
+    mockConfig({ lidarr: true });
+    const bodies: Record<string, unknown> = {
+      "/api/v1/artist": [
+        { statistics: { albumCount: 10, trackCount: 100, trackFileCount: 90, sizeOnDisk: 2e9 } },
+        { statistics: { albumCount: 2,  trackCount: 20,  trackFileCount: 20, sizeOnDisk: 1e9 } },
+      ],
+      "/api/v1/wanted/missing": { totalRecords: 3 },
+      "/api/v1/wanted/cutoff":  { totalRecords: 0 },
+      "/api/v1/queue":          { totalRecords: 1, records: [{ title: "Khruangbin – A La Sala", size: 100, sizeleft: 25, timeleft: "00:10:00" }] },
+      "/api/v1/health":         [{ type: "warning", message: "Indexers unavailable" }],
+    };
+    fetchWithTimeout.mockImplementation(async (url: string) => Response.json(bodies[new URL(url).pathname] ?? null));
+    const { getServicesFresh } = await import("@/app/lib/services");
+    const lidarr = (await getServicesFresh())!.services.find(s => s.name === "lidarr")!;
+
+    expect(lidarr).toMatchObject({
+      up: true, pct: 92,
+      lines: ["2 artists · 3.0 GB", "12 albums · 3 missing albums", "1 in queue"],
+      queueItems: [{ title: "Khruangbin – A La Sala", pct: 75, etaSec: 600 }],
+      health: { warning: 1, error: 0, messages: ["Indexers unavailable"] },
+    });
+    for (const [url, opts] of fetchWithTimeout.mock.calls.filter(([u]) => String(u).includes("lidarr"))) {
+      expect(url).not.toContain("apiKey");
+      expect((opts as { headers: Record<string, string> }).headers["X-Api-Key"]).toBe("k");
+    }
+  });
+
+  it("shows nexbeat's request counts, with failed requests as a warning", async () => {
+    mockConfig({ nexbeat: true });
+    fetchWithTimeout.mockImplementation(async () => Response.json({
+      requests_enabled: true,
+      requests: { waiting: 2, running: 1, failed: 1, done_last_7_days: 5 },
+      library:  { artists: 212, albums: 1904 },
+    }));
+    const { getServicesFresh } = await import("@/app/lib/services");
+    const nexbeat = (await getServicesFresh())!.services.find(s => s.name === "nexbeat")!;
+
+    expect(nexbeat).toMatchObject({
+      up: true,
+      lines: ["2 waiting · 1 running", "5 done this week · 212 artists · 1904 albums"],
+      health: { warning: 1, error: 0 },
+    });
+    const [url, opts] = fetchWithTimeout.mock.calls.find(([u]) => String(u).includes("nexbeat"))!;
+    expect(url).toBe("http://nexbeat.invalid/api/v1/dashboard");
+    expect((opts as { headers: Record<string, string> }).headers.Authorization).toBe("Bearer k");
+  });
+
+  it("says when nexbeat's requests aren't set up, and stays quiet with none failed", async () => {
+    const { nexbeatResult } = await import("@/app/lib/services");
+    const r = nexbeatResult({ requests_enabled: false, requests: { waiting: 0, running: 0, failed: 0 } }, "http://n");
+    expect(r.lines).toEqual(["0 waiting · 0 running", "requests not set up"]);
+    expect(r.health).toBeUndefined();
+  });
+
+  it("marks a wrong nexbeat token as an auth error, not as down", async () => {
+    mockConfig({ nexbeat: true });
+    fetchWithTimeout.mockImplementation(async () => new Response("", { status: 401 }));
+    const { getServicesFresh } = await import("@/app/lib/services");
+    const nexbeat = (await getServicesFresh())!.services.find(s => s.name === "nexbeat")!;
+    expect(nexbeat).toMatchObject({ up: true, authError: true, lines: ["check api token"] });
   });
 });

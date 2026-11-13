@@ -73,6 +73,40 @@ async function testSonarr(url: string, key: string): Promise<TestResult> {
   }
 }
 
+async function testLidarr(url: string, key: string): Promise<TestResult> {
+  if (!key) return fail("Missing API key");
+  try {
+    const r = await fetchWithTimeout(`${url}/api/v1/system/status`,
+      { timeoutMs: TIMEOUT, skipBreaker: true, headers: { "X-Api-Key": key, Accept: "application/json" } });
+    if (r.status === 401 || r.status === 403) return fail(`Unauthorized (HTTP ${r.status}) — wrong API key`);
+    if (!r.ok) return fail(`HTTP ${r.status}`);
+    const data = await r.json() as { version?: string };
+    return pass(`Connected${data.version ? ` (v${data.version})` : ""}`);
+  } catch (e) {
+    return fail(`Could not reach ${url} — ${(e as Error).message}`);
+  }
+}
+
+// Tests the same call the services row makes, so it also catches a token
+// that only sees its owner's requests (scope "mine").
+async function testNexbeat(url: string, key: string): Promise<TestResult> {
+  if (!key) return fail("Missing API token");
+  try {
+    const r = await fetchWithTimeout(`${url}/api/v1/dashboard`, {
+      timeoutMs: TIMEOUT, skipBreaker: true,
+      headers: { Authorization: `Bearer ${key}`, Accept: "application/json" },
+    });
+    if (r.status === 401 || r.status === 403) return fail("Unauthorized — wrong or deactivated API token");
+    if (!r.ok) return fail(`HTTP ${r.status}`);
+    const data = await r.json() as { version?: string; scope?: string };
+    const version = data.version ? ` (v${data.version})` : "";
+    if (data.scope === "mine") return pass(`Connected${version}, but this token only counts its own requests. Use an administrator's token to count everyone's.`);
+    return pass(`Connected${version}`);
+  } catch (e) {
+    return fail(`Could not reach ${url} — ${(e as Error).message}`);
+  }
+}
+
 async function testProwlarr(url: string, key: string): Promise<TestResult> {
   if (!key) return fail("Missing API key");
   try {
@@ -301,10 +335,12 @@ export async function POST(req: Request) {
   switch (service) {
     case "radarr":      result = await testRadarr(cleanUrl, key ?? "");                    break;
     case "sonarr":      result = await testSonarr(cleanUrl, key ?? "");                    break;
+    case "lidarr":      result = await testLidarr(cleanUrl, key ?? "");                    break;
     case "bazarr":      result = await testBazarr(cleanUrl, key ?? "");                    break;
     case "tautulli":    result = await testTautulli(cleanUrl, key ?? "");                  break;
     case "prowlarr":    result = await testProwlarr(cleanUrl, key ?? "");                  break;
     case "overseerr":   result = await testOverseerr(cleanUrl, key ?? "");                 break;
+    case "nexbeat":     result = await testNexbeat(cleanUrl, key ?? "");                   break;
     case "qbittorrent": result = await testQbittorrent(cleanUrl, key ?? "", user ?? "", pass ?? ""); break;
     case "pihole":      result = await testPihole(cleanUrl, pass ?? "");                  break;
     case "nginx":       result = await testNginx(cleanUrl, user ?? "", pass ?? "");   break;

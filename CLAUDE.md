@@ -49,7 +49,7 @@ $env:PATH = "C:\Program Files\nodejs;" + $env:PATH
 npm run dev        # localhost:3000
 npm run build      # local sanity check; CI does the real build
 npm run lint
-npm test           # vitest, 340 unit tests
+npm test           # vitest, 349 unit tests
 npm run test:e2e   # playwright
 npm run storybook  # primitives sandbox on :6006
 ```
@@ -151,8 +151,9 @@ prevent that, and every one of them matters:
    genuinely real-time data (queue items, active streams, qBit speeds) is
    fetched fresh each cycle. This is the real load-killer: ~150 calls/hour per
    upstream instead of 1800+.
-4. **Staged batching** — `lib/services.ts` splits its 10 upstream fetches into
-   2 batches of 5 with a 250ms gap, avoiding a thundering herd.
+4. **Staged batching** — `lib/services.ts` splits its 12 upstream fetches into
+   2 batches of 6 with a 250ms gap, avoiding a thundering herd. Each `BATCHES`
+   entry is a `[name, fetcher]` pair, so a result can't land under the wrong name.
 
 Plus a per-service last-known-good cache (60s) that keeps cards populated across
 brief failures, flagged `stale: true`.
@@ -246,9 +247,9 @@ All server-side proxies. All credentials resolved via `loadConfig()`.
 | Route | Purpose |
 |-------|---------|
 | `metrics/` | Thin wrapper over `lib/metrics.ts`: ~30 PromQL queries, 9s cache, appends to `history.jsonl`. |
-| `services/` | Thin wrapper over `lib/services.ts`: 10 service health cards, SWR + memoization. |
+| `services/` | Thin wrapper over `lib/services.ts`: 12 service health cards, SWR + memoization. |
 | `mikrotik/` | RouterOS stats (Basic auth). 10s cache. |
-| `activity/` | Sonarr + Radarr history + Tautulli watches, merged. 60s cache. |
+| `activity/` | Sonarr + Radarr + Lidarr history + Tautulli watches, merged. Lidarr logs one import per track, so only its grabs and album-level `downloadImported` are kept. 60s cache. |
 | `speedtest/` | SpeedTracker's last 20 results (headline + history chart). **Never triggers tests.** |
 | `weather/` | open-meteo, no auth, + 3-day forecast. |
 
@@ -266,7 +267,7 @@ scrape-target health).
 
 **Auth:** `auth/login/` (rate-limited), `auth/logout/`, `auth/status/`.
 
-**Media:** `calendar/` (Sonarr + Radarr calendars, last 7 days through the
+**Media:** `calendar/` (Sonarr + Radarr + Lidarr calendars, last 7 days through the
 next 7, for the "Coming up" card — `lib/calendar.ts`, cached 15 min, API key in
 the `X-Api-Key` header), `plex-art/` (Now playing posters via Tautulli's
 `pms_image_proxy`, so no key or Plex token reaches the browser; only
@@ -386,8 +387,11 @@ until Oct 2026 and the ZFS-aware total − available − SReclaimable (the card'
 figure) since, so the last hour can still mix the two.
 
 **Services panel** is a compact grouped list (`SVC_CATEGORIES` in
-`ServicesPanel.tsx`): *Media* (radarr, sonarr, bazarr, tautulli, qbittorrent,
-overseerr, prowlarr) and *Infrastructure* (pihole, nginx, uptimekuma). One row
+`ServicesPanel.tsx`): *Media* (radarr, sonarr, lidarr, bazarr, tautulli,
+qbittorrent, overseerr, nexbeat, prowlarr) and *Infrastructure* (pihole, nginx,
+uptimekuma). Lidarr is the music *arr (API v1, key in the `X-Api-Key` header);
+nexbeat is its request app, read from its one dashboard call
+(`/api/v1/dashboard`, bearer token) — failed requests show as a warning. One row
 per service: status word + dot (the only colour), the app's full-colour icon and
 name (links to its UI in a new tab), key number, detail line, and details /
 logs / restart buttons, and a 24-hour strip with an uptime % from the
@@ -523,13 +527,15 @@ Never hardcoded in source, never in the image.
 plus API keys for whichever services you use.
 
 **Service credentials:** `RADARR_API_KEY`, `SONARR_API_KEY`, `BAZARR_API_KEY`,
-`TAUTULLI_API_KEY`, `PROWLARR_API_KEY`, `OVERSEERR_API_KEY`, `PIHOLE_PASSWORD`,
+`TAUTULLI_API_KEY`, `PROWLARR_API_KEY`, `OVERSEERR_API_KEY`, `LIDARR_API_KEY`,
+`NEXBEAT_API_KEY` (a read-only nexbeat API token, ideally an admin's), `PIHOLE_PASSWORD`,
 `NGINX_USERNAME`/`NGINX_PASSWORD`, `UPTIME_KUMA_API_KEY`, `SPEEDTEST_API_KEY`,
 `MIKROTIK_USERNAME`/`MIKROTIK_PASSWORD`, and `QBIT_API_KEY` (qBit 5.1+,
 `qbt_...`) **or** `QBIT_USERNAME` + `QBIT_PASSWORD`.
 
 **URL overrides** (default to `${TRUENAS_IP}:<port>`): `RADARR_URL`, `SONARR_URL`,
-`BAZARR_URL`, `TAUTULLI_URL`, `QBIT_URL`, `OVERSEERR_URL`, `PIHOLE_URL`,
+`BAZARR_URL`, `TAUTULLI_URL`, `QBIT_URL`, `OVERSEERR_URL`, `LIDARR_URL`,
+`NEXBEAT_URL`, `PIHOLE_URL`,
 `PROWLARR_URL`, `NGINX_URL`, `UPTIME_KUMA_URL`, `SPEEDTEST_URL`,
 `PROMETHEUS_URL`, `MIKROTIK_URL`.
 
@@ -618,7 +624,7 @@ collector), `HISTORY_RETENTION_DAYS`, `HISTORY_MAX_SIZE_MB`,
 
 ## Testing
 
-- **Unit** — vitest, `tests/unit/`. 340 tests over 27 files covering `app/lib/*`
+- **Unit** — vitest, `tests/unit/`. 349 tests over 28 files covering `app/lib/*`
   plus `tests/unit/routes/` for API route handlers.
 - **E2E** — Playwright, `tests/e2e/smoke.spec.ts`, run by its own CI job.
 - **Storybook** — `stories/Primitives.stories.tsx`.

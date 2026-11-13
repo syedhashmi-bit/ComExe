@@ -5,14 +5,16 @@ import type { CalendarFeed, CalendarItem } from "@/app/lib/types";
 import { usePollingInterval } from "@/app/hooks/usePolling";
 import { isDemoMode } from "@/app/lib/demo-data";
 import { SourceIcon } from "@/app/components/ActivityFeed";
+import { SVC_LABELS } from "@/app/lib/constants";
 
-// What's airing and releasing over the next 7 days, from the Sonarr and Radarr
-// calendars (/api/calendar), grouped by day. Above the list, anything that
+// What's airing and releasing over the next 7 days, from the Sonarr, Radarr and
+// Lidarr calendars (/api/calendar), grouped by day. Above the list, anything that
 // aired more than a day ago and still has no file — the one thing here worth
 // acting on.
 
 const DAY = 86_400_000;
 const COLLAPSED = 8;
+const SOURCES = ["sonarr", "radarr", "lidarr"] as const;
 // Newer than this and an aired episode is probably still downloading.
 const MISSING_AFTER = DAY;
 
@@ -40,6 +42,7 @@ export function itemState(it: CalendarItem, now: number, tz: string): { text: st
   if (it.kind === "cinema")   return { text: "In cinemas", done: false };
   if (it.kind === "digital")  return { text: future ? "Digital release" : "Released", done: false };
   if (it.kind === "physical") return { text: future ? "Disc release" : "Released", done: false };
+  if (it.kind === "album")    return { text: future ? "Album release" : "Released", done: false };
   if (!future) return { text: "Aired", done: false };
   let time: string;
   try {
@@ -57,13 +60,14 @@ function demoFeed(): CalendarFeed {
   const ep = (title: string, detail: string, at: number, hasFile = false): CalendarItem =>
     ({ source: "sonarr", kind: "episode", title, detail, at, hasFile });
   return {
-    sources: { sonarr: "ok", radarr: "ok" },
+    sources: { sonarr: "ok", radarr: "ok", lidarr: "ok" },
     timestamp: now,
     items: [
       ep("Slow Horses", "S05E03", now - 2 * 24 * h),
       ep("The Bear", "S04E09", now - 3 * h, true),
       ep("Shogun", "S02E05", now + 2 * h),
       ep("Slow Horses", "S05E04", now + 2 * 24 * h),
+      { source: "lidarr", kind: "album", title: "Khruangbin – A La Sala", detail: "", at: Math.floor((now + 3 * 24 * h) / (24 * h)) * 24 * h, hasFile: false, allDay: true },
       { source: "radarr", kind: "digital", title: "Dune: Part Three (2026)", detail: "", at: Math.floor((now + 4 * 24 * h) / (24 * h)) * 24 * h, hasFile: false, allDay: true },
       ep("The Bear", "S04E10", now + 6 * 24 * h),
     ],
@@ -86,7 +90,7 @@ export function ComingUp({ timezone, sonarrUrl }: { timezone: string; sonarrUrl?
   usePollingInterval(load, 15 * 60_000);
 
   const f = feed;
-  if (!f || (f.sources.sonarr === "unconfigured" && f.sources.radarr === "unconfigured")) return null;
+  if (!f || SOURCES.every(s => f.sources[s] === "unconfigured")) return null;
 
   const now = f.timestamp;
   const fmt = dateKeyFmt(timezone);
@@ -110,10 +114,12 @@ export function ComingUp({ timezone, sonarrUrl }: { timezone: string; sonarrUrl?
   };
 
   const episodes = upcoming.filter(it => it.kind === "episode").length;
-  const movies = new Set(upcoming.filter(it => it.kind !== "episode").map(it => it.title)).size;
+  const movies = new Set(upcoming.filter(it => it.source === "radarr").map(it => it.title)).size;
+  const albums = upcoming.filter(it => it.kind === "album").length;
   const summary = [
     episodes ? `${episodes} episode${episodes === 1 ? "" : "s"}` : null,
     movies ? `${movies} movie${movies === 1 ? "" : "s"}` : null,
+    albums ? `${albums} album${albums === 1 ? "" : "s"}` : null,
   ].filter(Boolean).join(" · ");
 
   // Collapse to the first COLLAPSED rows across days.
@@ -124,7 +130,7 @@ export function ComingUp({ timezone, sonarrUrl }: { timezone: string; sonarrUrl?
     return { ...g, items };
   }).filter(g => g.items.length > 0);
 
-  const failed = (["sonarr", "radarr"] as const).filter(s => f.sources[s] === "error");
+  const failed = SOURCES.filter(s => f.sources[s] === "error");
   const allEpisodes = missing.every(it => it.kind === "episode");
   const missingNoun = allEpisodes ? `aired episode${missing.length === 1 ? "" : "s"}` : `release${missing.length === 1 ? "" : "s"}`;
 
@@ -161,7 +167,7 @@ export function ComingUp({ timezone, sonarrUrl }: { timezone: string; sonarrUrl?
 
       {shown.length === 0 ? (
         <span style={{ fontSize: 12, color: "var(--text-faint)" }}>
-          {failed.length > 0 ? `Couldn't reach ${failed.map(s => s === "sonarr" ? "Sonarr" : "Radarr").join(" or ")}.` : "Nothing scheduled in the next 7 days."}
+          {failed.length > 0 ? `Couldn't reach ${failed.map(s => SVC_LABELS[s]).join(" or ")}.` : "Nothing scheduled in the next 7 days."}
         </span>
       ) : (
         <div className="flex flex-col" style={{ gap: 8 }}>

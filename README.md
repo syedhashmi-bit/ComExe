@@ -40,12 +40,12 @@ external state, no secrets in the browser: every upstream call goes through a se
   too ("2 issues · ComExe" and a coloured dot), so a pinned tab tells you without a look.
 - **Calm by design** — flat cards, one soft accent per metric for its charts, and status colours
   (green / amber / red) reserved for actual problems, always paired with a word.
-- **Services in one list** — Radarr, Sonarr, Bazarr, Tautulli, qBittorrent, Overseerr, Prowlarr,
-  Pi-hole, Nginx Proxy Manager and Uptime Kuma, each with its own icon, status, key number,
+- **Services in one list** — Radarr, Sonarr, Lidarr, Bazarr, Tautulli, qBittorrent, Overseerr,
+  nexbeat, Prowlarr, Pi-hole, Nginx Proxy Manager and Uptime Kuma, each with its own icon, status, key number,
   download queue or Plex stream and a 24-hour uptime strip, sorted so problems come first.
 - **Now playing** — Plex streams with their posters, who's watching on what, and whether each is
   a direct play or a transcode (and whether the GPU is doing it).
-- **What's coming up** — the week's episodes and movie releases from Sonarr and Radarr, by day,
+- **What's coming up** — the week's episodes, movies and albums from Sonarr, Radarr and Lidarr, by day,
   with anything that aired but never downloaded called out, next to recent grabs and watches.
 - **Alerts with no tab open** — a background collector keeps evaluating thresholds and recording
   history around the clock, and sends webhooks to Discord, Slack, ntfy or any JSON endpoint,

@@ -16,7 +16,9 @@ beforeEach(() => {
   calls.length = 0;
   responses = {};
   vi.doMock("@/app/lib/server-config", () => ({
-    loadConfig: async () => ({ services: { sonarr: creds("http://sonarr:8989"), radarr: creds("http://radarr:7878") } }),
+    loadConfig: async () => ({ services: {
+      sonarr: creds("http://sonarr:8989"), radarr: creds("http://radarr:7878"), lidarr: creds("http://lidarr:8686"),
+    } }),
   }));
   vi.doMock("@/app/lib/http", () => ({
     fetchJson: async (url: string, opts: { headers: Record<string, string> }) => {
@@ -50,31 +52,48 @@ describe("sonarrItems / radarrItems", () => {
       at: Date.parse("2026-11-02T00:00:00Z"), hasFile: false, allDay: true,
     }]);
   });
+
+  it("names an album by artist, and counts it downloaded only when every track is", async () => {
+    const { lidarrItems } = await import("@/app/lib/calendar");
+    const from = Date.parse("2026-10-22T00:00:00Z"), to = Date.parse("2026-11-05T00:00:00Z");
+    const album = (title: string, stats: { trackFileCount: number; trackCount: number }, releaseDate = "2026-11-01T00:00:00Z") =>
+      ({ title, releaseDate, artist: { artistName: "Khruangbin" }, statistics: stats });
+    expect(lidarrItems([
+      album("A La Sala", { trackFileCount: 6, trackCount: 12 }),
+      album("Mordechai", { trackFileCount: 10, trackCount: 10 }),
+      album("Con Todo El Mundo", { trackFileCount: 0, trackCount: 10 }, "2018-01-26T00:00:00Z"),   // outside
+    ], from, to)).toEqual([
+      { source: "lidarr", kind: "album", title: "Khruangbin – A La Sala", detail: "", at: Date.parse("2026-11-01T00:00:00Z"), hasFile: false, allDay: true },
+      { source: "lidarr", kind: "album", title: "Khruangbin – Mordechai", detail: "", at: Date.parse("2026-11-01T00:00:00Z"), hasFile: true, allDay: true },
+    ]);
+  });
 });
 
 describe("getCalendar", () => {
-  it("asks both apps for ±7 days with the key in a header, not the URL", async () => {
+  it("asks each app for ±7 days with the key in a header, not the URL", async () => {
     responses = {
       "sonarr:8989": [{ series: { title: "Shogun" }, seasonNumber: 2, episodeNumber: 5, airDateUtc: new Date(Date.now() + DAY).toISOString() }],
       "radarr:7878": [],
+      "lidarr:8686": [{ title: "A La Sala", releaseDate: new Date(Date.now() + 2 * DAY).toISOString(), artist: { artistName: "Khruangbin" } }],
     };
     const { getCalendar } = await import("@/app/lib/calendar");
     const feed = await getCalendar();
 
-    expect(feed.sources).toEqual({ sonarr: "ok", radarr: "ok" });
-    expect(feed.items.map(i => i.title)).toEqual(["Shogun"]);
+    expect(feed.sources).toEqual({ sonarr: "ok", radarr: "ok", lidarr: "ok" });
+    expect(feed.items.map(i => i.title)).toEqual(["Shogun", "Khruangbin – A La Sala"]);
     for (const c of calls) {
-      expect(c.url).toContain("/api/v3/calendar?start=");
+      expect(c.url).toMatch(/\/api\/v[13]\/calendar\?start=/);
       expect(c.url).not.toContain("k3y");
       expect(c.headers["X-Api-Key"]).toBe("k3y");
     }
     expect(calls.find(c => c.url.startsWith("http://sonarr"))!.url).toContain("includeSeries=true");
+    expect(calls.find(c => c.url.startsWith("http://lidarr"))!.url).toMatch(/\/api\/v1\/calendar\?.*includeArtist=true/);
   });
 
   it("reports an unreachable app as an error rather than an empty week", async () => {
-    responses = { "radarr:7878": [] };
+    responses = { "radarr:7878": [], "lidarr:8686": [] };
     const { getCalendar } = await import("@/app/lib/calendar");
-    expect((await getCalendar()).sources).toEqual({ sonarr: "error", radarr: "ok" });
+    expect((await getCalendar()).sources).toEqual({ sonarr: "error", radarr: "ok", lidarr: "ok" });
   });
 });
 
@@ -102,6 +121,8 @@ describe("Coming up card helpers", () => {
     expect(itemState(ep({ at: now - 1000, hasFile: true }), now, "UTC")).toEqual({ text: "Downloaded", done: true });
     expect(itemState(ep({ at: now - 1000 }), now, "UTC").text).toBe("Aired");
     expect(itemState(ep({ at: now + DAY, kind: "digital" }), now, "UTC").text).toBe("Digital release");
+    expect(itemState(ep({ at: now + DAY, kind: "album", source: "lidarr" }), now, "UTC").text).toBe("Album release");
+    expect(itemState(ep({ at: now - DAY, kind: "album", source: "lidarr" }), now, "UTC").text).toBe("Released");
     expect(itemState(ep({ at: Date.parse("2026-10-29T21:00:00Z") }), now, "UTC").text).toMatch(/9:00/);
   });
 });

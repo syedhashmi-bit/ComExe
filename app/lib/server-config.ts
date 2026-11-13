@@ -44,10 +44,12 @@ export interface ResolvedConfig {
   services: {
     radarr:      ServiceCreds;
     sonarr:      ServiceCreds;
+    lidarr:      ServiceCreds;
     bazarr:      ServiceCreds;
     tautulli:    ServiceCreds;
     qbittorrent: ServiceCreds;
     overseerr:   ServiceCreds;
+    nexbeat:     ServiceCreds;
     pihole:      ServiceCreds;
     prowlarr:    ServiceCreds;
     nginx:       ServiceCreds;
@@ -102,6 +104,7 @@ interface ServiceManifest {
 const MANIFEST: ServiceManifest[] = [
   { name: "radarr",      defaultPort: 30025, envUrl: "RADARR_URL",      authShape: "apikey",   envApiKey:   "RADARR_API_KEY" },
   { name: "sonarr",      defaultPort: 33027, envUrl: "SONARR_URL",      authShape: "apikey",   envApiKey:   "SONARR_API_KEY" },
+  { name: "lidarr",      defaultPort: 30071, envUrl: "LIDARR_URL",      authShape: "apikey",   envApiKey:   "LIDARR_API_KEY" },
   { name: "bazarr",      defaultPort: 30046, envUrl: "BAZARR_URL",      authShape: "apikey",   envApiKey:   "BAZARR_API_KEY" },
   { name: "tautulli",    defaultPort: 30047, envUrl: "TAUTULLI_URL",    authShape: "apikey",   envApiKey:   "TAUTULLI_API_KEY" },
   // qBittorrent 5.1+ supports native API keys (Settings → WebUI → API Key,
@@ -110,6 +113,8 @@ const MANIFEST: ServiceManifest[] = [
   // resolveService below.
   { name: "qbittorrent", defaultPort: 30024, envUrl: "QBIT_URL",        authShape: "userpass", envApiKey: "QBIT_API_KEY", envUsername: "QBIT_USERNAME", envPassword: "QBIT_PASSWORD" },
   { name: "overseerr",   defaultPort: 30357, envUrl: "OVERSEERR_URL",   authShape: "apikey",   envApiKey:   "OVERSEERR_API_KEY" },
+  // nexbeat's API tokens are bearer tokens (Profile → API tokens, "nxb_…").
+  { name: "nexbeat",     defaultPort: 30497, envUrl: "NEXBEAT_URL",     authShape: "bearer",   envApiKey:   "NEXBEAT_API_KEY" },
   { name: "pihole",      defaultPort: 20720, envUrl: "PIHOLE_URL",      authShape: "password", envPassword: "PIHOLE_PASSWORD" },
   { name: "prowlarr",    defaultPort: 30050, envUrl: "PROWLARR_URL",    authShape: "apikey",   envApiKey:   "PROWLARR_API_KEY" },
   { name: "nginx",       defaultPort: 30020, envUrl: "NGINX_URL",       authShape: "userpass", envUsername: "NGINX_USERNAME", envPassword: "NGINX_PASSWORD" },

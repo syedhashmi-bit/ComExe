@@ -46,3 +46,28 @@ describe("/api/test-connection — saved credential fallback", () => {
     expect(String(fetchWithTimeout.mock.calls[0][0])).toContain("apiKey=typed");
   });
 });
+
+describe("/api/test-connection — Lidarr and nexbeat", () => {
+  it("tests Lidarr's API v1 with the key in a header", async () => {
+    fetchWithTimeout.mockResolvedValue(Response.json({ version: "3.2.1.5196" }));
+    const r = await test({ service: "lidarr", url: "http://nas:30071", apiKey: "lk" });
+    expect(r).toEqual({ ok: true, message: "Connected (v3.2.1.5196)" });
+    const [url, opts] = fetchWithTimeout.mock.calls[0];
+    expect(url).toBe("http://nas:30071/api/v1/system/status");
+    expect(opts.headers["X-Api-Key"]).toBe("lk");
+  });
+
+  it("warns when a nexbeat token only sees its own requests", async () => {
+    fetchWithTimeout.mockResolvedValue(Response.json({ version: "1.6.1", scope: "mine" }));
+    const r = await test({ service: "nexbeat", url: "http://nas:30497", apiKey: "nxb_t" });
+    expect(r.ok).toBe(true);
+    expect(r.message).toMatch(/^Connected \(v1\.6\.1\), but this token only counts its own requests/);
+    expect(fetchWithTimeout.mock.calls[0][1].headers.Authorization).toBe("Bearer nxb_t");
+  });
+
+  it("calls a rejected nexbeat token unauthorized", async () => {
+    fetchWithTimeout.mockResolvedValue(new Response("", { status: 401 }));
+    expect(await test({ service: "nexbeat", url: "http://nas:30497", apiKey: "bad" }))
+      .toEqual({ ok: false, message: "Unauthorized — wrong or deactivated API token" });
+  });
+});

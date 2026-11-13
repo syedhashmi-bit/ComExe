@@ -144,7 +144,7 @@ export interface ServiceResult {
 }
 
 export interface ActivityEvent {
-  source: "sonarr" | "radarr" | "tautulli";
+  source: "sonarr" | "radarr" | "lidarr" | "tautulli";
   type: "grabbed" | "imported" | "watched";
   title: string;
   subtitle?: string;
@@ -229,20 +229,21 @@ export interface Incident {
   end:   number | null;              // null while it's still going
 }
 
-// /api/calendar — Sonarr and Radarr calendars for the "Coming up" card
+// /api/calendar — Sonarr, Radarr and Lidarr calendars for the "Coming up" card
 // (lib/calendar.ts).
 export interface CalendarItem {
-  source:  "sonarr" | "radarr";
-  kind:    "episode" | "digital" | "physical" | "cinema";
-  title:   string;        // series, or "Movie (2026)"
-  detail:  string;        // "S04E09" for episodes; "" for movies
+  source:  "sonarr" | "radarr" | "lidarr";
+  kind:    "episode" | "digital" | "physical" | "cinema" | "album";
+  title:   string;        // series, "Movie (2026)", or "Artist – Album"
+  detail:  string;        // "S04E09" for episodes; "" for movies and albums
   at:      number;        // air / release time, ms
-  hasFile: boolean;
+  hasFile: boolean;       // albums: every track downloaded
   allDay?: boolean;       // a release date rather than an air time
 }
 
+type CalendarSourceState = "ok" | "error" | "unconfigured";
 export interface CalendarFeed {
-  sources:   { sonarr: "ok" | "error" | "unconfigured"; radarr: "ok" | "error" | "unconfigured" };
+  sources:   { sonarr: CalendarSourceState; radarr: CalendarSourceState; lidarr: CalendarSourceState };
   items:     CalendarItem[];   // last 7 days through the next 7, oldest first
   timestamp: number;
 }

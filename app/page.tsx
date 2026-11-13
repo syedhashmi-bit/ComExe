@@ -212,6 +212,7 @@ export default function Dashboard() {
     setActivityEvents([
       { type: "grabbed", title: "The Bear S04E08", source: "sonarr", timestamp: Date.now() - 300000, subtitle: "WEBDL-1080p" },
       { type: "imported", title: "Dune: Part Two", source: "radarr", timestamp: Date.now() - 1200000, subtitle: "Bluray-2160p" },
+      { type: "imported", title: "Khruangbin – Mordechai", source: "lidarr", timestamp: Date.now() - 2400000, subtitle: "FLAC" },
       { type: "watched", title: "Shogun S02E04", source: "tautulli", timestamp: Date.now() - 60000, subtitle: "alex" },
     ]);
     setActivityLoading(false);

@@ -21,9 +21,12 @@ function buildSvcUrls(ip: string): Record<string, string> {
 }
 
 const SVC_CATEGORIES: { id: string; label: string; services: string[] }[] = [
-  { id: "media", label: "Media",          services: ["radarr", "sonarr", "bazarr", "tautulli", "qbittorrent", "overseerr", "prowlarr"] },
+  { id: "media", label: "Media",          services: ["radarr", "sonarr", "lidarr", "bazarr", "tautulli", "qbittorrent", "overseerr", "nexbeat", "prowlarr"] },
   { id: "infra", label: "Infrastructure", services: ["pihole", "nginx", "uptimekuma"] },
 ];
+
+// Services whose download queue shows as a sub-list under the row.
+const QUEUE_SERVICES = new Set(["radarr", "sonarr", "lidarr", "qbittorrent"]);
 
 // Problems first, then busy services, then idle ones; route order within a tier.
 function tier(s: ServiceResult): number {
@@ -182,7 +185,7 @@ export function ServicesPanel({
                     : s.authError ? "Credentials rejected. Fix them in Setup."
                     : noRealData  ? (s.lines[0] === "loading…" ? "Collecting data…" : `Reachable, but no detail came back. Try opening ${host ?? "it"}.`)
                     : s.lines.slice(1).join(" · ");
-                  const queue = (s.name === "radarr" || s.name === "sonarr" || s.name === "qbittorrent") && s.up ? (s.queueItems ?? []).slice(0, 3) : [];
+                  const queue = QUEUE_SERVICES.has(s.name) && s.up ? (s.queueItems ?? []).slice(0, 3) : [];
                   const streams = s.name === "tautulli" && s.up ? (s.streams ?? []).slice(0, 3) : [];
                   const uptime = incidents?.enabled && incidents.now != null
                     ? serviceUptime(incidents.incidents ?? [], s.name, incidents.now, incidents.since ?? incidents.now)

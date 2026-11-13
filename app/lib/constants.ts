@@ -48,8 +48,8 @@ export const TIMEZONES = [
 // ── Service icon/port constants ─────────────────────────────────────────────
 
 export const SVC_PORTS: Record<string, number> = {
-  radarr: 30025, sonarr: 33027, bazarr: 30046, tautulli: 30047,
-  qbittorrent: 30024, overseerr: 30002, nginx: 30020, pihole: 20720,
+  radarr: 30025, sonarr: 33027, lidarr: 30071, bazarr: 30046, tautulli: 30047,
+  qbittorrent: 30024, overseerr: 30002, nexbeat: 30497, nginx: 30020, pihole: 20720,
   prowlarr: 30050, uptimekuma: 31050, speedtest: 30220, prometheus: 30104,
 };
 
@@ -68,8 +68,8 @@ export const SVC_PORTS: Record<string, number> = {
 // grafana, prometheus) are kept, since the others simply lacked them.
 
 export const SVC_COLORS: Record<string, string> = {
-  radarr: "#f5c518", sonarr: "#35c5f4", bazarr: "#4a90d9",
-  tautulli: "#e5a00d", qbittorrent: "#2196f3", overseerr: "#e5a00d",
+  radarr: "#f5c518", sonarr: "#35c5f4", lidarr: "#00a65b", bazarr: "#4a90d9",
+  tautulli: "#e5a00d", qbittorrent: "#2196f3", overseerr: "#e5a00d", nexbeat: "#f43f5e",
   pihole: "#f60d1a", prowlarr: "#ff8c00", nginx: "#2ecc71",
   uptimekuma: "#5cdd8b",
   // Referenced by the dependency graph, which can include services the
@@ -80,10 +80,12 @@ export const SVC_COLORS: Record<string, string> = {
 export const SVC_ICONS: Record<string, string> = {
   radarr:      "/icons/radarr.png",
   sonarr:      "/icons/sonarr.png",
+  lidarr:      "/icons/lidarr.png",
   bazarr:      "/icons/bazarr.png",
   tautulli:    "/icons/tautulli.png",
   qbittorrent: "/icons/qbittorrent.png",
   overseerr:   "/icons/overseerr.png",
+  nexbeat:     "/icons/nexbeat.png",
   nginx:       "/icons/nginx.png",
   pihole:      "/icons/pihole.png",
   prowlarr:    "/icons/prowlarr.png",
@@ -95,10 +97,12 @@ export const SVC_ICONS: Record<string, string> = {
 export const SVC_LABELS: Record<string, string> = {
   radarr:      "Radarr",
   sonarr:      "Sonarr",
+  lidarr:      "Lidarr",
   bazarr:      "Bazarr",
   tautulli:    "Tautulli",
   qbittorrent: "qBittorrent",
   overseerr:   "Overseerr",
+  nexbeat:     "nexbeat",
   prowlarr:    "Prowlarr",
   pihole:      "Pi-hole",
   nginx:       "Nginx Proxy",

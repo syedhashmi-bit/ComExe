@@ -3,9 +3,9 @@ import { fetchWithTimeout } from "@/app/lib/http";
 import { loadConfig, type ServiceCreds } from "@/app/lib/server-config";
 
 // ── Activity feed ─────────────────────────────────────────────────────────────
-// Pulls recent events from Sonarr / Radarr (grabbed history) and Tautulli
-// (watch history), normalizes to a unified shape, sorts newest-first, returns
-// the top N combined.
+// Pulls recent events from Sonarr / Radarr / Lidarr (grabbed history) and
+// Tautulli (watch history), normalizes to a unified shape, sorts newest-first,
+// returns the top N combined.
 //
 // Each individual fetch is wrapped in try/catch and falls back to an empty
 // list — one source being down should not blank the whole feed.
@@ -14,7 +14,7 @@ import { loadConfig, type ServiceCreds } from "@/app/lib/server-config";
 // the per-service calls.
 
 interface ActivityEvent {
-  source: "sonarr" | "radarr" | "tautulli";
+  source: "sonarr" | "radarr" | "lidarr" | "tautulli";
   type: "grabbed" | "imported" | "watched";
   title: string;          // primary text — "Severance S02E07" / "Anwar 2007" / "Kitchen Nightmares S02E08"
   subtitle?: string;      // quality / user / etc.
@@ -26,11 +26,11 @@ const MAX_EVENTS = 30;
 
 let activityCache: { data: { events: ActivityEvent[]; timestamp: number }; ts: number } | null = null;
 
-// Per-source memo so a cache miss on the top-level doesn't always re-hit all
-// three /history endpoints. Each source independently cached 5 min — the
-// *arr /history endpoints are real DB queries and were on the list of things
-// the throttling pass was meant to spare. 5 min × 3 sources = at most ~36
-// history fetches/hour across all browsers, vs the old ~60/hour each.
+// Per-source memo so a cache miss on the top-level doesn't always re-hit every
+// /history endpoint. Each source independently cached 5 min — the *arr
+// /history endpoints are real DB queries and were on the list of things the
+// throttling pass was meant to spare. 5 min × 4 sources = at most ~48 history
+// fetches/hour across all browsers, vs the old ~60/hour each.
 const memo = new Map<string, { value: ActivityEvent[]; ts: number }>();
 const SOURCE_TTL = 300_000;
 async function memoSource(key: string, fn: () => Promise<ActivityEvent[]>): Promise<ActivityEvent[]> {
@@ -152,6 +152,48 @@ async function radarrEvents(creds: ServiceCreds): Promise<ActivityEvent[]> {
   }
 }
 
+// ── Lidarr ────────────────────────────────────────────────────────────────────
+// Lidarr writes one "trackFileImported" per track, so an album would flood the
+// feed. "downloadImported" is the whole download landing, once per album.
+interface LidarrHistoryRecord {
+  date?: string;
+  eventType?: string;
+  sourceTitle?: string;
+  quality?: { quality?: { name?: string } };
+  artist?:  { artistName?: string };
+  album?:   { title?: string };
+}
+async function lidarrEvents(creds: ServiceCreds): Promise<ActivityEvent[]> {
+  if (!creds.configured) return [];
+  try {
+    const data = await jsonFetch(
+      `${creds.url}/api/v1/history?pageSize=20&sortKey=date&sortDirection=descending&includeArtist=true&includeAlbum=true`,
+      { "X-Api-Key": creds.apiKey ?? "" },
+    ) as { records?: LidarrHistoryRecord[] };
+    const records = data.records ?? [];
+    return records
+      .filter(r => r.eventType === "grabbed" || r.eventType === "downloadImported")
+      .map(r => {
+        const artist = r.artist?.artistName ?? "";
+        const album  = r.album?.title ?? "";
+        const title  = artist && album ? `${artist} – ${album}`
+                     : artist || album || cleanReleaseTitle(r.sourceTitle ?? "");
+        const ts = r.date ? Date.parse(r.date) : NaN;
+        if (!title || isNaN(ts)) return null;
+        return {
+          source:    "lidarr" as const,
+          type:      r.eventType === "grabbed" ? "grabbed" as const : "imported" as const,
+          title,
+          subtitle:  r.quality?.quality?.name ?? undefined,
+          timestamp: ts,
+        };
+      })
+      .filter((e): e is NonNullable<typeof e> => e !== null);
+  } catch {
+    return [];
+  }
+}
+
 // ── Tautulli ──────────────────────────────────────────────────────────────────
 interface TautulliHistoryRow {
   full_title?:    string;
@@ -206,13 +248,14 @@ export async function GET() {
   }
 
   const cfg = await loadConfig();
-  const [sonarr, radarr, tautulli] = await Promise.all([
+  const [sonarr, radarr, lidarr, tautulli] = await Promise.all([
     memoSource(`sonarr:${cfg.services.sonarr.url}`,     () => sonarrEvents(cfg.services.sonarr)),
     memoSource(`radarr:${cfg.services.radarr.url}`,     () => radarrEvents(cfg.services.radarr)),
+    memoSource(`lidarr:${cfg.services.lidarr.url}`,     () => lidarrEvents(cfg.services.lidarr)),
     memoSource(`tautulli:${cfg.services.tautulli.url}`, () => tautulliEvents(cfg.services.tautulli)),
   ]);
 
-  const events = [...sonarr, ...radarr, ...tautulli]
+  const events = [...sonarr, ...radarr, ...lidarr, ...tautulli]
     .filter(e => !isNaN(e.timestamp))
     .sort((a, b) => b.timestamp - a.timestamp)
     .slice(0, MAX_EVENTS);

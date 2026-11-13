@@ -27,19 +27,22 @@ interface ServiceSpec {
   category:     "media" | "infra";
   description:  string;
   helpText?:    string;   // "Where do I find this?" hint for the API key / password
+  tokenOptional?: boolean; // bearer services that work without a token (Uptime Kuma's /metrics)
 }
 
 const SERVICES: ServiceSpec[] = [
   { id: "radarr",      label: "Radarr",            defaultPort: 30025, authShape: "apikey",   category: "media", envKeys: { url: "RADARR_URL",      apiKey: "RADARR_API_KEY"      }, description: "Movies library + queue", helpText: "Settings → General → Security → API Key" },
   { id: "sonarr",      label: "Sonarr",            defaultPort: 33027, authShape: "apikey",   category: "media", envKeys: { url: "SONARR_URL",      apiKey: "SONARR_API_KEY"      }, description: "TV series library + queue", helpText: "Settings → General → Security → API Key" },
+  { id: "lidarr",      label: "Lidarr",            defaultPort: 30071, authShape: "apikey",   category: "media", envKeys: { url: "LIDARR_URL",      apiKey: "LIDARR_API_KEY"      }, description: "Music library + queue", helpText: "Settings → General → Security → API Key" },
   { id: "bazarr",      label: "Bazarr",            defaultPort: 30046, authShape: "apikey",   category: "media", envKeys: { url: "BAZARR_URL",      apiKey: "BAZARR_API_KEY"      }, description: "Subtitle downloader", helpText: "Settings → General → Security → API Key" },
   { id: "tautulli",    label: "Tautulli",          defaultPort: 30047, authShape: "apikey",   category: "media", envKeys: { url: "TAUTULLI_URL",    apiKey: "TAUTULLI_API_KEY"    }, description: "Plex stream / history stats", helpText: "Settings → Web Interface → API key" },
   { id: "qbittorrent", label: "qBittorrent",       defaultPort: 30024, authShape: "userpass", category: "media", envKeys: { url: "QBIT_URL",        apiKey: "QBIT_API_KEY", username: "QBIT_USERNAME", password: "QBIT_PASSWORD" }, description: "Torrent client", helpText: "Tools → Options → Web UI → API Key (or Authentication, for username + password)" },
   { id: "overseerr",   label: "Overseerr",         defaultPort: 30002, authShape: "apikey",   category: "media", envKeys: { url: "OVERSEERR_URL",   apiKey: "OVERSEERR_API_KEY"   }, description: "Request management", helpText: "Settings → General → API Key (copy from the top)" },
+  { id: "nexbeat",     label: "nexbeat",           defaultPort: 30497, authShape: "bearer",   category: "media", envKeys: { url: "NEXBEAT_URL",     apiKey: "NEXBEAT_API_KEY"     }, description: "Music requests", helpText: "Profile → API tokens → create one with Read only ticked, as an administrator so it counts everyone's requests" },
   { id: "prowlarr",    label: "Prowlarr",          defaultPort: 30050, authShape: "apikey",   category: "media", envKeys: { url: "PROWLARR_URL",    apiKey: "PROWLARR_API_KEY"    }, description: "Indexer manager", helpText: "Settings → General → Security → API Key" },
   { id: "pihole",      label: "Pi-hole",           defaultPort: 20720, authShape: "password", category: "infra", envKeys: { url: "PIHOLE_URL",      password: "PIHOLE_PASSWORD"   }, description: "DNS-level ad/tracker blocking", helpText: "The password you set during Pi-hole installation" },
   { id: "nginx",       label: "Nginx Proxy Mgr",   defaultPort: 30020, authShape: "userpass", category: "infra", envKeys: { url: "NGINX_URL",       username: "NGINX_USERNAME", password: "NGINX_PASSWORD" }, description: "Reverse proxy admin", helpText: "The email and password you log in with" },
-  { id: "uptimekuma",  label: "Uptime Kuma",       defaultPort: 31050, authShape: "bearer",   category: "infra", envKeys: { url: "UPTIME_KUMA_URL", apiKey: "UPTIME_KUMA_API_KEY" }, description: "External monitor (optional auth — /metrics works without)", helpText: "Settings → API Keys → Add (optional — unauthenticated /metrics works)" },
+  { id: "uptimekuma",  label: "Uptime Kuma",       defaultPort: 31050, authShape: "bearer",   category: "infra", envKeys: { url: "UPTIME_KUMA_URL", apiKey: "UPTIME_KUMA_API_KEY" }, description: "External monitor (optional auth — /metrics works without)", helpText: "Settings → API Keys → Add (optional — unauthenticated /metrics works)", tokenOptional: true },
   { id: "speedtest",   label: "SpeedTracker",      defaultPort: 30220, authShape: "bearer",   category: "infra", envKeys: { url: "SPEEDTEST_URL",   apiKey: "SPEEDTEST_API_KEY"   }, description: "Speedtest history (display only)", helpText: "SpeedTracker Settings → Authentication → API Token" },
 ];
 
@@ -470,7 +473,7 @@ export default function SetupWizard() {
                         <Field label="API key" value={row.apiKey} onChange={v => updateRow(svc.id, { apiKey: v })} placeholder={keepHint(saved?.services[svc.id]?.hasApiKey)} type={showPasswords ? "text" : "password"} mono />
                       )}
                       {svc.authShape === "bearer" && (
-                        <Field label="Bearer token (optional)" value={row.apiKey} onChange={v => updateRow(svc.id, { apiKey: v })} placeholder={keepHint(saved?.services[svc.id]?.hasApiKey)} type={showPasswords ? "text" : "password"} mono />
+                        <Field label={svc.tokenOptional ? "Bearer token (optional)" : "API token"} value={row.apiKey} onChange={v => updateRow(svc.id, { apiKey: v })} placeholder={keepHint(saved?.services[svc.id]?.hasApiKey)} type={showPasswords ? "text" : "password"} mono />
                       )}
                       {keyOrLogin(svc) && (
                         <Field label="API key" value={row.apiKey} onChange={v => updateRow(svc.id, { apiKey: v })} placeholder={keepHint(saved?.services[svc.id]?.hasApiKey)} type={showPasswords ? "text" : "password"} mono />

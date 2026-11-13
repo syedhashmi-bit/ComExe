@@ -34,6 +34,7 @@ export function buildDemoServices(): ServiceResult[] {
   return [
     { name: "radarr",      up: true, configured: true, lines: ["1,247 movies (8.2 TB)", "12 missing cutoff", "2 in queue"], pct: 94, queueItems: [{ title: "Dune: Part Three", pct: 67, etaSec: 1200 }] },
     { name: "sonarr",      up: true, configured: true, lines: ["186 series (4.1 TB)", "3 missing episodes"], pct: 98, queueItems: [{ title: "The Bear S04E08", pct: 23, etaSec: 3600 }] },
+    { name: "lidarr",      up: true, configured: true, lines: ["212 artists · 380.4 GB", "1,904 albums · 6 missing albums"], pct: 97, queueItems: [{ title: "Khruangbin – A La Sala", pct: 41, etaSec: 600 }] },
     { name: "bazarr",      up: true, configured: true, lines: ["1,198 synced", "8 wanted"] },
     { name: "tautulli",    up: true, configured: true, lines: ["2 streams active", "47 plays this week"], streams: [
       { title: "Shogun S02E04", progress: 45, user: "alex", posStr: "21:30 / 47:15", decision: "Direct play", quality: "1080p", bitrateKbps: 8200, player: "Living room TV" },
@@ -41,6 +42,7 @@ export function buildDemoServices(): ServiceResult[] {
     ], weekly: { plays: 47, topShow: "Shogun", topUser: "alex" } },
     { name: "qbittorrent", up: true, configured: true, lines: ["2.4 ratio overall", "↓ 12.3 MB/s · ↑ 4.1 MB/s"], pct: 78, queueItems: [{ title: "ubuntu-24.04.iso", pct: 78, etaSec: 900 }, { title: "archlinux-2024.iso", pct: 34, etaSec: 2400 }] },
     { name: "overseerr",   up: true, configured: true, lines: ["12 pending requests", "3 processing"] },
+    { name: "nexbeat",     up: true, configured: true, lines: ["2 waiting · 1 running", "5 done this week · 212 artists · 1,904 albums"] },
     { name: "prowlarr",    up: true, configured: true, lines: ["8 indexers active", "23,411 grabs total"] },
     { name: "pihole",      up: true, configured: true, lines: ["16,173 queries today", "22% blocked", "Top: ads.tracker.com"], pct: 22 },
     { name: "nginx",       up: true, configured: true, lines: ["14 proxy hosts", "SSL certs: 14 valid"] },

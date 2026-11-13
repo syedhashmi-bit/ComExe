@@ -18,10 +18,13 @@ const DEFAULT_DEPS: DependencyEdge[] = [
   { from: "sonarr",      to: "qbittorrent",  label: "downloads" },
   { from: "radarr",      to: "prowlarr",     label: "indexers" },
   { from: "radarr",      to: "qbittorrent",  label: "downloads" },
+  { from: "lidarr",      to: "prowlarr",     label: "indexers" },
+  { from: "lidarr",      to: "qbittorrent",  label: "downloads" },
   { from: "bazarr",      to: "sonarr",       label: "series data" },
   { from: "bazarr",      to: "radarr",       label: "movie data" },
   { from: "overseerr",   to: "sonarr",       label: "requests" },
   { from: "overseerr",   to: "radarr",       label: "requests" },
+  { from: "nexbeat",     to: "lidarr",       label: "requests" },
   { from: "tautulli",    to: "plex",         label: "monitoring" },
   { from: "nginx",       to: "overseerr",    label: "proxy" },
 ];

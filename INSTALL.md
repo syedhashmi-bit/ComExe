@@ -197,6 +197,8 @@ docker run -d \
   -e TAUTULLI_API_KEY='<your-key>' \
   -e PROWLARR_API_KEY='<your-key>' \
   -e OVERSEERR_API_KEY='<your-key>' \
+  -e LIDARR_API_KEY='<your-key>' \
+  -e NEXBEAT_API_KEY='<your-read-only-token>' \
   -e QBIT_USERNAME='admin' \
   -e QBIT_PASSWORD='<your-password>' \
   -e PIHOLE_PASSWORD='<your-password>' \
@@ -356,7 +358,7 @@ later updates keep them:
 /root/update-dashboard.sh --enable-docker
 ```
 
-Only the services ComExe knows about can be read or restarted (Radarr, Sonarr, Seerr,
+Only the services ComExe knows about can be read or restarted (Radarr, Sonarr, Lidarr, Seerr, nexbeat,
 Plex, Pi-hole, Nginx Proxy Manager, Uptime Kuma, Prometheus, Grafana, node-exporter, …).
 TrueNAS apps are matched by app name, so `ix-radarr-radarr-1` counts as `radarr`. Add
 others by app or container name: `-e COMEXE_DOCKER_ALLOW=kavita,audiobookshelf`. The

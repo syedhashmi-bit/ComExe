@@ -1,7 +1,7 @@
-// ── Coming up: Sonarr + Radarr calendars ────────────────────────────────────
-// The logic behind /api/calendar: episodes airing and movies releasing over
-// the next 7 days, plus the last 7 so the card can say which aired episodes
-// haven't downloaded. Cached 15 minutes — a calendar doesn't change by the
+// ── Coming up: Sonarr + Radarr + Lidarr calendars ───────────────────────────
+// The logic behind /api/calendar: episodes airing and movies and albums
+// releasing over the next 7 days, plus the last 7 so the card can say which
+// aired episodes haven't downloaded. Cached 15 minutes — a calendar doesn't change by the
 // minute, and these are real database queries on the *arr containers (the
 // load story in CLAUDE.md).
 //
@@ -36,6 +36,13 @@ interface RadarrMovie {
   digitalRelease?: string;
 }
 
+interface LidarrAlbum {
+  title?: string;
+  releaseDate?: string;
+  artist?: { artistName?: string };
+  statistics?: { trackFileCount?: number; trackCount?: number };
+}
+
 const pad = (n: number) => String(n).padStart(2, "0");
 
 export function sonarrItems(episodes: SonarrEpisode[]): CalendarItem[] {
@@ -68,6 +75,19 @@ export function radarrItems(movies: RadarrMovie[], from: number, to: number): Ca
   });
 }
 
+// An album's release date is a date, so it's all-day. It counts as downloaded
+// only once every track is: an album with half its tracks is still missing.
+export function lidarrItems(albums: LidarrAlbum[], from: number, to: number): CalendarItem[] {
+  return albums.flatMap((a) => {
+    const at = a.releaseDate ? Date.parse(a.releaseDate) : NaN;
+    if (!a.title || isNaN(at) || at < from || at > to) return [];
+    const artist = a.artist?.artistName;
+    const tracks = a.statistics?.trackCount ?? 0;
+    const hasFile = tracks > 0 && (a.statistics?.trackFileCount ?? 0) >= tracks;
+    return [{ source: "lidarr" as const, kind: "album" as const, title: artist ? `${artist} – ${a.title}` : a.title, detail: "", at, hasFile, allDay: true }];
+  });
+}
+
 async function fetchArr<T>(creds: ServiceCreds, path: string): Promise<T[] | null> {
   const data = await fetchJson<T[]>(`${creds.url}${path}`, {
     timeoutMs: 8_000,
@@ -95,14 +115,15 @@ async function fetchCalendar(): Promise<CalendarFeed> {
   const now = Date.now();
   const from = now - WINDOW_DAYS * DAY, to = now + WINDOW_DAYS * DAY;
   const range = `start=${new Date(from).toISOString()}&end=${new Date(to).toISOString()}&unmonitored=false`;
-  const { sonarr, radarr } = cfg.services;
+  const { sonarr, radarr, lidarr } = cfg.services;
 
-  const [eps, movies] = await Promise.all([
+  const [eps, movies, albums] = await Promise.all([
     sonarr.configured ? fetchArr<SonarrEpisode>(sonarr, `/api/v3/calendar?${range}&includeSeries=true`) : Promise.resolve(null),
     radarr.configured ? fetchArr<RadarrMovie>(radarr, `/api/v3/calendar?${range}`) : Promise.resolve(null),
+    lidarr.configured ? fetchArr<LidarrAlbum>(lidarr, `/api/v1/calendar?${range}&includeArtist=true`) : Promise.resolve(null),
   ]);
 
-  const items = [...sonarrItems(eps ?? []), ...radarrItems(movies ?? [], from, to)]
+  const items = [...sonarrItems(eps ?? []), ...radarrItems(movies ?? [], from, to), ...lidarrItems(albums ?? [], from, to)]
     .sort((a, b) => a.at - b.at)
     .slice(0, MAX_ITEMS);
 
@@ -110,7 +131,11 @@ async function fetchCalendar(): Promise<CalendarFeed> {
     !configured ? "unconfigured" as const : data ? "ok" as const : "error" as const;
 
   return {
-    sources: { sonarr: status(sonarr.configured, eps), radarr: status(radarr.configured, movies) },
+    sources: {
+      sonarr: status(sonarr.configured, eps),
+      radarr: status(radarr.configured, movies),
+      lidarr: status(lidarr.configured, albums),
+    },
     items,
     timestamp: now,
   };

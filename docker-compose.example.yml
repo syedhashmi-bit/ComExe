@@ -57,6 +57,8 @@ services:
       TAUTULLI_API_KEY:  your-tautulli-key
       PROWLARR_API_KEY:  your-prowlarr-key
       OVERSEERR_API_KEY: your-overseerr-key
+      LIDARR_API_KEY:    your-lidarr-key
+      NEXBEAT_API_KEY:   your-read-only-nexbeat-token
       QBIT_USERNAME:     admin
       QBIT_PASSWORD:     your-qbit-password
       PIHOLE_PASSWORD:   your-pihole-password

@@ -91,8 +91,8 @@ export async function listContainers(): Promise<Container[]> {
 // ComExe itself. COMEXE_DOCKER_ALLOW (comma-separated app or container names)
 // extends both.
 const BUILTIN_ALLOW = new Set([
-  "radarr", "sonarr", "bazarr", "tautulli", "qbittorrent", "prowlarr",
-  "overseerr", "seerr", "jellyseerr",
+  "radarr", "sonarr", "lidarr", "bazarr", "tautulli", "qbittorrent", "prowlarr",
+  "overseerr", "seerr", "jellyseerr", "nexbeat",
   "plex",
   "pihole", "pi-hole",
   "nginx", "nginx-proxy-manager", "npm",

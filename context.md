@@ -53,6 +53,8 @@ Open-Meteo coords: `lat=-41.4419, lon=147.1450`.
 | Prowlarr | `30050` | `$PROWLARR_API_KEY` |
 | qBittorrent | `30024` | `$QBIT_USERNAME` / `$QBIT_PASSWORD` (cookie SID auth) |
 | Overseerr | `30357` | `$OVERSEERR_API_KEY` |
+| Lidarr | `30071` | `$LIDARR_API_KEY` (header `X-Api-Key`, API v1) |
+| nexbeat | `30497` | `$NEXBEAT_API_KEY` (bearer; a read-only API token) |
 | Plex | `32400` | not currently read by dashboard (Tautulli covers Plex sessions) |
 
 ## Network / infra — `192.168.88.196`
@@ -87,6 +89,8 @@ All credentials are server-side `process.env.*`. None hardcoded. As of the exter
 | `TAUTULLI_API_KEY` | `services/route.ts` → `tautulli()` |
 | `PROWLARR_API_KEY` | `services/route.ts` → `prowlarr()` |
 | `OVERSEERR_API_KEY` | `services/route.ts` → `overseerr()` |
+| `LIDARR_API_KEY` | `lib/services.ts` → `lidarr()`, plus calendar + activity |
+| `NEXBEAT_API_KEY` | `lib/services.ts` → `nexbeat()` |
 | `QBIT_USERNAME` / `QBIT_PASSWORD` | `services/route.ts` → `qbittorrent()` |
 | `PIHOLE_PASSWORD` | `services/route.ts` → `pihole()` |
 | `NGINX_USERNAME` / `NGINX_PASSWORD` | `services/route.ts` → `nginxProxy()` |
@@ -105,6 +109,8 @@ All credentials are server-side `process.env.*`. None hardcoded. As of the exter
 | `TAUTULLI_URL` | `${TRUENAS_IP}:30047` | services + activity + client |
 | `QBIT_URL` | `${TRUENAS_IP}:30024` | services + client |
 | `OVERSEERR_URL` | `${TRUENAS_IP}:30002` | services + client |
+| `LIDARR_URL` | `${TRUENAS_IP}:30071` | services + calendar + activity + client |
+| `NEXBEAT_URL` | `${TRUENAS_IP}:30497` | services + client |
 | `PIHOLE_URL` | `${TRUENAS_IP}:20720` | services + client |
 | `PROWLARR_URL` | `${TRUENAS_IP}:30050` | services + client |
 | `NGINX_URL` | `${TRUENAS_IP}:30020` | services + client |
