@@ -71,3 +71,28 @@ describe("/api/test-connection — Lidarr and nexbeat", () => {
       .toEqual({ ok: false, message: "Unauthorized — wrong or deactivated API token" });
   });
 });
+
+describe("/api/test-connection — SABnzbd and Scrutiny", () => {
+  it("reads SABnzbd's HTTP 200 'API Key Incorrect' as a wrong key", async () => {
+    fetchWithTimeout.mockResolvedValue(Response.json({ status: false, error: "API Key Incorrect" }));
+    expect(await test({ service: "sabnzbd", url: "http://nas:30055", apiKey: "bad" }))
+      .toEqual({ ok: false, message: "Unauthorized — wrong API key" });
+  });
+
+  it("connects to SABnzbd with a good key", async () => {
+    fetchWithTimeout.mockResolvedValue(Response.json({ queue: { version: "5.1.3" } }));
+    expect(await test({ service: "sabnzbd", url: "http://nas:30055", apiKey: "k" }))
+      .toEqual({ ok: true, message: "Connected (v5.1.3)" });
+  });
+
+  it("tests Scrutiny with no key, counting its drives", async () => {
+    fetchWithTimeout.mockResolvedValue(Response.json({ success: true, data: { summary: { a: {}, b: {} } } }));
+    expect(await test({ service: "scrutiny", url: "http://nas:31054" })).toEqual({ ok: true, message: "Connected · 2 drives" });
+    expect(String(fetchWithTimeout.mock.calls[0][0])).toBe("http://nas:31054/api/summary");
+  });
+
+  it("says when an address answers but isn't Scrutiny", async () => {
+    fetchWithTimeout.mockResolvedValue(Response.json({ hello: "world" }));
+    expect((await test({ service: "scrutiny", url: "http://nas:31054" })).ok).toBe(false);
+  });
+});

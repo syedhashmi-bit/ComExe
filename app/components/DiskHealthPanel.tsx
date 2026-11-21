@@ -6,6 +6,7 @@ import { usePollingInterval } from "@/app/hooks/usePolling";
 import { isDemoMode } from "@/app/lib/demo-data";
 import { fmtSmoothAgo, withAlpha } from "@/app/lib/formatters";
 import { friendlyDriveName } from "@/app/lib/drive-names";
+import { SCRUTINY_STATUS_TEXT } from "@/app/lib/scrutiny";
 
 // Disk health as one table: every drive's temperature on a shared 20–80 °C
 // scale with its warm and hot zones marked, its age, bad sectors and the last
@@ -39,10 +40,21 @@ export function diskErrors(d: SmartDisk): { total: number | null; detail: string
   return { total: known.reduce((s, [, v]) => s + v, 0), detail: known.map(([k, v]) => `${v} ${k}`).join(" · ") };
 }
 
+// Failing by SMART, or judged likely to fail by Scrutiny (when it's set up).
+export const scrutinyFlags = (d: SmartDisk) => !!d.scrutiny && d.scrutiny.status !== "passed";
+export const isFailing = (d: SmartDisk) => !d.healthy || scrutinyFlags(d);
+
+// The row's word for a failing drive: SMART's own failure is "Failing";
+// Scrutiny's check alone, a prediction from Backblaze's failure rates, is "At risk".
+export function failingWord(d: SmartDisk): string | null {
+  if (!d.healthy || d.scrutiny?.status === "failed-smart" || d.scrutiny?.status === "failed-both") return "Failing";
+  return scrutinyFlags(d) ? "At risk" : null;
+}
+
 // 0 failing or bad sectors · 1 hot · 2 warm · 3 fine.
 export function diskRank(d: SmartDisk): number {
   const { warn, crit } = tempLimits(d.kind);
-  if (!d.healthy || (diskErrors(d).total ?? 0) > 0) return 0;
+  if (isFailing(d) || (diskErrors(d).total ?? 0) > 0) return 0;
   if (d.temperature != null && d.temperature >= crit) return 1;
   if (d.temperature != null && d.temperature >= warn) return 2;
   return 3;
@@ -92,6 +104,7 @@ function demoFeed(): SmartFeed {
   const now = Date.now();
   const disk = (device: string, kind: SmartDisk["kind"], model: string, temperature: number, years: number | null, h: number[]): SmartDisk => ({
     device, kind, model, serial: "", temperature, healthy: true, history: h,
+    scrutiny: { status: "passed", url: `http://scrutiny.example/web/device/${device.slice(5)}` },
     powerOnHours: years != null ? Math.round(years * 8760) : null,
     reallocatedSectors: years != null ? 0 : null, pendingSectors: years != null ? 0 : null, uncorrectableSectors: years != null ? 0 : null,
   });
@@ -291,6 +304,15 @@ function DiskDetail({ d }: { d: SmartDisk }) {
                 {[friendly ? raw : null, detail.serial ?? d.serial ?? null, detail.firmware ? `firmware ${detail.firmware}` : null].filter(Boolean).join(" · ")}
               </span>
             </div>
+            {d.scrutiny && (
+              <span className="flex flex-wrap items-baseline" style={{ columnGap: 8, fontSize: 12 }}>
+                <span style={{ color: d.scrutiny.status === "passed" ? "var(--text-faint)" : "var(--critical)", fontWeight: d.scrutiny.status === "passed" ? 400 : 600 }}>
+                  Scrutiny: {SCRUTINY_STATUS_TEXT[d.scrutiny.status]}
+                </span>
+                <a href={d.scrutiny.url} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
+                  style={{ color: "var(--brand)" }}>Open in Scrutiny ↗</a>
+              </span>
+            )}
             {detail.attributes.length === 0 ? (
               <span style={{ fontSize: 12, color: "var(--text-faint)", lineHeight: 1.5 }}>
                 This drive reports only whether it&apos;s healthy, no SMART counters. Its temperature comes from the kernel&apos;s sensor.
@@ -386,7 +408,7 @@ export function DiskHealthPanel() {
     );
   }
 
-  const failing = disks.filter(d => !d.healthy);
+  const failing = disks.filter(isFailing);
   const withTemp = disks.filter(d => d.temperature != null);
   const warmest = withTemp.length ? withTemp.reduce((a, b) => (b.temperature! > a.temperature! ? b : a)) : null;
   const aged = disks.filter(d => d.powerOnHours != null);
@@ -415,7 +437,7 @@ export function DiskHealthPanel() {
         <span className="flex items-center gap-1.5" style={{ fontSize: 12, color: failing.length ? "var(--critical)" : "var(--text-muted)", fontWeight: failing.length ? 600 : 400 }}>
           <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: 3, background: failing.length ? "var(--critical)" : "var(--ok)" }} />
           {failing.length
-            ? `${failing.length} failing SMART: ${failing.map(d => shortDev(d.device)).join(", ")}`
+            ? `${failing.length} ${failing.length === 1 ? "drive needs" : "drives need"} attention: ${failing.map(d => shortDev(d.device)).join(", ")}`
             : `All ${disks.length} healthy`}
         </span>
         {summary && <span className="ml-auto" style={{ fontSize: 12, color: "var(--text-faint)" }}>{summary}</span>}
@@ -457,7 +479,10 @@ export function DiskHealthPanel() {
                       {shortDev(d.device)}
                     </button>
                     {d.kind && <span style={{ fontSize: 12, color: "var(--text-faint)", border: "1px solid var(--border)", borderRadius: 4, padding: "0 5px" }}>{KIND[d.kind]}</span>}
-                    {!d.healthy && <span style={{ fontSize: 12, fontWeight: 600, color: "var(--critical)" }}>Failing</span>}
+                    {failingWord(d) && (
+                      <span title={d.scrutiny && d.scrutiny.status !== "passed" ? `Scrutiny: ${SCRUTINY_STATUS_TEXT[d.scrutiny.status]}` : "SMART reports this drive as failing"}
+                        style={{ fontSize: 12, fontWeight: 600, color: "var(--critical)" }}>{failingWord(d)}</span>
+                    )}
                   </span>
                   <span className="truncate" title={[d.model, d.serial].filter(Boolean).join(" · ")} style={{ fontSize: 12, color: "var(--text-faint)", paddingLeft: 16 }}>
                     {friendly ?? d.model}

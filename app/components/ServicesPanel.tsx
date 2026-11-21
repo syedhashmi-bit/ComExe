@@ -21,12 +21,12 @@ function buildSvcUrls(ip: string): Record<string, string> {
 }
 
 const SVC_CATEGORIES: { id: string; label: string; services: string[] }[] = [
-  { id: "media", label: "Media",          services: ["radarr", "sonarr", "lidarr", "bazarr", "tautulli", "qbittorrent", "overseerr", "nexbeat", "prowlarr"] },
-  { id: "infra", label: "Infrastructure", services: ["pihole", "nginx", "uptimekuma"] },
+  { id: "media", label: "Media",          services: ["radarr", "sonarr", "lidarr", "bazarr", "tautulli", "qbittorrent", "sabnzbd", "overseerr", "nexbeat", "prowlarr"] },
+  { id: "infra", label: "Infrastructure", services: ["pihole", "nginx", "uptimekuma", "scrutiny"] },
 ];
 
 // Services whose download queue shows as a sub-list under the row.
-const QUEUE_SERVICES = new Set(["radarr", "sonarr", "lidarr", "qbittorrent"]);
+const QUEUE_SERVICES = new Set(["radarr", "sonarr", "lidarr", "qbittorrent", "sabnzbd"]);
 
 // Problems first, then busy services, then idle ones; route order within a tier.
 function tier(s: ServiceResult): number {

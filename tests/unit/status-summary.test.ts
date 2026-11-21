@@ -42,6 +42,14 @@ describe("StatusSummary collectIssues", () => {
     expect(issues).toHaveLength(1);
     expect(issues[0]).toMatchObject({ status: "Health error", subject: "Radarr, Sonarr, Prowlarr", level: "critical" });
     expect(issues[0].title).toContain("Radarr: Indexer down");
+    expect(issues[0].detail).toBe("Each reports a problem under System › Status.");
+  });
+
+  it("says what's wrong for a service whose health isn't an *arr's System › Status", () => {
+    const [i] = collectIssues(metrics(), [
+      svc("scrutiny", { health: { error: 2, warning: 0, messages: ["sda (WDC WD80EFAX) failed SMART", "sdb failed Scrutiny's check"] } }),
+    ], cfg, false);
+    expect(i).toMatchObject({ status: "Health error", subject: "Scrutiny", detail: "sda (WDC WD80EFAX) failed SMART and 1 more." });
   });
 
   it("covers down, rejected credentials, stale data and Uptime Kuma, worst first", () => {

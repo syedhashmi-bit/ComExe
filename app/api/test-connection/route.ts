@@ -107,6 +107,35 @@ async function testNexbeat(url: string, key: string): Promise<TestResult> {
   }
 }
 
+// SABnzbd answers a wrong key with HTTP 200 and { error: "API Key Incorrect" }.
+async function testSabnzbd(url: string, key: string): Promise<TestResult> {
+  if (!key) return fail("Missing API key");
+  try {
+    const r = await fetchWithTimeout(`${url}/api?mode=queue&output=json&limit=1&apikey=${encodeURIComponent(key)}`,
+      { timeoutMs: TIMEOUT, skipBreaker: true, headers: { Accept: "application/json" } });
+    if (!r.ok) return fail(`HTTP ${r.status}`);
+    const data = await r.json() as { error?: string; queue?: { version?: string } };
+    if (data.error) return fail(/api key/i.test(data.error) ? "Unauthorized — wrong API key" : `SABnzbd returned: ${data.error}`);
+    return pass(`Connected${data.queue?.version ? ` (v${data.queue.version})` : ""}`);
+  } catch (e) {
+    return fail(`Could not reach ${url} — ${(e as Error).message}`);
+  }
+}
+
+// Scrutiny has no auth: a summary that parses is a working address.
+async function testScrutiny(url: string): Promise<TestResult> {
+  try {
+    const r = await fetchWithTimeout(`${url}/api/summary`, { timeoutMs: TIMEOUT, skipBreaker: true, headers: { Accept: "application/json" } });
+    if (!r.ok) return fail(`HTTP ${r.status}`);
+    const data = await r.json() as { success?: boolean; data?: { summary?: Record<string, unknown> } };
+    if (!data.success || !data.data?.summary) return fail("That address answered, but not like Scrutiny's API");
+    const n = Object.keys(data.data.summary).length;
+    return pass(`Connected · ${n} drive${n === 1 ? "" : "s"}`);
+  } catch (e) {
+    return fail(`Could not reach ${url} — ${(e as Error).message}`);
+  }
+}
+
 async function testProwlarr(url: string, key: string): Promise<TestResult> {
   if (!key) return fail("Missing API key");
   try {
@@ -340,6 +369,8 @@ export async function POST(req: Request) {
     case "tautulli":    result = await testTautulli(cleanUrl, key ?? "");                  break;
     case "prowlarr":    result = await testProwlarr(cleanUrl, key ?? "");                  break;
     case "overseerr":   result = await testOverseerr(cleanUrl, key ?? "");                 break;
+    case "sabnzbd":     result = await testSabnzbd(cleanUrl, key ?? "");                   break;
+    case "scrutiny":    result = await testScrutiny(cleanUrl);                             break;
     case "nexbeat":     result = await testNexbeat(cleanUrl, key ?? "");                   break;
     case "qbittorrent": result = await testQbittorrent(cleanUrl, key ?? "", user ?? "", pass ?? ""); break;
     case "pihole":      result = await testPihole(cleanUrl, pass ?? "");                  break;

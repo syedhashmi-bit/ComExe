@@ -48,12 +48,14 @@ export interface ResolvedConfig {
     bazarr:      ServiceCreds;
     tautulli:    ServiceCreds;
     qbittorrent: ServiceCreds;
+    sabnzbd:     ServiceCreds;
     overseerr:   ServiceCreds;
     nexbeat:     ServiceCreds;
     pihole:      ServiceCreds;
     prowlarr:    ServiceCreds;
     nginx:       ServiceCreds;
     uptimekuma:  ServiceCreds;
+    scrutiny:    ServiceCreds;
     speedtest:   ServiceCreds;
   };
   grafana: {
@@ -92,7 +94,7 @@ interface ServiceManifest {
   name:        ServiceName;
   defaultPort: number;
   envUrl:      string;
-  authShape:   "apikey" | "userpass" | "password" | "bearer";
+  authShape:   "apikey" | "userpass" | "password" | "bearer" | "none";
   envApiKey?:  string;
   envUsername?: string;
   envPassword?: string;
@@ -112,6 +114,7 @@ const MANIFEST: ServiceManifest[] = [
   // satisfies "configured" — see the apikey-or-userpass branch in
   // resolveService below.
   { name: "qbittorrent", defaultPort: 30024, envUrl: "QBIT_URL",        authShape: "userpass", envApiKey: "QBIT_API_KEY", envUsername: "QBIT_USERNAME", envPassword: "QBIT_PASSWORD" },
+  { name: "sabnzbd",     defaultPort: 30055, envUrl: "SABNZBD_URL",     authShape: "apikey",   envApiKey:   "SABNZBD_API_KEY" },
   { name: "overseerr",   defaultPort: 30357, envUrl: "OVERSEERR_URL",   authShape: "apikey",   envApiKey:   "OVERSEERR_API_KEY" },
   // nexbeat's API tokens are bearer tokens (Profile → API tokens, "nxb_…").
   { name: "nexbeat",     defaultPort: 30497, envUrl: "NEXBEAT_URL",     authShape: "bearer",   envApiKey:   "NEXBEAT_API_KEY" },
@@ -119,6 +122,10 @@ const MANIFEST: ServiceManifest[] = [
   { name: "prowlarr",    defaultPort: 30050, envUrl: "PROWLARR_URL",    authShape: "apikey",   envApiKey:   "PROWLARR_API_KEY" },
   { name: "nginx",       defaultPort: 30020, envUrl: "NGINX_URL",       authShape: "userpass", envUsername: "NGINX_USERNAME", envPassword: "NGINX_PASSWORD" },
   { name: "uptimekuma",  defaultPort: 31050, envUrl: "UPTIME_KUMA_URL", authShape: "bearer",   envApiKey:   "UPTIME_KUMA_API_KEY", optionalAuth: true },
+  // Scrutiny's API has no auth. It counts as set up once its URL is (the
+  // wizard saves one when ticked), so an install without Scrutiny never polls
+  // a default address and shows it as down.
+  { name: "scrutiny",    defaultPort: 31054, envUrl: "SCRUTINY_URL",    authShape: "none" },
   { name: "speedtest",   defaultPort: 30220, envUrl: "SPEEDTEST_URL",   authShape: "bearer",   envApiKey:   "SPEEDTEST_API_KEY" },
 ];
 
@@ -234,6 +241,8 @@ function resolveService(m: ServiceManifest, file: PartialFileConfig | null, true
     if (!password) required.push(m.envPassword!);
   } else if (m.authShape === "password") {
     if (!password) required.push(m.envPassword!);
+  } else if (m.authShape === "none") {
+    if (!fromFile.url && !process.env[m.envUrl]) required.push(m.envUrl);
   }
   return {
     url,

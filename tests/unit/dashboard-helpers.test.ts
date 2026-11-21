@@ -9,7 +9,7 @@ import { fmtDuration } from "@/app/lib/formatters";
 import { seedFromHistory, type SavedPoint } from "@/app/lib/history-seed";
 import { statusIcon, statusTitle } from "@/app/hooks/useTabStatus";
 import { summarize, transferred, trendPaths, type TrendPoint } from "@/app/components/TrendsCard";
-import { tempLimits, scalePct, diskErrors, fmtAge, sortDisks, attrLabel } from "@/app/components/DiskHealthPanel";
+import { tempLimits, scalePct, diskErrors, fmtAge, sortDisks, attrLabel, failingWord } from "@/app/components/DiskHealthPanel";
 import { friendlyDriveName } from "@/app/lib/drive-names";
 import type { SmartDisk } from "@/app/lib/types";
 
@@ -257,6 +257,19 @@ describe("Disk health ordering and labels", () => {
       disk("/dev/sde", { temperature: 40 }),
     ]).map(d => d.device);
     expect(order).toEqual(["/dev/sdd", "/dev/sdc", "/dev/nvme0", "/dev/sdb", "/dev/sda", "/dev/sde"]);
+  });
+
+  it("puts a drive Scrutiny flags with the problems, as 'At risk' unless SMART fails it too", () => {
+    const at = (status: NonNullable<SmartDisk["scrutiny"]>["status"]) => ({ status, url: "http://s/web/device/w" });
+    const order = sortDisks([
+      disk("/dev/sda", { temperature: 52 }),
+      disk("/dev/sdb", { temperature: 38, scrutiny: at("failed-scrutiny") }),
+    ]).map(d => d.device);
+    expect(order).toEqual(["/dev/sdb", "/dev/sda"]);
+    expect(failingWord(disk("/dev/sda", { scrutiny: at("passed") }))).toBeNull();
+    expect(failingWord(disk("/dev/sda", { scrutiny: at("failed-scrutiny") }))).toBe("At risk");
+    expect(failingWord(disk("/dev/sda", { scrutiny: at("failed-smart") }))).toBe("Failing");
+    expect(failingWord(disk("/dev/sda", { healthy: false }))).toBe("Failing");
   });
 
   it("names SMART attributes readably, and copes with unknown ones", () => {

@@ -8,6 +8,9 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 type Row = { metric: Record<string, string>; value: number };
 type Series = { metric: Record<string, string>; values: { ts: number; value: number }[] };
 const queries: string[] = [];
+const scrutinyCalls: string[] = [];
+let scrutinyConfigured = false;
+let scrutinyBody: unknown = null;
 
 function series(byQuery: Record<string, Row[]>, extra: { scalars?: Record<string, number>; ranges?: Record<string, Series[]> } = {}) {
   vi.doMock("@/app/lib/prometheus", () => ({
@@ -20,7 +23,14 @@ function series(byQuery: Record<string, Row[]>, extra: { scalars?: Record<string
 beforeEach(() => {
   vi.resetModules();
   queries.length = 0;
-  vi.doMock("@/app/lib/server-config", () => ({ loadConfig: async () => ({ prometheusUrl: "http://prom:9090" }) }));
+  scrutinyCalls.length = 0;
+  scrutinyBody = null;
+  scrutinyConfigured = false;
+  vi.doMock("@/app/lib/server-config", () => ({ loadConfig: async () => ({
+    prometheusUrl: "http://prom:9090",
+    services: { scrutiny: { url: "http://scrutiny:31054", configured: scrutinyConfigured } },
+  }) }));
+  vi.doMock("@/app/lib/http", () => ({ fetchJson: async (url: string) => { scrutinyCalls.push(url); return scrutinyBody; } }));
 });
 
 const sda = { disk: "/dev/sda", type: "sat" };
@@ -153,5 +163,40 @@ describe("/api/smart?device=", () => {
     });
     const body = await (await get("/dev/nvme0")).json();
     expect(body).toMatchObject({ attributes: [], firmware: "SN24737", serial: "9WBO6", history: [{ ts: 1, value: 30.9 }] });
+  });
+});
+
+describe("/api/smart with Scrutiny", () => {
+  const two = {
+    smartmon_temperature_celsius_raw_value: [
+      { metric: { disk: "/dev/sda", type: "sat" }, value: 36 },
+      { metric: { disk: "/dev/sdb", type: "sat" }, value: 38 },
+    ],
+  };
+
+  it("adds Scrutiny's verdict and link to the drive it names", async () => {
+    series(two);
+    scrutinyConfigured = true;
+    scrutinyBody = { success: true, data: { summary: {
+      "0x5000c500a": { device: { wwn: "0x5000c500a", device_name: "sda", model_name: "WDC WD40EFRX", device_status: 2 }, smart: { collector_date: "2026-11-20T00:00:00Z" } },
+      "0x5000c500b": { device: { wwn: "0x5000c500b", device_name: "sdz", device_status: 0 } },
+    } } };
+    const { GET } = await import("@/app/api/smart/route");
+    const { disks } = await (await GET()).json();
+
+    expect(scrutinyCalls).toEqual(["http://scrutiny:31054/api/summary"]);
+    expect(disks.find((d: { device: string }) => d.device === "/dev/sda").scrutiny)
+      .toEqual({ status: "failed-scrutiny", url: "http://scrutiny:31054/web/device/0x5000c500a" });
+    // sdb isn't in Scrutiny's list, and sdz isn't one smartmon reports.
+    expect(disks.find((d: { device: string }) => d.device === "/dev/sdb").scrutiny).toBeUndefined();
+    expect(disks.map((d: { device: string }) => d.device)).toEqual(["/dev/sda", "/dev/sdb"]);
+  });
+
+  it("doesn't call Scrutiny when it isn't set up", async () => {
+    series(two);
+    const { GET } = await import("@/app/api/smart/route");
+    const { disks } = await (await GET()).json();
+    expect(scrutinyCalls).toEqual([]);
+    expect(disks.every((d: { scrutiny?: unknown }) => d.scrutiny === undefined)).toBe(true);
   });
 });

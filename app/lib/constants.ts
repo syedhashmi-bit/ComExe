@@ -49,8 +49,8 @@ export const TIMEZONES = [
 
 export const SVC_PORTS: Record<string, number> = {
   radarr: 30025, sonarr: 33027, lidarr: 30071, bazarr: 30046, tautulli: 30047,
-  qbittorrent: 30024, overseerr: 30002, nexbeat: 30497, nginx: 30020, pihole: 20720,
-  prowlarr: 30050, uptimekuma: 31050, speedtest: 30220, prometheus: 30104,
+  qbittorrent: 30024, sabnzbd: 30055, overseerr: 30002, nexbeat: 30497, nginx: 30020, pihole: 20720,
+  prowlarr: 30050, uptimekuma: 31050, scrutiny: 31054, speedtest: 30220, prometheus: 30104,
 };
 
 // ── Service identity: colour, icon, display name ────────────────────────────
@@ -71,7 +71,7 @@ export const SVC_COLORS: Record<string, string> = {
   radarr: "#f5c518", sonarr: "#35c5f4", lidarr: "#00a65b", bazarr: "#4a90d9",
   tautulli: "#e5a00d", qbittorrent: "#2196f3", overseerr: "#e5a00d", nexbeat: "#f43f5e",
   pihole: "#f60d1a", prowlarr: "#ff8c00", nginx: "#2ecc71",
-  uptimekuma: "#5cdd8b",
+  uptimekuma: "#5cdd8b", sabnzbd: "#f5b800", scrutiny: "#8b1e3f",
   // Referenced by the dependency graph, which can include services the
   // dashboard doesn't poll directly.
   plex: "#e5a00d", grafana: "#f97316", prometheus: "#e6522c",
@@ -84,12 +84,14 @@ export const SVC_ICONS: Record<string, string> = {
   bazarr:      "/icons/bazarr.png",
   tautulli:    "/icons/tautulli.png",
   qbittorrent: "/icons/qbittorrent.png",
+  sabnzbd:     "/icons/sabnzbd.png",
   overseerr:   "/icons/overseerr.png",
   nexbeat:     "/icons/nexbeat.png",
   nginx:       "/icons/nginx.png",
   pihole:      "/icons/pihole.png",
   prowlarr:    "/icons/prowlarr.png",
   uptimekuma:  "/icons/uptimekuma.png",
+  scrutiny:    "/icons/scrutiny.png",
 };
 
 // Official brand casing. Without an entry, callers fall back to the raw
@@ -101,10 +103,12 @@ export const SVC_LABELS: Record<string, string> = {
   bazarr:      "Bazarr",
   tautulli:    "Tautulli",
   qbittorrent: "qBittorrent",
+  sabnzbd:     "SABnzbd",
   overseerr:   "Overseerr",
   nexbeat:     "nexbeat",
   prowlarr:    "Prowlarr",
   pihole:      "Pi-hole",
   nginx:       "Nginx Proxy",
   uptimekuma:  "Uptime Kuma",
+  scrutiny:    "Scrutiny",
 };

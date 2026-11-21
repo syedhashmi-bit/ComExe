@@ -59,6 +59,8 @@ services:
       OVERSEERR_API_KEY: your-overseerr-key
       LIDARR_API_KEY:    your-lidarr-key
       NEXBEAT_API_KEY:   your-read-only-nexbeat-token
+      SABNZBD_API_KEY:   your-sabnzbd-key
+      SCRUTINY_URL:      http://192.168.88.196:31054   # no key; the URL turns it on
       QBIT_USERNAME:     admin
       QBIT_PASSWORD:     your-qbit-password
       PIHOLE_PASSWORD:   your-pihole-password

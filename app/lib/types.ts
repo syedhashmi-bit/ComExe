@@ -269,7 +269,12 @@ export interface SmartDisk {
   uncorrectableSectors: number | null;
   healthy:              boolean;
   history:              number[];                       // °C over the last 24 h, oldest first
+  scrutiny?:            { status: ScrutinyStatus; url: string };  // when Scrutiny is set up and lists the drive
 }
+
+// Scrutiny's verdict on a drive (lib/scrutiny.ts): its own SMART thresholds,
+// and Backblaze's failure rates for the same attributes.
+export type ScrutinyStatus = "passed" | "failed-smart" | "failed-scrutiny" | "failed-both";
 
 export interface SmartFeed {
   disks:     SmartDisk[];

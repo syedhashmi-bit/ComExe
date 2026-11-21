@@ -16,7 +16,7 @@ import type { SavedConfig } from "@/app/lib/types";
 // progress. PASSWORDS / API KEYS LIVE IN LOCALSTORAGE while the user is on
 // this page — we clear them on "I'm done" or via the explicit clear button.
 
-type AuthShape = "apikey" | "userpass" | "password" | "bearer";
+type AuthShape = "apikey" | "userpass" | "password" | "bearer" | "none";
 
 interface ServiceSpec {
   id:           string;
@@ -37,12 +37,14 @@ const SERVICES: ServiceSpec[] = [
   { id: "bazarr",      label: "Bazarr",            defaultPort: 30046, authShape: "apikey",   category: "media", envKeys: { url: "BAZARR_URL",      apiKey: "BAZARR_API_KEY"      }, description: "Subtitle downloader", helpText: "Settings → General → Security → API Key" },
   { id: "tautulli",    label: "Tautulli",          defaultPort: 30047, authShape: "apikey",   category: "media", envKeys: { url: "TAUTULLI_URL",    apiKey: "TAUTULLI_API_KEY"    }, description: "Plex stream / history stats", helpText: "Settings → Web Interface → API key" },
   { id: "qbittorrent", label: "qBittorrent",       defaultPort: 30024, authShape: "userpass", category: "media", envKeys: { url: "QBIT_URL",        apiKey: "QBIT_API_KEY", username: "QBIT_USERNAME", password: "QBIT_PASSWORD" }, description: "Torrent client", helpText: "Tools → Options → Web UI → API Key (or Authentication, for username + password)" },
+  { id: "sabnzbd",     label: "SABnzbd",           defaultPort: 30055, authShape: "apikey",   category: "media", envKeys: { url: "SABNZBD_URL",     apiKey: "SABNZBD_API_KEY"     }, description: "Usenet downloader", helpText: "Config → General → Security → API Key" },
   { id: "overseerr",   label: "Overseerr",         defaultPort: 30002, authShape: "apikey",   category: "media", envKeys: { url: "OVERSEERR_URL",   apiKey: "OVERSEERR_API_KEY"   }, description: "Request management", helpText: "Settings → General → API Key (copy from the top)" },
   { id: "nexbeat",     label: "nexbeat",           defaultPort: 30497, authShape: "bearer",   category: "media", envKeys: { url: "NEXBEAT_URL",     apiKey: "NEXBEAT_API_KEY"     }, description: "Music requests", helpText: "Profile → API tokens → create one with Read only ticked, as an administrator so it counts everyone's requests" },
   { id: "prowlarr",    label: "Prowlarr",          defaultPort: 30050, authShape: "apikey",   category: "media", envKeys: { url: "PROWLARR_URL",    apiKey: "PROWLARR_API_KEY"    }, description: "Indexer manager", helpText: "Settings → General → Security → API Key" },
   { id: "pihole",      label: "Pi-hole",           defaultPort: 20720, authShape: "password", category: "infra", envKeys: { url: "PIHOLE_URL",      password: "PIHOLE_PASSWORD"   }, description: "DNS-level ad/tracker blocking", helpText: "The password you set during Pi-hole installation" },
   { id: "nginx",       label: "Nginx Proxy Mgr",   defaultPort: 30020, authShape: "userpass", category: "infra", envKeys: { url: "NGINX_URL",       username: "NGINX_USERNAME", password: "NGINX_PASSWORD" }, description: "Reverse proxy admin", helpText: "The email and password you log in with" },
   { id: "uptimekuma",  label: "Uptime Kuma",       defaultPort: 31050, authShape: "bearer",   category: "infra", envKeys: { url: "UPTIME_KUMA_URL", apiKey: "UPTIME_KUMA_API_KEY" }, description: "External monitor (optional auth — /metrics works without)", helpText: "Settings → API Keys → Add (optional — unauthenticated /metrics works)", tokenOptional: true },
+  { id: "scrutiny",    label: "Scrutiny",          defaultPort: 31054, authShape: "none",     category: "infra", envKeys: { url: "SCRUTINY_URL"   }, description: "SMART verdicts per drive (no key needed)" },
   { id: "speedtest",   label: "SpeedTracker",      defaultPort: 30220, authShape: "bearer",   category: "infra", envKeys: { url: "SPEEDTEST_URL",   apiKey: "SPEEDTEST_API_KEY"   }, description: "Speedtest history (display only)", helpText: "SpeedTracker Settings → Authentication → API Token" },
 ];
 
@@ -488,6 +490,7 @@ export default function SetupWizard() {
                       {(svc.authShape === "apikey" || svc.authShape === "bearer" || keyOrLogin(svc)) && (
                         <div /> // spacer to fill the 3rd column
                       )}
+                      {svc.authShape === "none" && <><div /><div /></>}
                       <Btn onClick={() => testService(svc.id)} disabled={row.testStatus.state === "testing"}>
                         {row.testStatus.state === "testing" ? "…" : "Test"}
                       </Btn>
@@ -821,9 +824,10 @@ function generateConfig(state: WizardState): GeneratedConfig {
   for (const svc of SERVICES) {
     const row = state.rows[svc.id];
     if (!row?.enabled) continue;
-    // Only emit a *_URL override if the user changed it from the default.
+    // Only emit a *_URL override if the user changed it from the default —
+    // except for a service with no key, whose URL is what marks it set up.
     const defaultUrl = deriveDefaultUrl(state.truenasIp, svc.defaultPort);
-    if (row.url && row.url !== defaultUrl) {
+    if (row.url && (row.url !== defaultUrl || svc.authShape === "none")) {
       envPairs.push([svc.envKeys.url, row.url]);
     }
     if (svc.authShape === "apikey" && svc.envKeys.apiKey) {

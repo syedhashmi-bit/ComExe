@@ -55,6 +55,8 @@ Open-Meteo coords: `lat=-41.4419, lon=147.1450`.
 | Overseerr | `30357` | `$OVERSEERR_API_KEY` |
 | Lidarr | `30071` | `$LIDARR_API_KEY` (header `X-Api-Key`, API v1) |
 | nexbeat | `30497` | `$NEXBEAT_API_KEY` (bearer; a read-only API token) |
+| SABnzbd | `30055` | `$SABNZBD_API_KEY` (query string `apikey=`) |
+| Scrutiny | `31054` | none — `$SCRUTINY_URL` set is what turns it on |
 | Plex | `32400` | not currently read by dashboard (Tautulli covers Plex sessions) |
 
 ## Network / infra — `192.168.88.196`
@@ -91,6 +93,7 @@ All credentials are server-side `process.env.*`. None hardcoded. As of the exter
 | `OVERSEERR_API_KEY` | `services/route.ts` → `overseerr()` |
 | `LIDARR_API_KEY` | `lib/services.ts` → `lidarr()`, plus calendar + activity |
 | `NEXBEAT_API_KEY` | `lib/services.ts` → `nexbeat()` |
+| `SABNZBD_API_KEY` | `lib/services.ts` → `sabnzbd()` |
 | `QBIT_USERNAME` / `QBIT_PASSWORD` | `services/route.ts` → `qbittorrent()` |
 | `PIHOLE_PASSWORD` | `services/route.ts` → `pihole()` |
 | `NGINX_USERNAME` / `NGINX_PASSWORD` | `services/route.ts` → `nginxProxy()` |
@@ -111,6 +114,8 @@ All credentials are server-side `process.env.*`. None hardcoded. As of the exter
 | `OVERSEERR_URL` | `${TRUENAS_IP}:30002` | services + client |
 | `LIDARR_URL` | `${TRUENAS_IP}:30071` | services + calendar + activity + client |
 | `NEXBEAT_URL` | `${TRUENAS_IP}:30497` | services + client |
+| `SABNZBD_URL` | `${TRUENAS_IP}:30055` | services + client |
+| `SCRUTINY_URL` | none until set | services + smart route + client |
 | `PIHOLE_URL` | `${TRUENAS_IP}:20720` | services + client |
 | `PROWLARR_URL` | `${TRUENAS_IP}:30050` | services + client |
 | `NGINX_URL` | `${TRUENAS_IP}:30020` | services + client |

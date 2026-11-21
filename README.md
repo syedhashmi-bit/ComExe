@@ -40,8 +40,8 @@ external state, no secrets in the browser: every upstream call goes through a se
   too ("2 issues · ComExe" and a coloured dot), so a pinned tab tells you without a look.
 - **Calm by design** — flat cards, one soft accent per metric for its charts, and status colours
   (green / amber / red) reserved for actual problems, always paired with a word.
-- **Services in one list** — Radarr, Sonarr, Lidarr, Bazarr, Tautulli, qBittorrent, Overseerr,
-  nexbeat, Prowlarr, Pi-hole, Nginx Proxy Manager and Uptime Kuma, each with its own icon, status, key number,
+- **Services in one list** — Radarr, Sonarr, Lidarr, Bazarr, Tautulli, qBittorrent, SABnzbd,
+  Overseerr, nexbeat, Prowlarr, Pi-hole, Nginx Proxy Manager, Uptime Kuma and Scrutiny, each with its own icon, status, key number,
   download queue or Plex stream and a 24-hour uptime strip, sorted so problems come first.
 - **Now playing** — Plex streams with their posters, who's watching on what, and whether each is
   a direct play or a transcode (and whether the GPU is doing it).
@@ -87,7 +87,8 @@ external state, no secrets in the browser: every upstream call goes through a se
 - **System** — OS, kernel, architecture, host, cores, uptime and last boot
 - **Disk health** — every drive in one table, problems first: temperature against warm/hot limits
   suited to disks or NVMe, age, bad sectors and the last 24 hours; click a drive for its week and
-  every SMART reading (needs the smartmon script — see INSTALL.md)
+  every SMART reading (needs the smartmon script — see INSTALL.md); with Scrutiny set up, each
+  drive also gets Scrutiny's verdict and a link to its page there
 - **Grafana** — embed any panel; with an API token it renders server-side, no iframe cookies
 - **Last 24 hours** — CPU, memory, network and GPU across the day on the dashboard itself, with
   the average, the peak and when it happened, and how much data moved
@@ -267,7 +268,7 @@ end-to-end suite as a separate job. Architecture notes and conventions live in
 │   ├── components/          StatusSummary, ServicesPanel, PageHeader, SettingsPanel,
 │   │                        primitives (Card, Sparkline, gauges), …
 │   ├── hooks/               useEventStream (SSE with polling fallback), usePolling
-│   ├── lib/                 32 shared modules — config resolution, http + circuit
+│   ├── lib/                 33 shared modules — config resolution, http + circuit
 │   │                        breaker, caches, collector, alerts, formatters, …
 │   ├── analytics/ forecast/ logs/ setup/ welcome/ login/
 │   ├── globals.css          Theme tokens (Midnight, Paper) and layout

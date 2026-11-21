@@ -41,12 +41,14 @@ export function buildDemoServices(): ServiceResult[] {
       { title: "Dune: Part Two", progress: 62, user: "sam", posStr: "1:43:10 / 2:46:00", decision: "Transcode", hwTranscode: true, quality: "4K → 1080p", bitrateKbps: 10_000, player: "iPad" },
     ], weekly: { plays: 47, topShow: "Shogun", topUser: "alex" } },
     { name: "qbittorrent", up: true, configured: true, lines: ["2.4 ratio overall", "↓ 12.3 MB/s · ↑ 4.1 MB/s"], pct: 78, queueItems: [{ title: "ubuntu-24.04.iso", pct: 78, etaSec: 900 }, { title: "archlinux-2024.iso", pct: 34, etaSec: 2400 }] },
+    { name: "sabnzbd",     up: true, configured: true, lines: ["↓ 42.1 MB/s", "2 in queue · 6.4 GB left · 812 GB free"], queueItems: [{ title: "Severance.S02E09.2160p.WEB-DL", pct: 58, etaSec: 140 }, { title: "The.Bear.S04E10.1080p.WEB-DL", pct: 0, etaSec: 260 }] },
     { name: "overseerr",   up: true, configured: true, lines: ["12 pending requests", "3 processing"] },
     { name: "nexbeat",     up: true, configured: true, lines: ["2 waiting · 1 running", "5 done this week · 212 artists · 1,904 albums"] },
     { name: "prowlarr",    up: true, configured: true, lines: ["8 indexers active", "23,411 grabs total"] },
     { name: "pihole",      up: true, configured: true, lines: ["16,173 queries today", "22% blocked", "Top: ads.tracker.com"], pct: 22 },
     { name: "nginx",       up: true, configured: true, lines: ["14 proxy hosts", "SSL certs: 14 valid"] },
     { name: "uptimekuma",  up: true, configured: true, lines: ["24 monitors", "All up"], downCount: 0 },
+    { name: "scrutiny",    up: true, configured: true, lines: ["5 drives · all passed", "read 6h ago"] },
   ] as ServiceResult[];
 }
 

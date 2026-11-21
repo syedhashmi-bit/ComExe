@@ -14,6 +14,7 @@ import { loadConfig, type ServiceCreds, type ServiceName } from "@/app/lib/serve
 // origins for the same reason.
 import { fetchWithTimeout, fetchJson } from "@/app/lib/http";
 import { globalSingleton } from "@/app/lib/singleton";
+import { drivesFromSummary, SCRUTINY_STATUS_TEXT, type ScrutinySummary } from "@/app/lib/scrutiny";
 import type {
   ServiceResult,
   ServiceQueueItem as QueueItem,
@@ -683,6 +684,72 @@ async function qbittorrent(creds: ServiceCreds): Promise<ServiceResult> {
   }
 }
 
+// SABnzbd (Usenet). Its API key goes in the query string (it has no header
+// form), and a wrong key comes back as HTTP 200 with { error: "API Key
+// Incorrect" } rather than a 401.
+interface SabQueue {
+  error?: string;
+  queue?: {
+    paused?: boolean; kbpersec?: string; mbleft?: string; diskspace1?: string; noofslots?: number;
+    slots?: { filename?: string; percentage?: string; timeleft?: string }[];
+  };
+}
+interface SabHistory { history?: { slots?: { completed?: number }[] } }
+
+// "0:10:00", or with days "1:02:03:04" → seconds.
+function parseSabTime(t?: string): number | null {
+  if (!t) return null;
+  const parts = t.split(":").map(Number);
+  if (parts.some(isNaN)) return null;
+  return parts.reduce((acc, n, i) => acc + n * [86_400, 3600, 60, 1].slice(-parts.length)[i], 0);
+}
+
+export function sabnzbdResult(q: SabQueue, failedLastDay: number, url: string): ServiceResult {
+  const queue = q.queue ?? {};
+  const speed = Number(queue.kbpersec ?? 0) * 1024;
+  const queued = queue.noofslots ?? 0;
+  const lines = [queue.paused ? "Paused" : speed > 0 ? `↓ ${fmtMB(speed)}/s` : "Idle"];
+  const detail: string[] = [];
+  if (queued > 0) detail.push(`${queued} in queue · ${fmtSize(Number(queue.mbleft ?? 0) * 1e6)} left`);
+  if (queue.diskspace1) detail.push(`${Number(queue.diskspace1).toFixed(0)} GB free`);
+  if (detail.length > 0) lines.push(detail.join(" · "));
+  const queueItems: QueueItem[] = (queue.slots ?? []).slice(0, 3).map(s => ({
+    title:  s.filename ?? "",
+    pct:    Math.round(Number(s.percentage ?? 0)),
+    etaSec: parseSabTime(s.timeleft),
+  }));
+  return {
+    name: "sabnzbd", up: true, configured: true, url, lines,
+    queueItem:  queueItems[0] ?? null,
+    queueItems: queueItems.length > 0 ? queueItems : undefined,
+    health: failedLastDay > 0
+      ? { warning: 1, error: 0, messages: [`${failedLastDay} download${failedLastDay === 1 ? "" : "s"} failed in the last day`] }
+      : undefined,
+  };
+}
+async function sabnzbd(creds: ServiceCreds): Promise<ServiceResult> {
+  if (!creds.configured) return unconfigured("sabnzbd", creds.envVar ?? ["SABNZBD_API_KEY"]);
+  const BASE = creds.url;
+  const KEY  = encodeURIComponent(creds.apiKey ?? "");
+  try {
+    // The queue is real-time, fetched fresh each poll. Failures are counted
+    // over the last day only: an all-time count would stay a warning until
+    // someone cleared SABnzbd's history.
+    const q = await apiFetch(`${BASE}/api?mode=queue&output=json&limit=3&apikey=${KEY}`) as SabQueue;
+    if (q.error) throw /api key/i.test(q.error) ? new AuthError(401) : new Error(q.error);
+    const history = await apiFetchMemoOpt(`sabnzbd:failed:${BASE}`, 180_000, () =>
+      apiFetchOpt(`${BASE}/api?mode=history&output=json&failed_only=1&limit=20&apikey=${KEY}`) as Promise<SabHistory | null>
+    );
+    const dayAgo = Date.now() / 1000 - 86_400;
+    const failed = (history?.history?.slots ?? []).filter(s => (s.completed ?? 0) > dayAgo).length;
+    return sabnzbdResult(q, failed, BASE);
+  } catch (e) {
+    const isAuth = e instanceof AuthError;
+    const up = await checkReachable(BASE);
+    return { name: "sabnzbd", up: up || isAuth, configured: true, url: BASE, authError: isAuth, lines: isAuth ? ["check api key"] : up ? ["—"] : [] };
+  }
+}
+
 async function overseerr(creds: ServiceCreds): Promise<ServiceResult> {
   if (!creds.configured) return unconfigured("overseerr", creds.envVar ?? ["OVERSEERR_API_KEY"]);
   const KEY = creds.apiKey ?? "";
@@ -950,6 +1017,47 @@ async function uptimeKuma(creds: ServiceCreds): Promise<ServiceResult> {
   return { name: "uptimekuma", up, configured: true, url: BASE, lines: up ? ["online"] : [] };
 }
 
+// Scrutiny's verdict per drive (see lib/scrutiny.ts). A failing drive is an
+// error on this row, which is what puts it in the status line; the Disk health
+// panel shows the same verdicts per drive. Scrutiny's collector runs daily by
+// default, so silence past two days means it has stopped.
+const SCRUTINY_STALE_MS = 2 * 86_400_000;
+export function scrutinyResult(json: ScrutinySummary, url: string, now = Date.now()): ServiceResult {
+  const drives = drivesFromSummary(json, url);
+  const failing = drives.filter(d => d.status !== "passed");
+  const lastRead = Math.max(0, ...drives.map(d => d.collectedAt ?? 0));
+  const stale = drives.length > 0 && now - lastRead > SCRUTINY_STALE_MS;
+  const lines = [failing.length > 0 ? `${failing.length} of ${drives.length} drives failing` : `${drives.length} drives · all passed`];
+  if (lastRead > 0) {
+    const hours = Math.floor((now - lastRead) / 3_600_000);
+    lines.push(hours < 1 ? "read in the last hour" : hours < 48 ? `read ${hours}h ago` : `read ${Math.floor(hours / 24)}d ago`);
+  }
+  return {
+    name: "scrutiny", up: true, configured: true, url, lines,
+    health: failing.length > 0 || stale ? {
+      error:   failing.length,
+      warning: stale ? 1 : 0,
+      messages: [
+        ...failing.map(d => `${d.device.slice(5)}${d.model ? ` (${d.model})` : ""} ${SCRUTINY_STATUS_TEXT[d.status]}`),
+        ...(stale ? ["Scrutiny's collector hasn't reported in over two days"] : []),
+      ],
+    } : undefined,
+  };
+}
+async function scrutiny(creds: ServiceCreds): Promise<ServiceResult> {
+  if (!creds.configured) return unconfigured("scrutiny", creds.envVar ?? ["SCRUTINY_URL"]);
+  try {
+    // Verdicts change when the collector runs (daily), so 5 minutes is plenty.
+    const json = await apiFetchMemo(`scrutiny:summary:${creds.url}`, 300_000, () =>
+      apiFetch(`${creds.url}/api/summary`) as Promise<ScrutinySummary>
+    );
+    return scrutinyResult(json, creds.url);
+  } catch {
+    const up = await checkReachable(creds.url);
+    return { name: "scrutiny", up, configured: true, url: creds.url, lines: up ? ["—"] : [] };
+  }
+}
+
 async function nginxProxy(creds: ServiceCreds): Promise<ServiceResult> {
   if (!creds.configured) return unconfigured("nginx", creds.envVar ?? ["NGINX_USERNAME", "NGINX_PASSWORD"]);
   const BASE = creds.url;
@@ -986,8 +1094,8 @@ async function nginxProxy(creds: ServiceCreds): Promise<ServiceResult> {
 // Each entry carries its own name: it keys both cfg.services and the result,
 // where a separate names array could drift out of line with the calls.
 const BATCHES: [ServiceName, (creds: ServiceCreds) => Promise<ServiceResult>][][] = [
-  [["radarr", radarr], ["sonarr", sonarr], ["lidarr", lidarr], ["bazarr", bazarr], ["tautulli", tautulli], ["qbittorrent", qbittorrent]],
-  [["overseerr", overseerr], ["nexbeat", nexbeat], ["pihole", pihole], ["prowlarr", prowlarr], ["nginx", nginxProxy], ["uptimekuma", uptimeKuma]],
+  [["radarr", radarr], ["sonarr", sonarr], ["lidarr", lidarr], ["bazarr", bazarr], ["tautulli", tautulli], ["qbittorrent", qbittorrent], ["sabnzbd", sabnzbd]],
+  [["overseerr", overseerr], ["nexbeat", nexbeat], ["pihole", pihole], ["prowlarr", prowlarr], ["nginx", nginxProxy], ["uptimekuma", uptimeKuma], ["scrutiny", scrutiny]],
 ];
 
 async function fetchAllServicesData(cfg: Awaited<ReturnType<typeof loadConfig>>) {

@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { promRange, promScalar, promVector } from "@/app/lib/prometheus";
 import { createKeyedTTLCache, createTTLCache } from "@/app/lib/cache";
-import { loadConfig } from "@/app/lib/server-config";
+import { loadConfig, type ServiceCreds } from "@/app/lib/server-config";
+import { fetchJson } from "@/app/lib/http";
+import { drivesFromSummary, type ScrutinyDrive, type ScrutinySummary } from "@/app/lib/scrutiny";
 import type { SmartDetail, SmartDisk, SmartFeed } from "@/app/lib/types";
 
 // Resolved per request via loadConfig() so a Prometheus URL set through the
@@ -13,6 +15,22 @@ const cache = createTTLCache<SmartFeed>(30_000);
 // get their own longer cache.
 const historyCache = createTTLCache<Map<string, number[]>>(5 * 60_000);
 const detailCache = createKeyedTTLCache<SmartDetail>(5 * 60_000, 32);
+// Scrutiny's verdicts change when its collector runs (daily by default).
+const scrutinyCache = createTTLCache<ScrutinyDrive[]>(5 * 60_000);
+
+// Scrutiny's verdict per drive, keyed like smartmon ("/dev/sda"). Empty when
+// Scrutiny isn't set up or doesn't answer: the panel then just has no verdicts.
+async function scrutinyDrives(creds: ServiceCreds): Promise<Map<string, ScrutinyDrive>> {
+  if (!creds.configured) return new Map();
+  let drives = scrutinyCache.get();
+  if (!drives) {
+    const json = await fetchJson<ScrutinySummary>(`${creds.url}/api/summary`, { timeoutMs: 8_000 });
+    if (!json) return new Map();
+    drives = drivesFromSummary(json, creds.url);
+    scrutinyCache.set(drives);
+  }
+  return new Map(drives.map(d => [d.device, d]));
+}
 
 // The device goes into PromQL label matchers, so only a plain device name gets
 // that far: "/dev/" then letters and digits. Anything else is a 400.
@@ -128,7 +146,7 @@ export async function GET(req?: Request) {
     // attributes, and an empty device_model. node_exporter's own collectors
     // fill in what they can: the kernel's composite temperature sensor
     // (hwmon chip "nvme_nvme0", sensor temp1) and the model (node_nvme_info).
-    const [tempResults, powerOnResults, reallocResults, pendingResults, uncorrResults, healthResults, infoResults, nvmeTempResults, nvmeInfoResults, lastRun, history] = await Promise.all([
+    const [tempResults, powerOnResults, reallocResults, pendingResults, uncorrResults, healthResults, infoResults, nvmeTempResults, nvmeInfoResults, lastRun, history, scrutiny] = await Promise.all([
       queryAll("smartmon_temperature_celsius_raw_value"),
       queryAll("smartmon_power_on_hours_raw_value"),
       queryAll("smartmon_reallocated_sector_ct_raw_value"),
@@ -142,6 +160,7 @@ export async function GET(req?: Request) {
       // the cron job has stopped.
       promScalar(cfg.prometheusUrl, "max(smartmon_smartctl_run)"),
       tempHistory(cfg.prometheusUrl),
+      scrutinyDrives(cfg.services.scrutiny),
     ]);
 
     const temps = buildDiskMap(tempResults);
@@ -206,6 +225,7 @@ export async function GET(req?: Request) {
         uncorrectableSectors: uncorrVal,
         healthy,
         history: history.get(dev) ?? [],
+        ...(scrutiny.has(dev) ? { scrutiny: { status: scrutiny.get(dev)!.status, url: scrutiny.get(dev)!.url } } : {}),
       };
     }).sort((a, b) => a.device.localeCompare(b.device));
 

@@ -25,7 +25,7 @@ chart library. Every upstream service is reached through a server-side route so
 credentials never enter the browser bundle.
 
 **Scale:** ~15k lines of TS/TSX under `app/` — 37 API routes, 35 components,
-32 lib modules, 7 pages.
+33 lib modules, 7 pages.
 
 **Deployment posture:** one LAN, one user, never exposed to the internet. That
 decision is why auth is optional, why RBAC/multi-user was dropped, and why the
@@ -49,7 +49,7 @@ $env:PATH = "C:\Program Files\nodejs;" + $env:PATH
 npm run dev        # localhost:3000
 npm run build      # local sanity check; CI does the real build
 npm run lint
-npm test           # vitest, 349 unit tests
+npm test           # vitest, 363 unit tests
 npm run test:e2e   # playwright
 npm run storybook  # primitives sandbox on :6006
 ```
@@ -151,8 +151,8 @@ prevent that, and every one of them matters:
    genuinely real-time data (queue items, active streams, qBit speeds) is
    fetched fresh each cycle. This is the real load-killer: ~150 calls/hour per
    upstream instead of 1800+.
-4. **Staged batching** — `lib/services.ts` splits its 12 upstream fetches into
-   2 batches of 6 with a 250ms gap, avoiding a thundering herd. Each `BATCHES`
+4. **Staged batching** — `lib/services.ts` splits its 14 upstream fetches into
+   2 batches of 7 with a 250ms gap, avoiding a thundering herd. Each `BATCHES`
    entry is a `[name, fetcher]` pair, so a result can't land under the wrong name.
 
 Plus a per-service last-known-good cache (60s) that keeps cards populated across
@@ -247,7 +247,7 @@ All server-side proxies. All credentials resolved via `loadConfig()`.
 | Route | Purpose |
 |-------|---------|
 | `metrics/` | Thin wrapper over `lib/metrics.ts`: ~30 PromQL queries, 9s cache, appends to `history.jsonl`. |
-| `services/` | Thin wrapper over `lib/services.ts`: 12 service health cards, SWR + memoization. |
+| `services/` | Thin wrapper over `lib/services.ts`: 14 service health cards, SWR + memoization. |
 | `mikrotik/` | RouterOS stats (Basic auth). 10s cache. |
 | `activity/` | Sonarr + Radarr + Lidarr history + Tautulli watches, merged. Lidarr logs one import per track, so only its grabs and album-level `downloadImported` are kept. 60s cache. |
 | `speedtest/` | SpeedTracker's last 20 results (headline + history chart). **Never triggers tests.** |
@@ -388,10 +388,16 @@ figure) since, so the last hour can still mix the two.
 
 **Services panel** is a compact grouped list (`SVC_CATEGORIES` in
 `ServicesPanel.tsx`): *Media* (radarr, sonarr, lidarr, bazarr, tautulli,
-qbittorrent, overseerr, nexbeat, prowlarr) and *Infrastructure* (pihole, nginx,
-uptimekuma). Lidarr is the music *arr (API v1, key in the `X-Api-Key` header);
-nexbeat is its request app, read from its one dashboard call
-(`/api/v1/dashboard`, bearer token) — failed requests show as a warning. One row
+qbittorrent, sabnzbd, overseerr, nexbeat, prowlarr) and *Infrastructure* (pihole,
+nginx, uptimekuma, scrutiny). Lidarr is the music *arr (API v1, key in the
+`X-Api-Key` header); nexbeat is its request app, read from its one dashboard call
+(`/api/v1/dashboard`, bearer token) — failed requests show as a warning. SABnzbd's
+key goes in the query string (it has no header form), and it answers a wrong key
+with HTTP 200 + `{ error: "API Key Incorrect" }`, not a 401; failures count over
+the last day only. Scrutiny has no auth (`authShape: "none"` in
+`server-config.ts`): it counts as set up only once its URL is, so installs
+without it never poll a default address. A health error from anything that
+isn't an *arr shows its own message in the status line, not "System › Status". One row
 per service: status word + dot (the only colour), the app's full-colour icon and
 name (links to its UI in a new tab), key number, detail line, and details /
 logs / restart buttons, and a 24-hour strip with an uptime % from the
@@ -528,14 +534,16 @@ plus API keys for whichever services you use.
 
 **Service credentials:** `RADARR_API_KEY`, `SONARR_API_KEY`, `BAZARR_API_KEY`,
 `TAUTULLI_API_KEY`, `PROWLARR_API_KEY`, `OVERSEERR_API_KEY`, `LIDARR_API_KEY`,
-`NEXBEAT_API_KEY` (a read-only nexbeat API token, ideally an admin's), `PIHOLE_PASSWORD`,
+`NEXBEAT_API_KEY` (a read-only nexbeat API token, ideally an admin's),
+`SABNZBD_API_KEY`, `PIHOLE_PASSWORD`,
 `NGINX_USERNAME`/`NGINX_PASSWORD`, `UPTIME_KUMA_API_KEY`, `SPEEDTEST_API_KEY`,
 `MIKROTIK_USERNAME`/`MIKROTIK_PASSWORD`, and `QBIT_API_KEY` (qBit 5.1+,
 `qbt_...`) **or** `QBIT_USERNAME` + `QBIT_PASSWORD`.
 
 **URL overrides** (default to `${TRUENAS_IP}:<port>`): `RADARR_URL`, `SONARR_URL`,
 `BAZARR_URL`, `TAUTULLI_URL`, `QBIT_URL`, `OVERSEERR_URL`, `LIDARR_URL`,
-`NEXBEAT_URL`, `PIHOLE_URL`,
+`NEXBEAT_URL`, `SABNZBD_URL`, `SCRUTINY_URL` (Scrutiny has no key — setting its
+URL is what turns it on), `PIHOLE_URL`,
 `PROWLARR_URL`, `NGINX_URL`, `UPTIME_KUMA_URL`, `SPEEDTEST_URL`,
 `PROMETHEUS_URL`, `MIKROTIK_URL`.
 
@@ -624,7 +632,7 @@ collector), `HISTORY_RETENTION_DAYS`, `HISTORY_MAX_SIZE_MB`,
 
 ## Testing
 
-- **Unit** — vitest, `tests/unit/`. 349 tests over 28 files covering `app/lib/*`
+- **Unit** — vitest, `tests/unit/`. 363 tests over 28 files covering `app/lib/*`
   plus `tests/unit/routes/` for API route handlers.
 - **E2E** — Playwright, `tests/e2e/smoke.spec.ts`, run by its own CI job.
 - **Storybook** — `stories/Primitives.stories.tsx`.
@@ -670,6 +678,12 @@ may have stopped"). Rows sort problems first, then warmest; part numbers become
 Clicking a row opens `/api/smart?device=/dev/sda`: 7 days of temperatures and every
 SMART attribute, cached 5 min per drive. The device is matched against
 `/^/dev/[a-z][a-z0-9]{1,15}$/` before it goes anywhere near a PromQL label matcher.
+When Scrutiny is set up, `/api/smart` adds its verdict per drive (`lib/scrutiny.ts`,
+`/api/summary`, cached 5 min; `device_status` bit 1 = failed SMART, bit 2 = failed
+Scrutiny's Backblaze-based check) and a link to the drive's Scrutiny page, matched
+by device name. A flagged drive sorts with the problems: "Failing" when SMART fails
+it, "At risk" when only Scrutiny does. Scrutiny's services row is what raises it
+in the status line.
 
 **Memory accounting** — TrueNAS ZFS ARC inflates raw `MemAvailable`. Use
 `MemTotal - MemAvailable - SReclaimable` as real-used. Warn >93%, critical >97%

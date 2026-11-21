@@ -34,6 +34,7 @@ interface Issue {
 
 const label = (name: string) => SVC_LABELS[name] ?? name;
 const joinNames = (xs: ServiceResult[]) => xs.map(s => label(s.name)).join(", ");
+const ARR_HEALTH = new Set(["radarr", "sonarr", "lidarr", "prowlarr"]);
 
 function serviceUrl(name: string, cfg: ClientConfig | null): string | undefined {
   if (cfg?.serviceUrls?.[name]) return cfg.serviceUrls[name];
@@ -89,9 +90,15 @@ export function collectIssues(metrics: Metrics | null, services: ServiceResult[]
     const group = healthGroup(kind);
     if (group.length === 0) continue;
     const messages = group.flatMap(s => (s.health?.messages ?? []).map(m => `${label(s.name)}: ${m}`));
+    // The *arrs' health lives under System › Status; anything else (Scrutiny's
+    // failing drives, nexbeat's failed requests) says what's wrong itself.
+    const own = group.flatMap(s => s.health?.messages ?? []).map(m => m.replace(/\.$/, ""));
+    const detail = group.every(s => ARR_HEALTH.has(s.name))
+      ? `${group.length === 1 ? "Reports" : "Each reports"} a problem under System › Status.`
+      : own.length > 0 ? `${own[0]}${own.length > 1 ? ` and ${own.length - 1} more` : ""}.` : "Reports a problem.";
     issues.push({
       key: `health-${kind}`, level, status, subject: joinNames(group),
-      detail: `${group.length === 1 ? "Reports" : "Each reports"} a problem under System › Status.`,
+      detail,
       title: messages.length > 0 ? messages.join("\n") : undefined,
       href: group.length === 1 ? serviceUrl(group[0].name, cfg) : undefined,
       action: group.length === 1 ? "Open" : undefined,

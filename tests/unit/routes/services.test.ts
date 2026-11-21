@@ -7,7 +7,7 @@ import { resetGlobalSingletons } from "../helpers/singletons";
 // network, a cold cache answers immediately with a placeholder, and a
 // previously-good service is served stale rather than blank when it fails.
 
-const NAMES = ["radarr","sonarr","lidarr","bazarr","tautulli","qbittorrent","overseerr","nexbeat","pihole","prowlarr","nginx","uptimekuma"];
+const NAMES = ["radarr","sonarr","lidarr","bazarr","tautulli","qbittorrent","sabnzbd","overseerr","nexbeat","pihole","prowlarr","nginx","uptimekuma","scrutiny"];
 
 function creds(configured: boolean, url = "http://svc.invalid") {
   return { url, configured, apiKey: configured ? "k" : undefined, envVar: configured ? undefined : ["X_API_KEY"] };
@@ -152,5 +152,68 @@ describe("services module", () => {
     const { getServicesFresh } = await import("@/app/lib/services");
     const nexbeat = (await getServicesFresh())!.services.find(s => s.name === "nexbeat")!;
     expect(nexbeat).toMatchObject({ up: true, authError: true, lines: ["check api token"] });
+  });
+  it("reads SABnzbd's queue, and counts only the last day's failures", async () => {
+    mockConfig({ sabnzbd: true });
+    const now = Date.now() / 1000;
+    fetchWithTimeout.mockImplementation(async (url: string) => {
+      const mode = new URL(url).searchParams.get("mode");
+      return Response.json(mode === "queue"
+        ? { queue: { paused: false, kbpersec: "43110.4", mbleft: "6400", diskspace1: "812.33", noofslots: 2,
+            slots: [{ filename: "Severance.S02E09", percentage: "58", timeleft: "0:02:20" }] } }
+        : { history: { slots: [{ completed: now - 3600 }, { completed: now - 3 * 86_400 }] } });
+    });
+    const { getServicesFresh } = await import("@/app/lib/services");
+    const sab = (await getServicesFresh())!.services.find(s => s.name === "sabnzbd")!;
+
+    expect(sab).toMatchObject({
+      up: true,
+      lines: ["↓ 44 MB/s", "2 in queue · 6.4 GB left · 812 GB free"],
+      queueItems: [{ title: "Severance.S02E09", pct: 58, etaSec: 140 }],
+      health: { warning: 1, error: 0, messages: ["1 download failed in the last day"] },
+    });
+  });
+
+  it("treats SABnzbd's HTTP 200 'API Key Incorrect' as an auth error", async () => {
+    mockConfig({ sabnzbd: true });
+    fetchWithTimeout.mockImplementation(async () => Response.json({ status: false, error: "API Key Incorrect" }));
+    const { getServicesFresh } = await import("@/app/lib/services");
+    const sab = (await getServicesFresh())!.services.find(s => s.name === "sabnzbd")!;
+    expect(sab).toMatchObject({ up: true, authError: true, lines: ["check api key"] });
+  });
+
+  it("shows SABnzbd paused, and idle with nothing queued", async () => {
+    const { sabnzbdResult } = await import("@/app/lib/services");
+    expect(sabnzbdResult({ queue: { paused: true, kbpersec: "0" } }, 0, "http://s").lines).toEqual(["Paused"]);
+    expect(sabnzbdResult({ queue: { paused: false, kbpersec: "0", noofslots: 0 } }, 0, "http://s")).toMatchObject({ lines: ["Idle"], health: undefined });
+  });
+
+  it("makes a drive Scrutiny flags an error, and a silent collector a warning", async () => {
+    const { scrutinyResult } = await import("@/app/lib/services");
+    const now = Date.parse("2026-11-21T12:00:00Z");
+    const drive = (name: string, status: number, collected: string) => ({
+      device: { wwn: "w-" + name, device_name: name, model_name: "WDC WD80EFAX", device_status: status },
+      smart: { collector_date: collected },
+    });
+    const ok = scrutinyResult({ data: { summary: { a: drive("sda", 0, "2026-11-21T06:00:00Z"), b: drive("sdb", 0, "2026-11-21T06:00:00Z") } } }, "http://s", now);
+    expect(ok).toMatchObject({ lines: ["2 drives · all passed", "read 6h ago"], health: undefined });
+
+    const bad = scrutinyResult({ data: { summary: { a: drive("sda", 3, "2026-11-18T06:00:00Z"), b: drive("sdb", 0, "2026-11-18T06:00:00Z") } } }, "http://s", now);
+    expect(bad.lines).toEqual(["1 of 2 drives failing", "read 3d ago"]);
+    expect(bad.health).toEqual({
+      error: 1, warning: 1,
+      messages: ["sda (WDC WD80EFAX) failed SMART and Scrutiny's check", "Scrutiny's collector hasn't reported in over two days"],
+    });
+  });
+
+  it("reads Scrutiny's summary without a key", async () => {
+    mockConfig({ scrutiny: true });
+    fetchWithTimeout.mockImplementation(async () => Response.json({ success: true, data: { summary: {} } }));
+    const { getServicesFresh } = await import("@/app/lib/services");
+    const scr = (await getServicesFresh())!.services.find(s => s.name === "scrutiny")!;
+    expect(scr).toMatchObject({ up: true, lines: ["0 drives · all passed"] });
+    const [url, opts] = fetchWithTimeout.mock.calls.find(([u]) => String(u).includes("scrutiny"))!;
+    expect(url).toBe("http://scrutiny.invalid/api/summary");
+    expect(Object.keys((opts as { headers: Record<string, string> }).headers)).toEqual(["Accept"]);
   });
 });

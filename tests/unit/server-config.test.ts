@@ -53,6 +53,17 @@ describe("server-config", () => {
     expect(cfg.services.radarr.apiKey).toBe("test-key-123");
   });
 
+  it("counts Scrutiny, which has no key, as set up only once its URL is", async () => {
+    delete process.env.SCRUTINY_URL;
+    let { loadConfig } = await import("@/app/lib/server-config");
+    expect((await loadConfig()).services.scrutiny).toMatchObject({ configured: false, envVar: ["SCRUTINY_URL"] });
+    vi.resetModules();
+    process.env.SCRUTINY_URL = "http://nas:31054";
+    ({ loadConfig } = await import("@/app/lib/server-config"));
+    expect((await loadConfig()).services.scrutiny).toMatchObject({ configured: true, url: "http://nas:31054" });
+    delete process.env.SCRUTINY_URL;
+  });
+
   it("builds service URL from TrueNAS IP + default port", async () => {
     process.env.TRUENAS_IP = "10.0.0.99";
     const { loadConfig } = await import("@/app/lib/server-config");
