@@ -1,17 +1,21 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 
-const inter = Inter({
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
+// Bundled, not next/font/google: that downloads the fonts from Google during
+// every build, and a failed download failed CI's image build three times.
+// Both are the variable-weight Latin files from Fontsource (SIL OFL 1.1,
+// licences beside them), so one file covers every weight.
+const inter = localFont({
+  src: "./fonts/inter-latin-wght.woff2",
+  weight: "100 900",
   display: "swap",
   variable: "--font-inter",
 });
 
-const jetbrainsMono = JetBrains_Mono({
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600"],
+const jetbrainsMono = localFont({
+  src: "./fonts/jetbrains-mono-latin-wght.woff2",
+  weight: "100 800",
   display: "swap",
   variable: "--font-mono",
 });

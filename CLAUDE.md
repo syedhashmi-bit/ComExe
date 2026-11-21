@@ -623,6 +623,10 @@ collector), `HISTORY_RETENTION_DAYS`, `HISTORY_MAX_SIZE_MB`,
 - Side panels (Settings): `min(420px, 100vw)` wide, 24px padding, sentence-case
   13px section headings, controls at least ~34px tall, `role="dialog"`.
 - Fonts: Inter (UI), JetBrains Mono (numbers — `font-mono` or `var(--font-mono)`).
+  Bundled in `app/fonts/` (variable-weight Latin woff2 from Fontsource, SIL OFL,
+  licences alongside) and loaded with `next/font/local` in `layout.tsx`.
+  `next/font/google` downloaded them on every build, and that download failed
+  CI's image build three times — don't switch back.
 - Inline `style` for colors/sizes; Tailwind for layout/spacing/flex. No CSS
   modules, no styled-components.
 - Mobile responsiveness **is** implemented (`sm:`/`lg:`/`xl:` breakpoints) —
